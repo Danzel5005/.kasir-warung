@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
     "electron:build": "vite build && electron-builder --win"
   },
@@ -20,6 +22,7 @@
     "electron": "^31.7.7",
     "electron-builder": "^25.1.8",
     "vite": "^5.4.10",
+    "vitest": "^4.1.10",
     "wait-on": "^8.0.1"
   },
   "build": {
@@ -37,13 +40,14 @@
     "win": {
       "target": [
         {
-          "target": "nsis", 
-          "arch": ["x64"]
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
         }
-      ]
-    ,"icon": "src/assets/icon.ico"
+      ],
+      "icon": "src/assets/icon.ico"
     },
-
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
