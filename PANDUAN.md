@@ -2,8 +2,6 @@
 
 OminRoute API
 
-sk-1519b8bdebcc94fb-1649d8-786c74cb
-
 ## STRUKTUR FILE (WAJIB LENGKAP)
 
 ```
