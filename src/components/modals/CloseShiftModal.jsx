@@ -1,0 +1,31 @@
+import { W, BD, MT } from "../../constants/colors.js";
+import { RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/theme.js";
+
+export default function CloseShiftModal({ authH, confirmCloseShift }) {
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.55)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:400 }}>
+      <div style={{ background:W, borderRadius:RADIUS.lg, padding:"24px 22px", width:340, textAlign:"center", boxShadow:"0 20px 60px rgba(0,0,0,0.3)" }}>
+        <div style={{ fontSize:32, marginBottom:8 }}>🔒</div>
+        <div style={{ fontSize:TYPOGRAPHY.body.fontSize, fontWeight:700, marginBottom:6 }}>
+          Tutup Shift {authH.activeShift?.shiftNum}?
+        </div>
+        <div style={{ fontSize:TYPOGRAPHY.label.fontSize, color:MT, marginBottom:6, lineHeight:1.6 }}>
+          Shift ini dimulai pukul <b>{authH.activeShift?.startJam}</b> oleh <b>{authH.activeShift?.operator}</b>.
+        </div>
+        <div style={{ background:COLOR_PALETTE.secondaryLight, border:`1px solid ${COLOR_PALETTE.border}`, borderRadius:RADIUS.md, padding:"9px 12px", marginBottom:16, fontSize:TYPOGRAPHY.label.fontSize, color:COLOR_PALETTE.warning, textAlign:"left" }}>
+          ⚠️ Semua open bill akan dihapus. Pastikan semua transaksi sudah diproses sebelum menutup shift.
+        </div>
+        <div style={{ display:"flex", gap:8 }}>
+          <button
+            onClick={() => authH.setClosingShift(false)}
+            style={{ flex:1, padding:10, border:`1px solid ${BD}`, borderRadius:RADIUS.md, background:W, cursor:"pointer", fontFamily:"inherit", fontSize:TYPOGRAPHY.small.fontSize, fontWeight:600 }}
+          >Batal</button>
+          <button
+            onClick={confirmCloseShift}
+            style={{ flex:1, padding:10, background:COLOR_PALETTE.danger, color:W, border:"none", borderRadius:RADIUS.md, cursor:"pointer", fontFamily:"inherit", fontSize:TYPOGRAPHY.small.fontSize, fontWeight:700 }}
+          >Tutup Shift</button>
+        </div>
+      </div>
+    </div>
+  );
+}

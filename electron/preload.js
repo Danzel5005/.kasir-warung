@@ -1,0 +1,47 @@
+const { contextBridge, ipcRenderer } = require("electron");
+
+contextBridge.exposeInMainWorld("kasirAPI", {
+  // Transactions
+  loadTrx:     ()      => ipcRenderer.invoke("trx-load"),
+  saveTrx:     (t)     => ipcRenderer.invoke("trx-save", t),
+  deleteTrx:   (id)    => ipcRenderer.invoke("trx-delete", id),
+  restoreTrx:  (list)  => ipcRenderer.invoke("trx-restore", list),
+  clearTrx:    ()      => ipcRenderer.invoke("trx-clear"),
+  // Open Bills
+  loadBills:    ()      => ipcRenderer.invoke("bills-load"),
+  saveBills:    (list)  => ipcRenderer.invoke("bills-save", list),
+  restoreBills: (list)  => ipcRenderer.invoke("bills-restore", list),
+  clearBills:   ()      => ipcRenderer.invoke("bills-clear"),
+  // Menu
+  loadMenu:    ()      => ipcRenderer.invoke("menu-load"),
+  saveMenu:    (list)  => ipcRenderer.invoke("menu-save", list),
+  // Logo
+  loadLogo:    ()      => ipcRenderer.invoke("logo-load"),
+  saveLogo:    (data)  => ipcRenderer.invoke("logo-save", data),
+  // QRIS
+  loadQris:    ()      => ipcRenderer.invoke("qris-load"),
+  saveQris:    (map)   => ipcRenderer.invoke("qris-save", map),
+  deleteQris:  (key)   => ipcRenderer.invoke("qris-delete", key),
+  // Categories
+  loadCats:    ()      => ipcRenderer.invoke("cats-load"),
+  saveCats:    (list)  => ipcRenderer.invoke("cats-save", list),
+  // Settings
+  loadSettings: ()     => ipcRenderer.invoke("settings-load"),
+  saveSettings: (d)    => ipcRenderer.invoke("settings-save", d),
+  // CSV
+  saveCSV:     (data)  => ipcRenderer.invoke("csv-save", data),
+  // Printer
+  getPrinters:   ()    => ipcRenderer.invoke("get-printers"),
+  printReceipt:  (data)=> ipcRenderer.invoke("print-receipt", data),
+  // Shifts
+  loadShifts:  ()      => ipcRenderer.invoke("shifts-load"),
+  saveShifts:  (list)  => ipcRenderer.invoke("shifts-save", list),
+  // License
+  checkLicense:    ()    => ipcRenderer.invoke("license-check"),
+  activateLicense: (key) => ipcRenderer.invoke("license-activate", key),
+  getHardwareId:   ()    => ipcRenderer.invoke("license-hwid"),
+  // Info
+  getDataPath:  ()      => ipcRenderer.invoke("get-data-path"),
+  processPayment: (data) => ipcRenderer.invoke("process-payment", data),
+
+});

@@ -1,0 +1,198 @@
+import { memo } from "react";
+import { fmt } from "../utilities/receipt.js";
+import { G, OR, W, LT, BD, TX, MT } from "../constants/colors.js";
+import { inp, row } from "../constants/styles.js";
+import StockBadge from "../components/StockBadge.jsx";
+
+// ViewKasir — sidebar kategori, search, grid menu, FAB, dan cart drawer.
+// Props per-field (bukan {menuH, cartH} utuh) supaya React.memo efektif.
+function ViewKasir({
+  // dari menuH
+  allCats, kategori, setKategori, search, setSearch, displayMenu,
+  // dari cartH
+  cart, drawerOpen, setDrawerOpen, tableNum, setTableNum, pax, setPax,
+  items, subtotal, service, pajak, total, activeBill,
+  addToCart, decCart, delCart, clearCart,
+  // App.jsx wrapper functions (sudah di-useCallback di App.jsx)
+  saveOpenBill, printPreview, printingPreview, setPayModal,
+  // ref
+  searchRef,
+}) {
+  return (
+    <>
+      <style>{"@keyframes preview-shimmer{from{transform:translateX(-100%)}to{transform:translateX(100%)}}"}</style>
+      {/* Sidebar kategori */}
+      <aside style={{width:146,background:G,display:"flex",flexDirection:"column",flexShrink:0,overflowY:"auto"}}>
+        {allCats.map(k=>(
+          <button key={k.key} onClick={()=>setKategori(k.key)} style={{display:"flex",alignItems:"center",padding:"10px 13px",border:"none",cursor:"pointer",fontFamily:"inherit",fontSize:11,fontWeight:600,textAlign:"left",background:kategori===k.key?"rgba(255,255,255,0.18)":"transparent",color:W,borderLeft:kategori===k.key?"3px solid #fff":"3px solid transparent",transition:"all 0.15s"}}>
+            {k.label}
+          </button>
+        ))}
+      </aside>
+
+      <main style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+        {/* Search */}
+        <div style={{padding:"8px 12px",background:W,borderBottom:`1px solid ${BD}`,flexShrink:0}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,background:LT,border:`1px solid ${BD}`,borderRadius:7,padding:"6px 10px"}}>
+            <span style={{color:MT,fontSize:13}}>&#128269;</span>
+            <input ref={searchRef} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cari menu... (tekan / untuk fokus)" style={{border:"none",background:"transparent",outline:"none",fontSize:12,fontFamily:"inherit",width:"100%"}}/>
+            {search&&<button onClick={()=>setSearch("")} style={{border:"none",background:"none",cursor:"pointer",color:MT,fontSize:12}}>&#10005;</button>}
+          </div>
+        </div>
+
+        {/* Grid menu */}
+        <div style={{flex:1,overflowY:"auto",padding:"10px 12px"}}>
+          {displayMenu.length===0?<div style={{textAlign:"center",color:MT,marginTop:60,fontSize:13}}>Tidak ada menu ditemukan</div>
+          :<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(175px,1fr))",gap:10}}>
+            {displayMenu.map(item=>{
+              const qty=cart[item.id]?.qty||0; const habis=item.stok===0;
+              return(
+                <div key={item.id} onClick={()=>!habis&&addToCart(item)} style={{background:W,border:`1px solid ${qty>0?"#a8d5b8":BD}`,borderRadius:9,overflow:"hidden",boxShadow:qty>0?"0 0 0 2px #a8d5b8":"0 1px 3px rgba(0,0,0,0.05)",cursor:habis?"not-allowed":"pointer",opacity:habis?0.55:1,transition:"all 0.12s"}}>
+                  {item.foto?<img src={item.foto} alt={item.nama} style={{width:"100%",height:95,objectFit:"cover"}}/>
+                  :<div style={{height:68,background:"linear-gradient(135deg,#e8f5ee,#d4ead8)",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{fontSize:10,color:"#5a8a6a",fontWeight:600,textAlign:"center",padding:"0 8px"}}>{item.nama}</span></div>}
+                  <div style={{padding:"7px 9px 9px"}}>
+                    <div style={{...row,gap:4,marginBottom:2}}><span style={{fontSize:11,fontWeight:700,lineHeight:1.3}}>{item.nama}</span><StockBadge stok={item.stok}/></div>
+                    {item.desc&&<div style={{fontSize:9,color:MT,marginBottom:4}}>{item.desc}</div>}
+                    <div style={{...row,marginTop:4}}>
+                      <span style={{fontSize:12,fontWeight:700}}>{fmt(item.harga)}</span>
+                      <div onClick={e=>{e.stopPropagation();if(!habis)addToCart(item);}} style={{width:24,height:24,background:habis?"#ccc":G,borderRadius:5,display:"flex",alignItems:"center",justifyContent:"center",color:W,fontSize:15,fontWeight:700,cursor:habis?"not-allowed":"pointer"}}>{qty>0?qty:"+"}</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>}
+        </div>
+      </main>
+
+      {/* FAB */}
+      <button onClick={()=>setDrawerOpen(o=>!o)} title="Hotkey: P" style={{position:"absolute",bottom:20,right:20,zIndex:100,width:52,height:52,borderRadius:"50%",background:drawerOpen?"#333":OR,color:W,border:"none",cursor:"pointer",fontSize:20,boxShadow:"0 4px 14px rgba(0,0,0,0.25)",display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.2s"}}>
+        {drawerOpen?"✕":"🛒"}
+        {!drawerOpen&&items.length>0&&<span style={{position:"absolute",top:3,right:3,background:"#e84040",color:W,borderRadius:"50%",width:17,height:17,fontSize:9,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>{items.length}</span>}
+      </button>
+
+      {drawerOpen&&<div onClick={()=>setDrawerOpen(false)} style={{position:"absolute",inset:0,zIndex:90,background:"rgba(0,0,0,0.3)"}}/>}
+
+      {/* ─ Cart Drawer ─ */}
+      <div style={{position:"absolute",top:0,right:0,bottom:0,zIndex:95,width:340,background:W,borderLeft:`1px solid ${BD}`,display:"flex",flexDirection:"column",transform:drawerOpen?"translateX(0)":"translateX(100%)",transition:"transform 0.3s cubic-bezier(.4,0,.2,1)",boxShadow:drawerOpen?"-5px 0 20px rgba(0,0,0,0.1)":"none"}}>
+        <div style={{background:G,padding:"10px 13px",...row}}>
+          <div>
+            <span style={{color:W,fontWeight:700,fontSize:13}}>Pesanan</span>
+            {activeBill&&<span style={{marginLeft:8,fontSize:10,color:"rgba(255,255,255,0.7)"}}>Open Bill #
+              {activeBill.id}</span>}
+          </div>
+          <div style={{display:"flex",gap:6}}>
+            {items.length>0&&<button onClick={clearCart} style={{background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.3)",color:W,borderRadius:4,padding:"2px 7px",cursor:"pointer",fontFamily:"inherit",fontSize:10}}>Reset</button>}
+            <button onClick={()=>setDrawerOpen(false)} style={{background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.3)",color:W,borderRadius:4,width:22,height:22,cursor:"pointer",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+          </div>
+        </div>
+
+        {printingPreview && (
+          <div style={{padding:"8px 12px",borderBottom:`1px solid ${BD}`,background:"#f7fbf8"}}>
+            <div style={{fontSize:10,color:G,fontWeight:700,marginBottom:6}}>Mempersiapkan Print Preview…</div>
+            <div style={{height:7,borderRadius:999,background:"#e7efe8",overflow:"hidden",position:"relative"}}>
+              <div style={{position:"absolute",inset:0,background:"linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.75) 50%, transparent 100%)",animation:"preview-shimmer 1.1s linear infinite"}} />
+            </div>
+          </div>
+        )}
+
+        {/* Meja & Pax */}
+        <div style={{padding:"8px 12px",borderBottom:`1px solid ${BD}`,background:"#f9faf9"}}>
+          <div style={{marginBottom:7}}>
+            <div style={{fontSize:10,color:MT,fontWeight:600,marginBottom:3}}>NOMOR MEJA <span style={{color:"#e84040"}}>*</span></div>
+            <input type="number" min="1" value={tableNum} onChange={e=>setTableNum(e.target.value)} placeholder="Masukkan nomor meja..." style={{...inp,fontSize:12}}/>
+          </div>
+          <div>
+            <div style={{fontSize:10,color:MT,fontWeight:600,marginBottom:3}}>JUMLAH PAX (orang di meja ini)</div>
+            <input type="number" min="1" value={pax} onChange={e=>setPax(e.target.value)} placeholder="Contoh: 4" style={{...inp,fontSize:12}}/>
+          </div>
+        </div>
+
+        {/* Header kolom */}
+        {items.length>0&&<div style={{display:"grid",gridTemplateColumns:"1fr 60px 46px 60px 20px",gap:3,padding:"5px 12px",borderBottom:`1px solid ${BD}`,background:LT}}>
+          {["Item","Harga","Qty","Sub",""].map((h,i)=><div key={i} style={{fontSize:9,color:MT,fontWeight:700,textAlign:i>0?"center":undefined}}>{h}</div>)}
+        </div>}
+
+        {/* Items */}
+        <div style={{flex:1,overflowY:"auto"}}>
+          {items.length===0?<div style={{textAlign:"center",color:MT,marginTop:50,fontSize:12}}><div style={{fontSize:32,marginBottom:6}}>&#128722;</div>Belum ada pesanan</div>
+          :items.map(item=>(
+            <div key={item.id} style={{display:"grid",gridTemplateColumns:"1fr 60px 46px 60px 20px",gap:3,alignItems:"center",padding:"7px 12px",borderBottom:`1px solid ${LT}`}}>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                {item.foto?<img src={item.foto} alt="" style={{width:26,height:26,borderRadius:4,objectFit:"cover",flexShrink:0}}/>:<div style={{width:26,height:26,background:"#e8f5ee",borderRadius:4,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{fontSize:7,color:"#5a8a6a",fontWeight:600}}>YKK</span></div>}
+                <span style={{fontSize:10,fontWeight:600,lineHeight:1.3}}>{item.nama}</span>
+              </div>
+              <div style={{fontSize:10,color:MT,textAlign:"center"}}>{fmt(item.harga)}</div>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:2}}>
+                <button onClick={()=>decCart(item.id)} style={{width:16,height:16,borderRadius:3,border:`1px solid ${BD}`,background:LT,cursor:"pointer",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center"}}>-</button>
+                <span style={{fontSize:10,fontWeight:700,minWidth:13,textAlign:"center"}}>{item.qty}</span>
+                <button onClick={()=>addToCart(item)} style={{width:16,height:16,borderRadius:3,border:`1px solid ${BD}`,background:LT,cursor:"pointer",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+              </div>
+              <div style={{fontSize:10,fontWeight:600,textAlign:"center"}}>{fmt(item.harga*item.qty)}</div>
+              <button onClick={()=>delCart(item.id)} style={{background:"none",border:"none",cursor:"pointer",color:"#ccc",fontSize:11}}>&times;</button>
+            </div>
+          ))}
+        </div>
+
+        {/* Summary */}
+        {items.length>0&&(
+          <div style={{padding:"10px 13px",borderTop:`1px solid ${BD}`}}>
+            <div style={{...row,fontSize:11,color:MT,marginBottom:3}}><span>Subtotal</span><span style={{fontWeight:600,color:TX}}>{fmt(subtotal)}</span></div>
+            <div style={{...row,fontSize:11,color:MT,marginBottom:8}}><span>Service 6%</span><span style={{fontWeight:600,color:TX}}>{fmt(service)}</span></div>
+            <div style={{...row,fontSize:11,color:MT,marginBottom:3}}><span>Pajak 10%</span><span style={{fontWeight:600,color:TX}}>{fmt(pajak)}</span></div>
+            <div style={{...row,borderTop:`1px solid ${BD}`,paddingTop:7,marginBottom:9}}>
+              <span style={{fontSize:14,fontWeight:700}}>Total</span>
+              <span style={{fontSize:15,fontWeight:700,color:OR}}>{fmt(total)}</span>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>
+              <button onClick={saveOpenBill}
+              disabled={!tableNum.trim()}
+              style={{padding:"8px 0",
+              border:`2px solid ${tableNum.trim()?"#a8d5b8":BD}`,
+              borderRadius:7,
+              background:tableNum.trim()?"#e8f5ee":LT,
+              color:tableNum.trim()?G:MT,
+              cursor:tableNum.trim()?"pointer":"not-allowed",
+              fontFamily:"inherit",fontSize:10,fontWeight:700}}>
+                {activeBill?"Perbarui Open Bill":"Simpan Open Bill"}
+              </button>
+
+              <button onClick={printPreview} disabled={!items.length || !tableNum.trim() || printingPreview}
+                style={{flex:1,
+                padding:10,
+                border:`1px solid ${G}`,
+                borderRadius:7,
+background: items.length && tableNum.trim() && !printingPreview ? "#e8f5ee" : LT,
+color: items.length && tableNum.trim() && !printingPreview ? G : MT,
+cursor: items.length && tableNum.trim() && !printingPreview ? "pointer" : "not-allowed",
+fontFamily:"inherit", fontSize:10, fontWeight:700}}>
+{printingPreview ? "Mencetak..." : "Print Preview"}
+</button>
+              <button onClick={
+                ()=>tableNum.trim()&&setPayModal(true)
+              }
+               disabled={!tableNum.trim()}
+                style={{
+                  padding:"8px 0",
+                  border:"none",
+                  borderRadius:7,
+                  background:tableNum.trim()?OR:"#f0c89a",
+                  color:W,
+                  cursor:tableNum.trim()?"pointer":"not-allowed",
+                  fontFamily:"inherit",
+                  fontSize:10,
+                  fontWeight:700}}>
+                Bayar Sekarang
+              </button>
+            </div>
+            {!tableNum.trim()&&<div style={{fontSize:9,color:"#e84040",
+              textAlign:"center",marginTop:4}}>
+                Isi nomor meja terlebih dahulu</div>}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+export default memo(ViewKasir);
