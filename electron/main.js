@@ -374,7 +374,7 @@ let mainWin;
 function createWindow() {
   mainWin = new BrowserWindow({
     width: 1400, height: 860, minWidth: 1020, minHeight: 680,
-    title: "Kasir — Yan Kedai Kopi",
+    title: "Kasir — restaurant",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       nodeIntegration: false,

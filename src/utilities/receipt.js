@@ -45,11 +45,11 @@ function buildReceiptHTML(trx, logo) {
   </style></head><body>
     <div class="center">
       ${logo?`<img src="${logo}" class="logo" /><br/>`:""}
-      <h2 class="bold">YAN KEDAI KOPI</h2>
-      <div>${trx.hari}, 
-      ${trx.tgl} 
-      ${trx.bln} 
-      ${trx.thn} &bull; 
+      <h2 class="bold">restaurant</h2>
+      <div>${trx.hari},
+      ${trx.tgl}
+      ${trx.bln}
+      ${trx.thn} &bull;
       ${trx.jam}:${trx.mnt}:${trx.dtk}
       </div>
       <div class="bold">Meja ${trx.meja} &bull; TRX #${trx.id}${trx.pax?` &bull; ${trx.pax} Pax`:""}</div>
@@ -100,7 +100,7 @@ function buildPreviewHTML(tableNum, pax, items, logo) {
                 -webkit-font-smoothing:none;
                 font-smooth:never;
                 margin:0;
-                text-align:left;  
+                text-align:left;
               }
             @media print
               {
@@ -119,10 +119,10 @@ function buildPreviewHTML(tableNum, pax, items, logo) {
               }
             .center{
             text-align:center;
-              } 
+              }
             .bold{
             font-weight:700;
-            } 
+            }
             .row{
             display:flex;
             justify-content:space-between;
@@ -131,7 +131,7 @@ function buildPreviewHTML(tableNum, pax, items, logo) {
             .line{
             border-top:1px dashed #000;
             margin:5px 0;
-            } 
+            }
             .logo{
             width:40px;
             height:40px;
@@ -140,7 +140,7 @@ function buildPreviewHTML(tableNum, pax, items, logo) {
             }
             h2{
             font-size:10px;
-            } 
+            }
             .big{
             font-size:12px;
             }
@@ -150,7 +150,7 @@ function buildPreviewHTML(tableNum, pax, items, logo) {
   <body>
     <div class="center">
       ${logo ? `<img src="${logo}" class="logo" /><br/>` : ""}
-      <h2 class="bold">YAN KEDAI KOPI</h2>
+      <h2 class="bold">restaurant</h2>
       <div>${t.hari}, ${t.tgl} ${t.bln} ${t.thn} &bull;
        ${t.jam}:${t.mnt}</div>
       <div class="bold">Meja ${tableNum}${pax ? ` &bull; ${pax} Pax` : ""}

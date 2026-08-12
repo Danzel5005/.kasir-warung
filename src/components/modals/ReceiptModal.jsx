@@ -64,7 +64,7 @@ export default function ReceiptModal({ receipt, logo, printReceipt, setReceipt }
             ? <img src={logo} alt="logo" style={{ width:42, height:42, objectFit:"cover", borderRadius:RADIUS.md, marginBottom:5 }}/>
             : <div style={{ width:42, height:42, background:G, borderRadius:RADIUS.md, display:"flex", alignItems:"center", justifyContent:"center", fontSize:TYPOGRAPHY.small.fontSize, fontWeight:700, color:W, margin:"0 auto 5px" }}>YKK</div>
           }
-          <div style={{ fontWeight:700, fontSize:TYPOGRAPHY.body.fontSize, color:G }}>YAN KEDAI KOPI</div>
+          <div style={{ fontWeight:700, fontSize:TYPOGRAPHY.body.fontSize, color:G }}>restaurant</div>
           <div style={{ fontSize:TYPOGRAPHY.label.fontSize, color:MT }}>{receipt.hari}, {receipt.tgl} {receipt.bln} {receipt.thn}</div>
           <div style={{ fontSize:TYPOGRAPHY.label.fontSize, color:COLOR_PALETTE.info, fontWeight:700, marginTop:2 }}>
             Meja {receipt.meja}{receipt.pax > 0 ? ` · ${receipt.pax} pax` : ""} · TRX #{receipt.id}

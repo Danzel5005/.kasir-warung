@@ -1,9 +1,9 @@
-// i18n — Lightweight, reactive Internationalization Engine for Yan Kedai Kopi / Kasir Warung Nusantara
+// i18n — Lightweight, reactive Internationalization Engine for restaurant / Kasir Warung Nusantara
 
 const translations = {
   id: {
     // Nav & Header
-    "app.title": "Kasir — Yan Kedai Kopi",
+    "app.title": "Kasir — restaurant",
     "nav.kasir": "Kasir",
     "nav.bills": "Open Bill",
     "nav.history": "Riwayat",
@@ -264,7 +264,7 @@ export function fmtCurrency(amount, lang = currentLang) {
 export function fmtDate(dateInput, lang = currentLang) {
   const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
   if (isNaN(date.getTime())) return String(dateInput);
-  
+
   const locale = lang === "en" ? "en-US" : "id-ID";
   return date.toLocaleDateString(locale, {
     weekday: "long",
@@ -280,7 +280,7 @@ export function fmtDate(dateInput, lang = currentLang) {
 export function fmtTime(dateInput, lang = currentLang) {
   const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
   if (isNaN(date.getTime())) return String(dateInput);
-  
+
   const locale = lang === "en" ? "en-US" : "id-ID";
   return date.toLocaleTimeString(locale, {
     hour: "2-digit",

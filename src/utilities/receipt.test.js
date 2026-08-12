@@ -52,7 +52,7 @@ describe("receipt.js - Receipt utilities and HTML builders", () => {
       const html = buildReceiptHTML(mockTrxCash, "data:image/png;base64,mocklogo");
       expect(html).toContain("<!DOCTYPE html>");
       expect(html).toContain('<img src="data:image/png;base64,mocklogo" class="logo" />');
-      expect(html).toContain("YAN KEDAI KOPI");
+      expect(html).toContain("restaurant");
       expect(html).toContain("TRX #TRX-101");
       expect(html).toContain("Meja 05");
       expect(html).toContain("2 Pax");

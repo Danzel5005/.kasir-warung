@@ -1,4 +1,4 @@
-# Design System — Kasir Warung Nusantara (Yan Kedai Kopi)
+# Design System — Kasir Warung Nusantara (restaurant)
 
 Dokumentasi sistem desain visual terpadu untuk pengembangan antarmuka aplikasi Kasir Warung Nusantara. Seluruh komponen dan tampilan wajib menggunakan token desain yang didefinisikan di [`src/constants/theme.js`](file:///c:/Users/tech%20aarohi/.kasir-warung/src/constants/theme.js).
 

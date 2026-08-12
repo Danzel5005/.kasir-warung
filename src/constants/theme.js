@@ -1,4 +1,4 @@
-// Design System Tokens for Yan Kedai Kopi / Kasir Warung Nusantara
+// Design System Tokens for restaurant / Kasir Warung Nusantara
 
 /**
  * 8-Step Color Palette
