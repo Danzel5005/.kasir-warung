@@ -1,14 +1,15 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import { fmt } from "../utilities/receipt.js";
 import { G, OR, W, LT, BD, TX, MT } from "../constants/colors.js";
 import { inp, row } from "../constants/styles.js";
 import StockBadge from "../components/StockBadge.jsx";
+import AdditionalsModal from "../components/modals/AdditionalsModal.jsx";
 
 // ViewKasir — sidebar kategori, search, grid menu, FAB, dan cart drawer.
 // Props per-field (bukan {menuH, cartH} utuh) supaya React.memo efektif.
 function ViewKasir({
   // dari menuH
-  allCats, kategori, setKategori, search, setSearch, displayMenu,
+  allCats, kategori, setKategori, search, setSearch, displayMenu, cats,
   // dari cartH
   cart, drawerOpen, setDrawerOpen, tableNum, setTableNum, pax, setPax,
   items, subtotal, service, pajak, total, activeBill,
@@ -18,6 +19,46 @@ function ViewKasir({
   // ref
   searchRef,
 }) {
+  const [additionalsModal, setAdditionalsModal] = useState({ open: false, item: null });
+
+  // Check if item belongs to drinks category
+  const isDrinkItem = (item) => {
+    const itemCat = cats?.find(c => c.key === item.kategori);
+    return itemCat?.tags?.includes("drinks");
+  };
+
+  // Handle item click - show additionals modal for drinks, add directly otherwise
+  const handleItemClick = (item) => {
+    if (isDrinkItem(item)) {
+      setAdditionalsModal({ open: true, item });
+    } else {
+      addToCart(item);
+    }
+  };
+
+  // Handle additionals confirm
+  const handleAdditionalsConfirm = (additionals) => {
+    if (additionalsModal.item) {
+      addToCart(additionalsModal.item, additionals);
+    }
+  };
+
+  // Format additionals for display
+  const formatAdditionals = (additionals) => {
+    if (!additionals) return "";
+    const parts = [];
+    if (additionals.cupsize) parts.push(additionals.cupsize);
+    if (additionals.sugar) parts.push(additionals.sugar);
+    if (additionals.temperature) {
+      if (additionals.temperature === "ice" && additionals.ice_level) {
+        parts.push(`${additionals.temperature} (${additionals.ice_level})`);
+      } else {
+        parts.push(additionals.temperature);
+      }
+    }
+    return parts.join(" • ");
+  };
+
   return (
     <>
       <style>{"@keyframes preview-shimmer{from{transform:translateX(-100%)}to{transform:translateX(100%)}}"}</style>
@@ -45,9 +86,11 @@ function ViewKasir({
           {displayMenu.length===0?<div style={{textAlign:"center",color:MT,marginTop:60,fontSize:13}}>Tidak ada menu ditemukan</div>
           :<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(175px,1fr))",gap:10}}>
             {displayMenu.map(item=>{
-              const qty=cart[item.id]?.qty||0; const habis=item.stok===0;
+              const itemCartEntries = Object.entries(cart).filter(([key]) => key.startsWith(`${item.id}_`) || key === item.id);
+              const qty = itemCartEntries.reduce((sum, [, val]) => sum + (val?.qty || 0), 0);
+              const habis = item.stok === 0;
               return(
-                <div key={item.id} onClick={()=>!habis&&addToCart(item)} style={{background:W,border:`1px solid ${qty>0?"#a8d5b8":BD}`,borderRadius:9,overflow:"hidden",boxShadow:qty>0?"0 0 0 2px #a8d5b8":"0 1px 3px rgba(0,0,0,0.05)",cursor:habis?"not-allowed":"pointer",opacity:habis?0.55:1,transition:"all 0.12s"}}>
+                <div key={item.id} onClick={()=>!habis&&handleItemClick(item)} style={{background:W,border:`1px solid ${qty>0?"#a8d5b8":BD}`,borderRadius:9,overflow:"hidden",boxShadow:qty>0?"0 0 0 2px #a8d5b8":"0 1px 3px rgba(0,0,0,0.05)",cursor:habis?"not-allowed":"pointer",opacity:habis?0.55:1,transition:"all 0.12s"}}>
                   {item.foto?<img src={item.foto} alt={item.nama} style={{width:"100%",height:95,objectFit:"cover"}}/>
                   :<div style={{height:68,background:"linear-gradient(135deg,#e8f5ee,#d4ead8)",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{fontSize:10,color:"#5a8a6a",fontWeight:600,textAlign:"center",padding:"0 8px"}}>{item.nama}</span></div>}
                   <div style={{padding:"7px 9px 9px"}}>
@@ -55,7 +98,7 @@ function ViewKasir({
                     {item.desc&&<div style={{fontSize:9,color:MT,marginBottom:4}}>{item.desc}</div>}
                     <div style={{...row,marginTop:4}}>
                       <span style={{fontSize:12,fontWeight:700}}>{fmt(item.harga)}</span>
-                      <div onClick={e=>{e.stopPropagation();if(!habis)addToCart(item);}} style={{width:24,height:24,background:habis?"#ccc":G,borderRadius:5,display:"flex",alignItems:"center",justifyContent:"center",color:W,fontSize:15,fontWeight:700,cursor:habis?"not-allowed":"pointer"}}>{qty>0?qty:"+"}</div>
+                      <div onClick={e=>{e.stopPropagation();if(!habis)handleItemClick(item);}} style={{width:24,height:24,background:habis?"#ccc":G,borderRadius:5,display:"flex",alignItems:"center",justifyContent:"center",color:W,fontSize:15,fontWeight:700,cursor:habis?"not-allowed":"pointer"}}>{qty>0?qty:"+"}</div>
                     </div>
                   </div>
                 </div>
@@ -116,22 +159,33 @@ function ViewKasir({
         {/* Items */}
         <div style={{flex:1,overflowY:"auto"}}>
           {items.length===0?<div style={{textAlign:"center",color:MT,marginTop:50,fontSize:12}}><div style={{fontSize:32,marginBottom:6}}>&#128722;</div>Belum ada pesanan</div>
-          :items.map(item=>(
-            <div key={item.id} style={{display:"grid",gridTemplateColumns:"1fr 60px 46px 60px 20px",gap:3,alignItems:"center",padding:"7px 12px",borderBottom:`1px solid ${LT}`}}>
-              <div style={{display:"flex",alignItems:"center",gap:6}}>
-                {item.foto?<img src={item.foto} alt="" style={{width:26,height:26,borderRadius:4,objectFit:"cover",flexShrink:0}}/>:<div style={{width:26,height:26,background:"#e8f5ee",borderRadius:4,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{fontSize:7,color:"#5a8a6a",fontWeight:600}}>YKK</span></div>}
-                <span style={{fontSize:10,fontWeight:600,lineHeight:1.3}}>{item.nama}</span>
+          :items.map((item,idx)=>{
+            const cartKey = item.cartKey || item.id;
+            const additionalStr = formatAdditionals(item.additionals);
+            return(
+              <div key={`${cartKey}_${idx}`} style={{padding:"7px 12px",borderBottom:`1px solid ${LT}`,background:item.additionals?"#f9faf9":W}}>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 60px 46px 60px 20px",gap:3,alignItems:"center",marginBottom:item.additionals?4:0}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    {item.foto?<img src={item.foto} alt="" style={{width:26,height:26,borderRadius:4,objectFit:"cover",flexShrink:0}}/>:<div style={{width:26,height:26,background:"#e8f5ee",borderRadius:4,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{fontSize:7,color:"#5a8a6a",fontWeight:600}}>YKK</span></div>}
+                    <span style={{fontSize:10,fontWeight:600,lineHeight:1.3}}>{item.nama}</span>
+                  </div>
+                  <div style={{fontSize:10,color:MT,textAlign:"center"}}>{fmt(item.harga)}</div>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:2}}>
+                    <button onClick={()=>decCart(cartKey)} style={{width:16,height:16,borderRadius:3,border:`1px solid ${BD}`,background:LT,cursor:"pointer",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center"}}>-</button>
+                    <span style={{fontSize:10,fontWeight:700,minWidth:13,textAlign:"center"}}>{item.qty}</span>
+                    <button onClick={()=>addToCart(item,item.additionals)} style={{width:16,height:16,borderRadius:3,border:`1px solid ${BD}`,background:LT,cursor:"pointer",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+                  </div>
+                  <div style={{fontSize:10,fontWeight:600,textAlign:"center"}}>{fmt(item.harga*item.qty)}</div>
+                  <button onClick={()=>delCart(cartKey)} style={{background:"none",border:"none",cursor:"pointer",color:"#ccc",fontSize:11}}>&times;</button>
+                </div>
+                {additionalStr && (
+                  <div style={{fontSize:8,color:"#888",marginLeft:32,marginTop:2,fontStyle:"italic"}}>
+                    {additionalStr}
+                  </div>
+                )}
               </div>
-              <div style={{fontSize:10,color:MT,textAlign:"center"}}>{fmt(item.harga)}</div>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:2}}>
-                <button onClick={()=>decCart(item.id)} style={{width:16,height:16,borderRadius:3,border:`1px solid ${BD}`,background:LT,cursor:"pointer",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center"}}>-</button>
-                <span style={{fontSize:10,fontWeight:700,minWidth:13,textAlign:"center"}}>{item.qty}</span>
-                <button onClick={()=>addToCart(item)} style={{width:16,height:16,borderRadius:3,border:`1px solid ${BD}`,background:LT,cursor:"pointer",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
-              </div>
-              <div style={{fontSize:10,fontWeight:600,textAlign:"center"}}>{fmt(item.harga*item.qty)}</div>
-              <button onClick={()=>delCart(item.id)} style={{background:"none",border:"none",cursor:"pointer",color:"#ccc",fontSize:11}}>&times;</button>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Summary */}
@@ -191,6 +245,15 @@ fontFamily:"inherit", fontSize:10, fontWeight:700}}>
           </div>
         )}
       </div>
+
+      {/* Additionals Modal */}
+      <AdditionalsModal
+        item={additionalsModal.item}
+        isOpen={additionalsModal.open}
+        onClose={() => setAdditionalsModal({ open: false, item: null })}
+        onConfirm={handleAdditionalsConfirm}
+        cats={cats}
+      />
     </>
   );
 }

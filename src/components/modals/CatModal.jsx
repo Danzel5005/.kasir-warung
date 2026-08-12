@@ -1,7 +1,10 @@
+import { useState } from "react";
 import { G, W, LT, BD } from "../../constants/colors.js";
 import { row, inp, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/theme.js";
 
 export default function CatModal({ menuH }) {
+  const [tagModalCat, setTagModalCat] = useState(null);
+
   return (
     <div
       style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:300 }}
@@ -21,8 +24,23 @@ export default function CatModal({ menuH }) {
         {/* List kategori */}
         <div style={{ marginBottom:12 }}>
           {menuH.cats.map(c => (
-            <div key={c.key} style={{ ...row, padding:"8px 10px", background:LT, borderRadius:RADIUS.md, marginBottom:5 }}>
-              <span style={{ fontSize:TYPOGRAPHY.small.fontSize, fontWeight:600 }}>{c.label}</span>
+            <div key={c.key} style={{ ...row, padding:"8px 10px", background:LT, borderRadius:RADIUS.md, marginBottom:5, gap:6 }}>
+              <div style={{ flex:1 }}>
+                <span style={{ fontSize:TYPOGRAPHY.small.fontSize, fontWeight:600 }}>{c.label}</span>
+                {c.tags && c.tags.length > 0 && (
+                  <div style={{ display:"flex", gap:4, marginTop:3, flexWrap:"wrap" }}>
+                    {c.tags.map(tag => (
+                      <span key={tag} style={{ fontSize:TYPOGRAPHY.label.fontSize, background:COLOR_PALETTE.successLight, color:COLOR_PALETTE.success, padding:"2px 6px", borderRadius:RADIUS.sm }}>
+                        {tag === "drinks" ? "🥤 Drinks" : tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => setTagModalCat(c.key)}
+                style={{ background:COLOR_PALETTE.infoLight, color:COLOR_PALETTE.info, border:"none", borderRadius:RADIUS.sm, padding:"3px 8px", cursor:"pointer", fontFamily:"inherit", fontSize:TYPOGRAPHY.label.fontSize, fontWeight:600, whiteSpace:"nowrap" }}
+              >Add tag</button>
               <button
                 onClick={() => menuH.deleteCat(c.key)}
                 style={{ background:COLOR_PALETTE.dangerLight, color:COLOR_PALETTE.danger, border:"none", borderRadius:RADIUS.sm, padding:"3px 8px", cursor:"pointer", fontFamily:"inherit", fontSize:TYPOGRAPHY.label.fontSize, fontWeight:600 }}
@@ -30,6 +48,35 @@ export default function CatModal({ menuH }) {
             </div>
           ))}
         </div>
+
+        {/* Tag Modal */}
+        {tagModalCat && (
+          <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:400 }}
+            onClick={e => { if (e.target === e.currentTarget) setTagModalCat(null); }}
+          >
+            <div style={{ background:W, borderRadius:RADIUS.lg, padding:"20px", width:320, maxWidth:"95vw", boxShadow:"0 20px 60px rgba(0,0,0,0.3)" }}>
+              <div style={{ ...row, marginBottom:14 }}>
+                <span style={{ fontSize:TYPOGRAPHY.body.fontSize, fontWeight:700, color:G }}>Tambah Tag</span>
+                <button
+                  onClick={() => setTagModalCat(null)}
+                  style={{ background:"none", border:`1px solid ${BD}`, borderRadius:RADIUS.sm, width:24, height:24, cursor:"pointer", fontSize:TYPOGRAPHY.small.fontSize }}
+                >&#10005;</button>
+              </div>
+              
+              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                <button
+                  onClick={() => {
+                    menuH.addTagToCategory(tagModalCat, "drinks");
+                    setTagModalCat(null);
+                  }}
+                  style={{ padding:"10px 12px", background:COLOR_PALETTE.successLight, color:COLOR_PALETTE.success, border:"none", borderRadius:RADIUS.md, cursor:"pointer", fontFamily:"inherit", fontSize:TYPOGRAPHY.small.fontSize, fontWeight:600, textAlign:"left" }}
+                >
+                  🥤 Drinks (Cupsize, Sugar, Ice/Hot)
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Tambah kategori baru */}
         <div style={{ display:"flex", gap:7 }}>

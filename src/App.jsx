@@ -433,7 +433,7 @@ export default function Kasir() {
         {view==="menu" && (
           <ViewKasir
             allCats={menuH.allCats} kategori={menuH.kategori} setKategori={menuH.setKategori}
-            search={menuH.search} setSearch={menuH.setSearch} displayMenu={menuH.displayMenu}
+            search={menuH.search} setSearch={menuH.setSearch} displayMenu={menuH.displayMenu} cats={menuH.cats}
             cart={cartH.cart} drawerOpen={cartH.drawerOpen} setDrawerOpen={cartH.setDrawerOpen}
             tableNum={cartH.tableNum} setTableNum={cartH.setTableNum}
             pax={cartH.pax} setPax={cartH.setPax}

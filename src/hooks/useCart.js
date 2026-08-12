@@ -32,6 +32,8 @@ function useCart({ toast_, getNow }) {
   const [metode, setMetode]     = useState("cash");
   const [paid, setPaid]         = useState("");
   const [activeBill, setActiveBill] = useState(null);
+  const [additionalsModal, setAdditionalsModal] = useState({ open: false, item: null });
+  const [pendingItem, setPendingItem] = useState(null);
 
   const items    = Object.values(cart);
   const subtotal = items.reduce((s, i) => s + i.harga * i.qty, 0);
@@ -43,14 +45,39 @@ function useCart({ toast_, getNow }) {
   // PENTING: pakai functional update setCart(c=>...), TIDAK baca `cart`
   // langsung dari closure — pattern paling stabil. Tapi memanggil toast_,
   // jadi tetap perlu [toast_] di deps (toast_ sendiri stabil/[]).
-  const addToCart = useCallback((item) => {
+  const addToCart = useCallback((item, additionals = null) => {
     if (item.stok === 0) { toast_(`Stok "${item.nama}" habis`, "err"); return; }
-    setCart(c => ({ ...c, [item.id]: { ...item, qty: (c[item.id]?.qty || 0) + 1 } }));
+    setCart(c => {
+      const cartKey = additionals 
+        ? `${item.id}_${JSON.stringify(additionals)}` 
+        : item.id;
+      return { 
+        ...c, 
+        [cartKey]: { 
+          ...item, 
+          id: item.id, // Keep original id for stock tracking
+          cartKey: cartKey, // Store unique cart key
+          qty: (c[cartKey]?.qty || 0) + 1,
+          additionals: additionals || undefined,
+        } 
+      };
+    });
   }, [toast_]);
 
   // deps kosong aman: functional update penuh, tidak baca state luar sama sekali.
-  const decCart = useCallback((id) => setCart(c => { const n = { ...c }; if (n[id].qty <= 1) delete n[id]; else n[id] = { ...n[id], qty: n[id].qty - 1 }; return n; }), []);
-  const delCart = useCallback((id) => setCart(c => { const n = { ...c }; delete n[id]; return n; }), []);
+  // Note: id parameter is now cartKey which may include additionals in the format "itemId_{...}"
+  const decCart = useCallback((cartKey) => setCart(c => { 
+    const n = { ...c }; 
+    if (!n[cartKey]) return c;
+    if (n[cartKey].qty <= 1) delete n[cartKey]; 
+    else n[cartKey] = { ...n[cartKey], qty: n[cartKey].qty - 1 }; 
+    return n; 
+  }), []);
+  const delCart = useCallback((cartKey) => setCart(c => { 
+    const n = { ...c }; 
+    delete n[cartKey]; 
+    return n; 
+  }), []);
 
   // deps kosong aman: semua setter dengan nilai konstan, tidak baca state.
   const clearCart = useCallback(() => {

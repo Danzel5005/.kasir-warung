@@ -96,7 +96,7 @@ function useMenu({ toast_, addUndo }) {
     const label = newCatLabel.trim();
     if (!label) { toast_("Nama kategori wajib diisi", "err"); return; }
     const key = `cat_${Date.now()}`;
-    const next = [...cats, { key, label }];
+    const next = [...cats, { key, label, tags: [] }];
     await api.saveCats(next); setCats(next); setNewCatLabel("");
     toast_(`Kategori "${label}" ditambahkan`, "ok");
   }, [newCatLabel, cats, toast_]);
@@ -108,6 +108,23 @@ function useMenu({ toast_, addUndo }) {
     await api.saveCats(next); setCats(next);
     addUndo("Hapus Kategori", async () => { await api.saveCats(snap); setCats(snap); });
   }, [cats, addUndo]);
+
+  // PENTING: membaca cats LANGSUNG dari closure. Wajib [cats, toast_].
+  const addTagToCategory = useCallback(async (catKey, tag) => {
+    const updated = cats.map(c => {
+      if (c.key === catKey) {
+        const tags = c.tags || [];
+        if (!tags.includes(tag)) {
+          return { ...c, tags: [...tags, tag] };
+        }
+        return c;
+      }
+      return c;
+    });
+    await api.saveCats(updated);
+    setCats(updated);
+    toast_(`Tag "${tag}" ditambahkan`, "ok");
+  }, [cats, toast_]);
 
   // Hanya MENGHITUNG updatedMenu — TIDAK setMenu di sini.
   // Kode asli (processPayment) baru setMenu(updatedMenu) SETELAH
@@ -133,7 +150,7 @@ function useMenu({ toast_, addUndo }) {
     setKategori, setSearch, setItemModal, setForm, setCatModal, setNewCatLabel,
     setMenu, // diperlukan App.jsx untuk commit stok SETELAH IPC processPayment sukses
     loadInitial, openAdd, openEdit, handlePhoto, saveItem, deleteItem,
-    addCat, deleteCat, computeStockDeduction,
+    addCat, deleteCat, addTagToCategory, computeStockDeduction,
   };
 }
 

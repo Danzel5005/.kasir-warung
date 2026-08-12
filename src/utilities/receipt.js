@@ -18,10 +18,30 @@ function getNow() {
 
 const fmt   = (n) => `Rp ${Number(n||0).toLocaleString("id-ID")}`;
 const fmtNum = (n) => Number(n||0).toLocaleString("id-ID");
+
+// Helper function to format additionals
+const formatAdditionals = (additionals) => {
+  if (!additionals) return "";
+  const parts = [];
+  if (additionals.cupsize) parts.push(additionals.cupsize);
+  if (additionals.sugar) parts.push(additionals.sugar);
+  if (additionals.temperature) {
+    if (additionals.temperature === "ice" && additionals.ice_level) {
+      parts.push(`${additionals.temperature} (${additionals.ice_level})`);
+    } else {
+      parts.push(additionals.temperature);
+    }
+  }
+  return parts.join(" • ");
+};
+
 function buildReceiptHTML(trx, logo) {
   const { pajak, service, total } = calcPrice(trx.subtotal);
   const metodeLabel = globalThis.METODE_LABELS?.[trx.metodeBayar] ?? trx.metodeBayar;
-  const rows = trx.items.map(i=>`<div class="row"><span>${i.qty}x ${i.nama}</span><span>${fmt(i.harga*i.qty)}</span></div>`).join("");
+  const rows = trx.items.map(i=>{
+    const addStr = formatAdditionals(i.additionals);
+    return `<div class="row"><span>${i.qty}x ${i.nama}</span><span>${fmt(i.harga*i.qty)}</span></div>${addStr?`<div class="row-sub"><span>${addStr}</span></div>`:""}`
+  }).join("");
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     *{margin:0;padding:0;box-sizing:border-box;
     -weblit-print-color-adjust:exact;
@@ -39,6 +59,7 @@ function buildReceiptHTML(trx, logo) {
     }
 
     .center{text-align:center;} .bold{font-weight:700;} .row{display:flex;justify-content:space-between;margin-bottom:2px;}
+    .row-sub{display:flex;justify-content:flex-start;margin-bottom:3px;margin-left:8px;font-size:10px;color:#666;margin-top:-2px;}
     .line{border-top:1px dashed #000;margin:5px 0;} .logo{width:40px;height:40px;object-fit:cover;border-radius:4px;}
     h2{font-size:8px;} .big{font-size:9px;}
 
@@ -72,7 +93,10 @@ function buildPreviewHTML(tableNum, pax, items, logo) {
   const subtotal = items.reduce((s, i) => s + i.harga * i.qty, 0);
   const { pajak, service, total } = calcPrice(subtotal);
   const t = getNow();
-  const rows = items.map(i => `<div class="row"><span>${i.qty}x ${i.nama}</span><span>${fmt(i.harga * i.qty)}</span></div>`).join("");
+  const rows = items.map(i => {
+    const addStr = formatAdditionals(i.additionals);
+    return `<div class="row"><span>${i.qty}x ${i.nama}</span><span>${fmt(i.harga * i.qty)}</span></div>${addStr?`<div class="row-sub"><span>${addStr}</span></div>`:""}`
+  }).join("");
   return `<!DOCTYPE html>
   <html>
     <head>
@@ -127,6 +151,15 @@ function buildPreviewHTML(tableNum, pax, items, logo) {
             display:flex;
             justify-content:space-between;
             margin-bottom:2px;
+            }
+            .row-sub{
+            display:flex;
+            justify-content:flex-start;
+            margin-bottom:3px;
+            margin-left:8px;
+            font-size:11px;
+            color:#666;
+            margin-top:-2px;
             }
             .line{
             border-top:1px dashed #000;
