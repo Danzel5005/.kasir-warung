@@ -35,8 +35,12 @@ const formatAdditionals = (additionals) => {
   return parts.join(" • ");
 };
 
-function buildReceiptHTML(trx, logo) {
-  const { pajak, service, total } = calcPrice(trx.subtotal);
+function buildReceiptHTML(trx, logo, receiptAdditionals) {
+  const taxEnabled = receiptAdditionals?.find(f => f.key === "tax")?.enabled !== false;
+  const serviceEnabled = receiptAdditionals?.find(f => f.key === "service")?.enabled !== false;
+  const { pajak, service, total } = calcPrice(trx.subtotal, { 
+    taxEnabled, serviceEnabled
+  });
   const metodeLabel = globalThis.METODE_LABELS?.[trx.metodeBayar] ?? trx.metodeBayar;
   const rows = trx.items.map(i=>{
     const addStr = formatAdditionals(i.additionals);
@@ -80,8 +84,8 @@ function buildReceiptHTML(trx, logo) {
     ${rows}
     <div class="line"></div>
     <div class="row"><span>Subtotal</span><span>${fmt(trx.subtotal)}</span></div>
-    <div class="row"><span>Service 6% </span><span>${fmt(service)}</span></div>
-    <div class="row"><span>Pajak 10%</span><span>${fmt(pajak)}</span></div>
+    ${(serviceEnabled ?? true) ? `<div class="row"><span>Service 6% </span><span>${fmt(service)}</span></div>` : ""}
+    ${(taxEnabled ?? true) ? `<div class="row"><span>Pajak 10%</span><span>${fmt(pajak)}</span></div>` : ""}
     <div class="line"></div>
     <div class="row big bold"><span>TOTAL</span><span>${fmt(total)}</span></div>
     ${trx.metodeBayar==="cash"?`<div class="row"><span>Bayar</span><span>${fmt(trx.bayar)}</span></div><div class="row"><span>Kembalian</span><span>${fmt(trx.kembalian)}</span></div>`:""}
@@ -89,9 +93,11 @@ function buildReceiptHTML(trx, logo) {
     <div class="center">Terima kasih atas kunjungan Anda!<br/>Selamat menikmati</div>
   </body></html>`;
 }
-function buildPreviewHTML(tableNum, pax, items, logo) {
+function buildPreviewHTML(tableNum, pax, items, logo, receiptAdditionals) {
   const subtotal = items.reduce((s, i) => s + i.harga * i.qty, 0);
-  const { pajak, service, total } = calcPrice(subtotal);
+  const taxEnabled = receiptAdditionals?.find(f => f.key === "tax")?.enabled !== false;
+  const serviceEnabled = receiptAdditionals?.find(f => f.key === "service")?.enabled !== false;
+  const { pajak, service, total } = calcPrice(subtotal, { taxEnabled, serviceEnabled });
   const t = getNow();
   const rows = items.map(i => {
     const addStr = formatAdditionals(i.additionals);
@@ -194,8 +200,8 @@ function buildPreviewHTML(tableNum, pax, items, logo) {
     ${rows}
     <div class="line"></div>
     <div class="row"><span>Subtotal</span><span>${fmt(subtotal)}</span></div>
-    <div class="row"><span>Service (6%)</span><span>${fmt(pajak)}</span></div>
-    <div class="row"><span>Pajak (10%)</span><span>${fmt(service)}</span></div>
+    ${(serviceEnabled ?? true) ? `<div class="row"><span>Service (6%)</span><span>${fmt(service)}</span></div>` : ""}
+    ${(taxEnabled ?? true) ? `<div class="row"><span>Pajak (10%)</span><span>${fmt(pajak)}</span></div>` : ""}
     <div class="line"></div>
     <div class="row big bold"><span>TOTAL</span><span>${fmt(total)}</span></div>
     <div class="line"></div>

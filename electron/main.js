@@ -63,7 +63,106 @@ const FILES = {
   qris: path.join(DATA_DIR, "qris.json"),   // { "qris-bca": base64, "qris-bni": base64 }
   wal: path.join(DATA_DIR, "trx.wal"),
   backups: path.join(DATA_DIR, "backups"),
+  db: path.join(DATA_DIR, "kasir.db"),     // SQLite database
+  jsonBackups: path.join(DATA_DIR, "json-backups"), // Backup folder for old JSON files
 };
+
+// ─── SQLite DATABASE ─────────────────────────────────────────────────────────
+let db = null;
+
+function initDB() {
+  try {
+    const Database = require("better-sqlite3");
+    ensureDir();
+    db = new Database(FILES.db);
+    db.pragma("journal_mode = WAL");  // Write-Ahead Logging for better concurrency
+    
+    // Create tables if not exist
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS transactions (
+        id INTEGER PRIMARY KEY,
+        data TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      
+      CREATE TABLE IF NOT EXISTS shifts (
+        id INTEGER PRIMARY KEY,
+        data TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      
+      CREATE INDEX IF NOT EXISTS idx_trx_created ON transactions(created_at);
+      CREATE INDEX IF NOT EXISTS idx_shifts_created ON shifts(created_at);
+    `);
+    
+    console.log("[DB] SQLite initialized successfully");
+    return true;
+  } catch (err) {
+    console.error("[DB] Failed to initialize SQLite:", err.message);
+    return false;
+  }
+}
+
+function migrateJSONToSQLite() {
+  if (!db) return;
+  
+  try {
+    // Backup existing JSON files
+    ensureDir();
+    if (!fs.existsSync(FILES.jsonBackups)) {
+      fs.mkdirSync(FILES.jsonBackups, { recursive: true });
+    }
+    
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    
+    // Migrate transactions
+    if (fs.existsSync(FILES.trx)) {
+      const trxList = rJSON(FILES.trx) || [];
+      if (trxList.length > 0) {
+        const stmt = db.prepare("INSERT INTO transactions (id, data) VALUES (?, ?)");
+        const insertMany = db.transaction((items) => {
+          for (const item of items) {
+            stmt.run(item.id || null, JSON.stringify(item));
+          }
+        });
+        insertMany(trxList);
+        
+        // Backup original JSON
+        const backupPath = path.join(FILES.jsonBackups, `transactions_${timestamp}.json`);
+        fs.copyFileSync(FILES.trx, backupPath);
+        console.log(`[Migration] Transactions migrated to SQLite. Backup: ${backupPath}`);
+      }
+    }
+    
+    // Migrate shifts
+    if (fs.existsSync(FILES.shifts)) {
+      const shiftsList = rJSON(FILES.shifts) || [];
+      if (shiftsList.length > 0) {
+        const stmt = db.prepare("INSERT INTO shifts (id, data) VALUES (?, ?)");
+        const insertMany = db.transaction((items) => {
+          for (const item of items) {
+            stmt.run(item.id || null, JSON.stringify(item));
+          }
+        });
+        insertMany(shiftsList);
+        
+        // Backup original JSON
+        const backupPath = path.join(FILES.jsonBackups, `shifts_${timestamp}.json`);
+        fs.copyFileSync(FILES.shifts, backupPath);
+        console.log(`[Migration] Shifts migrated to SQLite. Backup: ${backupPath}`);
+      }
+    }
+  } catch (err) {
+    console.error("[Migration] Error during JSON to SQLite migration:", err.message);
+  }
+}
+
+function closeDB() {
+  if (db) {
+    db.close();
+    db = null;
+  }
+}
 
 // ─── CORE UTILS ──────────────────────────────────────────────────────────────
 
@@ -194,14 +293,93 @@ function dailyBackup() {
 
 // ─── IPC HANDLERS ────────────────────────────────────────────────────────────
 
-// ── Transactions
-ipcMain.handle("trx-load", () => rJSON(FILES.trx) || []);
+// ── Transactions (SQLite)
+ipcMain.handle("trx-load", () => {
+  if (!db) return [];
+  try {
+    const stmt = db.prepare("SELECT id, data FROM transactions ORDER BY created_at DESC");
+    const rows = stmt.all();
+    return rows.map(row => JSON.parse(row.data));
+  } catch (err) {
+    console.error("[trx-load] Error:", err.message);
+    return [];
+  }
+});
 
-// trx-save tetap ada untuk keperluan lain (undo restore, dll)
-ipcMain.handle("trx-save", (_e, trx) => { const a = rJSON(FILES.trx) || []; a.unshift(trx); atomicWrite(FILES.trx, a); return { ok: true }; });
-ipcMain.handle("trx-delete", (_e, id) => { atomicWrite(FILES.trx, (rJSON(FILES.trx) || []).filter(t => t.id !== id)); return { ok: true }; });
-ipcMain.handle("trx-restore", (_e, list) => { atomicWrite(FILES.trx, list); return { ok: true }; });
-ipcMain.handle("trx-clear", () => { atomicWrite(FILES.trx, []); return { ok: true }; });
+ipcMain.handle("trx-save", (_e, trx) => {
+  if (!db) {
+    // Fallback ke JSON jika DB tidak tersedia
+    const a = rJSON(FILES.trx) || [];
+    a.unshift(trx);
+    atomicWrite(FILES.trx, a);
+    return { ok: true };
+  }
+  
+  try {
+    const stmt = db.prepare("INSERT INTO transactions (id, data) VALUES (?, ?)");
+    stmt.run(trx.id || null, JSON.stringify(trx));
+    return { ok: true };
+  } catch (err) {
+    console.error("[trx-save] Error:", err.message);
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle("trx-delete", (_e, id) => {
+  if (!db) {
+    // Fallback
+    atomicWrite(FILES.trx, (rJSON(FILES.trx) || []).filter(t => t.id !== id));
+    return { ok: true };
+  }
+  
+  try {
+    // Get the record to delete
+    const stmt = db.prepare("DELETE FROM transactions WHERE json_extract(data, '$.id') = ?");
+    stmt.run(id);
+    return { ok: true };
+  } catch (err) {
+    console.error("[trx-delete] Error:", err.message);
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle("trx-restore", (_e, list) => {
+  if (!db) {
+    atomicWrite(FILES.trx, list);
+    return { ok: true };
+  }
+  
+  try {
+    // Clear and restore
+    db.exec("DELETE FROM transactions");
+    const stmt = db.prepare("INSERT INTO transactions (id, data) VALUES (?, ?)");
+    const insertMany = db.transaction((items) => {
+      for (const item of items) {
+        stmt.run(item.id || null, JSON.stringify(item));
+      }
+    });
+    insertMany(list);
+    return { ok: true };
+  } catch (err) {
+    console.error("[trx-restore] Error:", err.message);
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle("trx-clear", () => {
+  if (!db) {
+    atomicWrite(FILES.trx, []);
+    return { ok: true };
+  }
+  
+  try {
+    db.exec("DELETE FROM transactions");
+    return { ok: true };
+  } catch (err) {
+    console.error("[trx-clear] Error:", err.message);
+    return { ok: false, error: err.message };
+  }
+});
 
 // ── Process Payment (ATOMIC — trx + menu + hapus bill dalam satu operasi)
 //
@@ -210,13 +388,25 @@ ipcMain.handle("trx-clear", () => { atomicWrite(FILES.trx, []); return { ok: tru
 //
 ipcMain.handle("process-payment", (_e, { trx, updatedMenu, activeBillId }) => {
   try {
+    if (!db) {
+      // Fallback ke JSON jika DB tidak tersedia
+      const allTrx = rJSON(FILES.trx) || [];
+      allTrx.unshift(trx);
+      atomicWrite(FILES.trx, allTrx);
+      if (updatedMenu) atomicWrite(FILES.menu, updatedMenu);
+      if (activeBillId) {
+        const remaining = (rJSON(FILES.bills) || []).filter(b => String(b.id) !== String(activeBillId));
+        atomicWrite(FILES.bills, remaining);
+      }
+      return { ok: true };
+    }
+    
     // 1. Catat ke WAL dulu — kalau crash setelah ini, transaksi bisa dipulihkan
     walAppend(trx);
 
-    // 2. Tulis transaksi
-    const allTrx = rJSON(FILES.trx) || [];
-    allTrx.unshift(trx);
-    atomicWrite(FILES.trx, allTrx);
+    // 2. Tulis transaksi ke SQLite
+    const stmtTrx = db.prepare("INSERT INTO transactions (id, data) VALUES (?, ?)");
+    stmtTrx.run(trx.id || null, JSON.stringify(trx));
 
     // 3. Tulis menu (update stok)
     if (updatedMenu) atomicWrite(FILES.menu, updatedMenu);
@@ -265,9 +455,41 @@ ipcMain.handle("cats-save", (_e, list) => { atomicWrite(FILES.cats, list); retur
 ipcMain.handle("settings-load", () => rJSON(FILES.settings) || {});
 ipcMain.handle("settings-save", (_e, data) => { atomicWrite(FILES.settings, data); return { ok: true }; });
 
-// ── Shifts
-ipcMain.handle("shifts-load", () => rJSON(FILES.shifts) || []);
-ipcMain.handle("shifts-save", (_e, list) => { atomicWrite(FILES.shifts, list); return { ok: true }; });
+// ── Shifts (SQLite)
+ipcMain.handle("shifts-load", () => {
+  if (!db) return [];
+  try {
+    const stmt = db.prepare("SELECT id, data FROM shifts ORDER BY created_at DESC");
+    const rows = stmt.all();
+    return rows.map(row => JSON.parse(row.data));
+  } catch (err) {
+    console.error("[shifts-load] Error:", err.message);
+    return [];
+  }
+});
+
+ipcMain.handle("shifts-save", (_e, list) => {
+  if (!db) {
+    atomicWrite(FILES.shifts, list);
+    return { ok: true };
+  }
+  
+  try {
+    // Clear existing and insert new
+    db.exec("DELETE FROM shifts");
+    const stmt = db.prepare("INSERT INTO shifts (id, data) VALUES (?, ?)");
+    const insertMany = db.transaction((items) => {
+      for (const item of items) {
+        stmt.run(item.id || null, JSON.stringify(item));
+      }
+    });
+    insertMany(list);
+    return { ok: true };
+  } catch (err) {
+    console.error("[shifts-save] Error:", err.message);
+    return { ok: false, error: err.message };
+  }
+});
 
 // ── CSV
 ipcMain.handle("csv-save", async (_e, { filename, content }) => {
@@ -388,8 +610,10 @@ function createWindow() {
 
 app.whenReady().then(() => {
   // Jalankan recovery & backup SEBELUM window dibuka
-  walRecover();   // pulihkan transaksi yang crash sebelum tersimpan
-  dailyBackup();  // buat backup harian kalau belum ada hari ini
+  initDB();                   // Inisialisasi SQLite
+  migrateJSONToSQLite();      // Migrasi data JSON ke SQLite (jika belum)
+  walRecover();               // pulihkan transaksi yang crash sebelum tersimpan
+  dailyBackup();              // buat backup harian kalau belum ada hari ini
 
   createWindow();
   app.on("activate", () => {
@@ -398,5 +622,6 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => {
+  closeDB();
   if (process.platform !== "darwin") app.quit();
 });

@@ -2,23 +2,16 @@
 
 @echo off
 cd /d "%~dp0"
-echo.
-echo ================================================
-echo   KASIR WARUNG - BUILD .EXE
-echo ================================================
-echo   Folder: %cd%
-echo.
-pause
 
 npm run build
+npm run electron:build
 
 echo ================================================
 echo Membuat file .exe...
 echo       Bisa 5-15 menit, harap tunggu...
 echo ================================================
 echo.
-
-npm run electron:build
+pause
 
 :: ── SELESAI ──────────────────────────────────────────────────────────────────
 echo.

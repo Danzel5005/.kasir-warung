@@ -6,6 +6,7 @@ const LABELS = {
   trx:      "Hapus transaksi ini?",
   allBills: "Hapus SEMUA open bill?",
   bill:     "Hapus open bill ini?",
+  allMenu:  "Hapus SEMUA menu?",
 };
 
 export default function ConfirmDelModal({ confirmDel, setConfirmDel, executeConfirmDel }) {

@@ -1,21 +1,44 @@
 import { useState, useRef, useCallback } from "react";
 import { api } from "../utilities/utils.js";
+import { DEFAULT_RECEIPT_ADDITIONALS } from "../constants/receiptAdditionals.js";
 
-// useSettings — logo, printer config, printer-picker modal.
+// Default payment methods — Tunai and Qris always available initially
+const DEFAULT_PAYMENT_METHODS = [
+  { key: "cash", label: "Tunai", category: "cash" },
+  { key: "qris-bca", label: "QRIS BCA", category: "qris" },
+  { key: "qris-bni", label: "QRIS BNI", category: "qris" },
+];
+
+// useSettings — logo, settings (printer, payment methods), modals.
 // Tidak depend ke hook lain. Expose `printHTML(html)` generik supaya
 // useCart/useHistory bisa cetak tanpa import hook ini langsung — mereka
 // menerima `printHTML` sebagai parameter dari App.jsx.
 function useSettings({ toast_ }) {
   const [logo, setLogo]               = useState(null);
-  const [settings, setSettings]       = useState({ printerName: "" });
+  const [settings, setSettings]       = useState({ 
+    printerName: "", 
+    paymentMethods: DEFAULT_PAYMENT_METHODS,
+    receiptAdditionals: DEFAULT_RECEIPT_ADDITIONALS,
+  });
+  const [settingsModal, setSettingsModal] = useState(false);
   const [printerModal, setPrinterModal] = useState(false);
   const [printerList, setPrinterList]   = useState([]);
+  const [newPaymentLabel, setNewPaymentLabel] = useState("");
   const logoRef = useRef();
 
   // deps kosong aman: hanya setter, tidak baca state apapun.
   const loadInitial = useCallback((savedLogo, savedSettings) => {
     setLogo(savedLogo || null);
-    setSettings(savedSettings || { printerName: "" });
+    const s = savedSettings || {};
+    // Ensure paymentMethods exist; if not, use defaults
+    if (!s.paymentMethods || !Array.isArray(s.paymentMethods) || s.paymentMethods.length === 0) {
+      s.paymentMethods = DEFAULT_PAYMENT_METHODS;
+    }
+    // Ensure receiptAdditionals exist; if not, use defaults
+    if (!s.receiptAdditionals || !Array.isArray(s.receiptAdditionals) || s.receiptAdditionals.length === 0) {
+      s.receiptAdditionals = DEFAULT_RECEIPT_ADDITIONALS;
+    }
+    setSettings(s);
   }, []);
 
   // deps kosong aman: hanya setter, tidak baca state apapun.
@@ -59,11 +82,124 @@ function useSettings({ toast_ }) {
     toast_(`Printer: ${name || "Default"}`, "ok");
   }, [settings, toast_]);
 
+  // ── Payment Methods CRUD ──────────────────────────────────────────────────────
+  // PENTING: membaca settings & newPaymentLabel LANGSUNG dari closure.
+  // Wajib [settings, newPaymentLabel, toast_] di deps.
+  const addPaymentMethod = useCallback(async () => {
+    const label = newPaymentLabel.trim();
+    if (!label) { toast_("Nama metode pembayaran wajib diisi", "err"); return; }
+    
+    // Check if label already exists
+    if (settings.paymentMethods.some(p => p.label.toLowerCase() === label.toLowerCase())) {
+      toast_("Metode pembayaran sudah ada", "err"); 
+      return;
+    }
+    
+    const newMethod = {
+      key: `custom_${Date.now()}`,
+      label: label,
+      category: "custom"
+    };
+    
+    const updated = [...settings.paymentMethods, newMethod];
+    const s = { ...settings, paymentMethods: updated };
+    await api.saveSettings(s);
+    setSettings(s);
+    setNewPaymentLabel("");
+    toast_(`Metode "${label}" ditambahkan`, "ok");
+  }, [settings, newPaymentLabel, toast_]);
+
+  // PENTING: membaca settings LANGSUNG dari closure.
+  // Wajib [settings, toast_] di deps.
+  const deletePaymentMethod = useCallback(async (key) => {
+    // Prevent deletion if only one method left
+    if (settings.paymentMethods.length <= 1) {
+      toast_("Minimal harus ada satu metode pembayaran", "err");
+      return;
+    }
+    
+    const updated = settings.paymentMethods.filter(p => p.key !== key);
+    const s = { ...settings, paymentMethods: updated };
+    await api.saveSettings(s);
+    setSettings(s);
+    toast_("Metode pembayaran dihapus", "ok");
+  }, [settings, toast_]);
+
+  // ── QRIS Image Upload ─────────────────────────────────────────────────────────
+  // Handle QRIS image upload for each QRIS payment method
+  const handleQrisImageUpload = useCallback(async (methodKey, file) => {
+    if (!file) return;
+    if (!["image/jpeg", "image/png"].includes(file.type)) {
+      toast_("Hanya JPEG/PNG untuk QRIS", "err");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast_("Ukuran QRIS maks 2MB", "err");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const imageData = ev.target.result;
+      // Initialize qrisImages if not exist
+      if (!settings.qrisImages) settings.qrisImages = {};
+      const qrisImages = { ...settings.qrisImages, [methodKey]: imageData };
+      const s = { ...settings, qrisImages };
+      await api.saveSettings(s);
+      setSettings(s);
+      toast_(`QRIS image untuk "${methodKey}" berhasil disimpan`, "ok");
+    };
+    reader.readAsDataURL(file);
+  }, [settings, toast_]);
+
+  // Delete QRIS image for a payment method
+  const deleteQrisImage = useCallback(async (methodKey) => {
+    if (!settings.qrisImages) return;
+    const qrisImages = { ...settings.qrisImages };
+    delete qrisImages[methodKey];
+    const s = { ...settings, qrisImages };
+    await api.saveSettings(s);
+    setSettings(s);
+    toast_(`QRIS image untuk "${methodKey}" dihapus`, "ok");
+  }, [settings, toast_]);
+
+  // ── Receipt Additionals CRUD ──────────────────────────────────────────────────
+  // Toggle "Wajib di isi" (required) for a receipt additional field
+  const toggleReceiptAdditionalRequired = useCallback(async (key) => {
+    const updated = settings.receiptAdditionals.map(field => {
+      if (field.key === key && field.type !== "toggle") {
+        return { ...field, required: !field.required };
+      }
+      return field;
+    });
+    const s = { ...settings, receiptAdditionals: updated };
+    await api.saveSettings(s);
+    setSettings(s);
+  }, [settings, toast_]);
+
+  // Toggle enabled status for charges (tax, service)
+  const toggleChargeEnabled = useCallback(async (key) => {
+    const updated = settings.receiptAdditionals.map(field => {
+      if (field.key === key && field.type === "toggle") {
+        return { ...field, enabled: !field.enabled };
+      }
+      return field;
+    });
+    const s = { ...settings, receiptAdditionals: updated };
+    await api.saveSettings(s);
+    setSettings(s);
+    toast_(`${key === "tax" ? "Pajak" : "Service"} ${updated.find(f => f.key === key)?.enabled ? "diaktifkan" : "dinonaktifkan"}`, "ok");
+  }, [settings, toast_]);
+
   return {
-    logo, settings, printerModal, printerList, logoRef,
+    logo, settings, settingsModal, setSettingsModal,
+    printerModal, printerList, logoRef,
+    newPaymentLabel, setNewPaymentLabel,
     loadInitial, handleLogoUpload, printHTML,
-    openPrinterModal, selectPrinter,
-    setPrinterModal, // dibutuhkan untuk tombol close modal di JSX
+    openPrinterModal, selectPrinter, setPrinterModal,
+    addPaymentMethod, deletePaymentMethod,
+    handleQrisImageUpload, deleteQrisImage,
+    toggleReceiptAdditionalRequired, toggleChargeEnabled,
   };
 }
 

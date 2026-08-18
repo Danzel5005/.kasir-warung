@@ -25,6 +25,7 @@ import PayModal        from "./components/modals/PayModal.jsx";
 import ReceiptModal    from "./components/modals/ReceiptModal.jsx";
 import ItemModal       from "./components/modals/ItemModal.jsx";
 import CatModal        from "./components/modals/CatModal.jsx";
+import SettingsModal   from "./components/modals/SettingsModal.jsx";
 import PrinterModal    from "./components/modals/PrinterModal.jsx";
 import CloseShiftModal from "./components/modals/CloseShiftModal.jsx";
 import ConfirmDelModal from "./components/modals/ConfirmDelModal.jsx";
@@ -118,7 +119,7 @@ export default function Kasir() {
   const authH     = useAuth({ getNow, toast_: toastH.toast_ });
   const menuH     = useMenu({ toast_: toastH.toast_, addUndo: toastH.addUndo });
   const billsH    = useBills({ toast_: toastH.toast_, addUndo: toastH.addUndo });
-  const cartH     = useCart({ toast_: toastH.toast_, getNow });
+  const cartH     = useCart({ toast_: toastH.toast_, getNow, receiptAdditionals: settingsH.settings.receiptAdditionals || [] });
   const historyH  = useHistory({ toast_: toastH.toast_, addUndo: toastH.addUndo, getNow });
 
   // ── Navigasi (UI-level, tidak dimiliki domain manapun)
@@ -218,9 +219,9 @@ export default function Kasir() {
   // printReceipt(trx) — generic, dari useSettings.printHTML + buildReceiptHTML
   // PENTING: membaca settingsH.logo langsung. Wajib di deps.
   const printReceipt = useCallback(async (trx) => {
-    const html = buildReceiptHTML(trx, settingsH.logo);
+    const html = buildReceiptHTML(trx, settingsH.logo, settingsH.settings.receiptAdditionals);
     await settingsH.printHTML(html, "Mencetak resi...");
-  }, [settingsH.logo, settingsH.printHTML]);
+  }, [settingsH.logo, settingsH.printHTML, settingsH.settings.receiptAdditionals]);
 
   // printPreview — depend ke cart (items/tableNum/pax), pakai printHTML generic dari settings
   // PENTING: membaca cartH.items/tableNum/pax dan settingsH.logo langsung. Semua wajib di deps.
@@ -228,12 +229,12 @@ export default function Kasir() {
     if (!cartH.items.length || !cartH.tableNum.trim()) { toastH.toast_("Isi meja dan pesanan dulu", "err"); return; }
     setPrintingPreview(true);
     try {
-      const html = buildPreviewHTML(cartH.tableNum.trim(), cartH.pax, cartH.items, settingsH.logo);
+      const html = buildPreviewHTML(cartH.tableNum.trim(), cartH.pax, cartH.items, settingsH.logo, settingsH.settings.receiptAdditionals);
       await settingsH.printHTML(html, "Mencetak preview tagihan...");
     } finally {
       setPrintingPreview(false);
     }
-  }, [cartH.items, cartH.tableNum, cartH.pax, toastH.toast_, settingsH.logo, settingsH.printHTML]);
+  }, [cartH.items, cartH.tableNum, cartH.pax, toastH.toast_, settingsH.logo, settingsH.printHTML, settingsH.settings.receiptAdditionals]);
 
   // Dipanggil dari tombol "Bayar" di Open Bill view — pola setTimeout
   // DIPERTAHANKAN PERSIS dari kode asli (lihat catatan di useCart.js bagian
@@ -247,16 +248,17 @@ export default function Kasir() {
   // confirmDel dispatcher — menggantikan switch-case yang dulu inline di modal konfirmasi
   // PENTING: membaca confirmDel langsung dari closure. Wajib di deps, atau
   // dispatcher akan selalu mengeksekusi confirmDel dari render pertama (null).
-  const executeConfirmDel = useCallback(() => {
+const executeConfirmDel = useCallback(() => {
     if (!confirmDel) return;
     if (confirmDel.type === "all") historyH.clearAllTrx();
     else if (confirmDel.type === "trx") historyH.deleteTrx(confirmDel.id);
     else if (confirmDel.type === "allBills") billsH.clearAllBills();
     else if (confirmDel.type === "bill") billsH.closeBill(confirmDel.id);
+    else if (confirmDel.type === "allMenu") menuH.clearAllMenu();   // ← new, must be explicit
     else menuH.deleteItem(confirmDel.id);
     setConfirmDel(null);
-  }, [confirmDel, historyH.clearAllTrx, historyH.deleteTrx, billsH.clearAllBills, billsH.closeBill, menuH.deleteItem]);
-
+  }, [confirmDel, historyH.clearAllTrx, historyH.deleteTrx, billsH.clearAllBills, billsH.closeBill, menuH.clearAllMenu, menuH.deleteItem]);
+ 
   const at = historyH.at;
   const doCSV = historyH.doCSV;
 
@@ -408,8 +410,8 @@ export default function Kasir() {
         </div>
 
         <div style={{marginLeft:"auto",display:"flex",gap:6,alignItems:"center"}}>
-          <button onClick={settingsH.openPrinterModal} title="Pengaturan Printer" style={{padding:"4px 10px",background:settingsH.settings.printerName?"#e8f5ee":LT,color:settingsH.settings.printerName?G:MT,border:`1px solid ${settingsH.settings.printerName?"#b8ddc8":BD}`,borderRadius:6,cursor:"pointer",fontFamily:"inherit",fontSize:10,fontWeight:600}}>
-            Printer{settingsH.settings.printerName?`: ${settingsH.settings.printerName.slice(0,12)}...`:""}
+          <button onClick={() => settingsH.setSettingsModal(true)} title="Pengaturan" style={{padding:"4px 10px",background:LT,color:G,border:`1px solid ${BD}`,borderRadius:6,cursor:"pointer",fontFamily:"inherit",fontSize:10,fontWeight:600}}>
+            ⚙️ Pengaturan
           </button>
           {/* Shift badge */}
           {authH.activeShift&&(
@@ -437,11 +439,13 @@ export default function Kasir() {
             cart={cartH.cart} drawerOpen={cartH.drawerOpen} setDrawerOpen={cartH.setDrawerOpen}
             tableNum={cartH.tableNum} setTableNum={cartH.setTableNum}
             pax={cartH.pax} setPax={cartH.setPax}
+            receiptAdditionalValues={cartH.receiptAdditionalValues} receiptAdditionals={cartH.receiptAdditionals} updateReceiptAdditionalValue={cartH.updateReceiptAdditionalValue}
             items={cartH.items} subtotal={cartH.subtotal} service={cartH.service}
             pajak={cartH.pajak} total={cartH.total} activeBill={cartH.activeBill}
             addToCart={cartH.addToCart} decCart={cartH.decCart} delCart={cartH.delCart} clearCart={cartH.clearCart}
             saveOpenBill={saveOpenBill} printPreview={printPreview} printingPreview={printingPreview} setPayModal={setPayModal}
             searchRef={searchRef}
+            checkRequiredAdditionals={cartH.checkRequiredAdditionals}
           />
         )}
 
@@ -509,12 +513,12 @@ export default function Kasir() {
 
       {/* ══ MODAL: PEMBAYARAN ══════════════════════════════════════════════ */}
       {payModal && (
-        <PayModal cartH={cartH} processPayment={processPayment} setPayModal={setPayModal} />
+        <PayModal cartH={cartH} processPayment={processPayment} setPayModal={setPayModal} paymentMethods={settingsH.settings.paymentMethods} receiptAdditionals={settingsH.settings.receiptAdditionals} />
       )}
 
       {/* ══ MODAL: RESI (klik transaksi atau setelah bayar) ════════════════ */}
       {receipt && (
-        <ReceiptModal receipt={receipt} logo={settingsH.logo} printReceipt={printReceipt} setReceipt={setReceipt} />
+        <ReceiptModal receipt={receipt} logo={settingsH.logo} printReceipt={printReceipt} setReceipt={setReceipt} receiptAdditionals={settingsH.settings.receiptAdditionals} />
       )}
 
       {/* ══ MODAL: TAMBAH/EDIT MENU ════════════════════════════════════════ */}
@@ -527,7 +531,12 @@ export default function Kasir() {
         <CatModal menuH={menuH} />
       )}
 
-      {/* ══ MODAL: PRINTER ════════════════════════════════════════════════ */}
+      {/* ══ MODAL: SETTINGS (PRINTER & PAYMENT) ════════════════════════════ */}
+      {settingsH.settingsModal && (
+        <SettingsModal settingsH={settingsH} />
+      )}
+
+      {/* ══ MODAL: PRINTER (Legacy, kept for backward compatibility) ════════ */}
       {settingsH.printerModal && (
         <PrinterModal settingsH={settingsH} />
       )}

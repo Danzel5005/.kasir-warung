@@ -30,9 +30,16 @@ export default function CatModal({ menuH }) {
                 {c.tags && c.tags.length > 0 && (
                   <div style={{ display:"flex", gap:4, marginTop:3, flexWrap:"wrap" }}>
                     {c.tags.map(tag => (
-                      <span key={tag} style={{ fontSize:TYPOGRAPHY.label.fontSize, background:COLOR_PALETTE.successLight, color:COLOR_PALETTE.success, padding:"2px 6px", borderRadius:RADIUS.sm }}>
-                        {tag === "drinks" ? "🥤 Drinks" : tag}
-                      </span>
+                      <div key={tag} style={{ display:"flex", alignItems:"center", gap:2, fontSize:TYPOGRAPHY.label.fontSize, background:COLOR_PALETTE.successLight, color:COLOR_PALETTE.success, padding:"2px 6px", borderRadius:RADIUS.sm }}>
+                        <span>{tag === "drinks" ? "🥤 Drinks" : tag}</span>
+                        <button
+                          onClick={() => menuH.removeTagFromCategory(c.key, tag)}
+                          style={{ background:"none", border:"none", color:COLOR_PALETTE.success, cursor:"pointer", padding:0, fontSize:"12px", fontWeight:"bold", lineHeight:1 }}
+                          title="Hapus tag"
+                        >
+                          ✕
+                        </button>
+                      </div>
                     ))}
                   </div>
                 )}

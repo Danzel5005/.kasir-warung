@@ -126,6 +126,20 @@ function useMenu({ toast_, addUndo }) {
     toast_(`Tag "${tag}" ditambahkan`, "ok");
   }, [cats, toast_]);
 
+  // PENTING: membaca cats LANGSUNG dari closure. Wajib [cats, toast_].
+  const removeTagFromCategory = useCallback(async (catKey, tag) => {
+    const updated = cats.map(c => {
+      if (c.key === catKey) {
+        const tags = c.tags || [];
+        return { ...c, tags: tags.filter(t => t !== tag) };
+      }
+      return c;
+    });
+    await api.saveCats(updated);
+    setCats(updated);
+    toast_(`Tag "${tag}" dihapus`, "ok");
+  }, [cats, toast_]);
+
   // Hanya MENGHITUNG updatedMenu — TIDAK setMenu di sini.
   // Kode asli (processPayment) baru setMenu(updatedMenu) SETELAH
   // api.processPayment() sukses. Kalau di-setMenu di sini (sebelum IPC
@@ -144,13 +158,20 @@ function useMenu({ toast_, addUndo }) {
     });
   }, [menu]);
 
+// PENTING: membaca menu LANGSUNG dari closure untuk snapshot undo. Wajib [menu, addUndo].
+const clearAllMenu = useCallback(async () => {
+  const snap = [...menu];
+  await api.saveMenu([]); setMenu([]);
+  addUndo("Hapus Semua Menu", async () => { await api.saveMenu(snap); setMenu(snap); });
+}, [menu, addUndo]);
+
   return {
     menu, cats, kategori, search, allCats, displayMenu,
     itemModal, editTarget, form, catModal, newCatLabel,
     setKategori, setSearch, setItemModal, setForm, setCatModal, setNewCatLabel,
     setMenu, // diperlukan App.jsx untuk commit stok SETELAH IPC processPayment sukses
     loadInitial, openAdd, openEdit, handlePhoto, saveItem, deleteItem,
-    addCat, deleteCat, addTagToCategory, computeStockDeduction,
+    addCat, deleteCat, addTagToCategory, removeTagFromCategory, computeStockDeduction, clearAllMenu
   };
 }
 

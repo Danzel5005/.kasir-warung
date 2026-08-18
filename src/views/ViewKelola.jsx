@@ -22,6 +22,11 @@ function ViewKelola({
           <button onClick={()=>setCatModal(true)} style={{background:COLOR_PALETTE.infoLight,color:COLOR_PALETTE.info,border:"none",borderRadius:RADIUS.md,padding:"6px 12px",cursor:"pointer",fontFamily:"inherit",fontSize:TYPOGRAPHY.small.fontSize,fontWeight:700}}>Kelola Kategori</button>
           <button onClick={()=>setUserModal(true)} style={{background:COLOR_PALETTE.dangerLight,color:COLOR_PALETTE.danger,border:"none",borderRadius:RADIUS.md,padding:"6px 12px",cursor:"pointer",fontFamily:"inherit",fontSize:TYPOGRAPHY.small.fontSize,fontWeight:700}}>Kelola Pengguna</button>
           <button onClick={openAdd} style={{background:G,color:W,border:"none",borderRadius:RADIUS.md,padding:"6px 12px",cursor:"pointer",fontFamily:"inherit",fontSize:TYPOGRAPHY.small.fontSize,fontWeight:700}}>+ Tambah Menu</button>
+        {menu.length>0 && (
+         <button onClick={()=>setConfirmDel({type:"allMenu"})}
+          style={{background:"#fef0f0",color:"#e84040",border:"none",borderRadius:7,padding:"6px 12px",cursor:"pointer",fontFamily:"inherit",fontSize:11,fontWeight:700}}>
+           Hapus Semua Menu
+         </button>)}
         </div>
       </div>
       <div style={{flex:1,overflowY:"auto",padding:"10px 16px"}}>
