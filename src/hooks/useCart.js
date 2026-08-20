@@ -240,6 +240,11 @@ const processPayment = useCallback(async ({
   if (onSuccess) onSuccess(trx);
   return trx;
 }, [items, subtotal, metode, paidNum, kembalian, cart, toast_, getNow, clearCart]);
+
+  return {
+    cart, drawerOpen, receiptAdditionalValues, receiptAdditionals, metode, paid, activeBill,
+    items, subtotal, pajak, service, total, paidNum, kembalian, canPay,
+    setDrawerOpen, updateReceiptAdditionalValue, setMetode, setPaid,
     addToCart, decCart, delCart, clearCart,
     saveOpenBill, loadBillToCart, processPayment, checkRequiredAdditionals, getCanPay,
   };
