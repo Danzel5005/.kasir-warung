@@ -21,6 +21,7 @@ function ViewRiwayat({
   shiftIdFilter, setShiftIdFilter,         // historyH
   histByShift,                             // historyH
   shifts,                                  // authH
+  paymentMethods = [],                     // settingsH - for custom payment method labels
 }) {
   const [showAllShifts, setShowAllShifts] = useState(false);
   const [expandedShifts, setExpandedShifts] = useState(null);
@@ -75,7 +76,7 @@ function ViewRiwayat({
       <div style={{ ...row, marginBottom:5 }}>
         <div style={{ display:"flex", gap:5, flexWrap:"wrap", alignItems:"center" }}>
           <Tag label={`TRX #${t.id}`} bg="#e8f5ee" tc={G}/>
-          <Tag label={METODE_LABELS[t.metodeBayar] || t.metodeBayar}
+          <Tag label={t.metodeBayarLabel ?? paymentMethods.find(m => m.key === t.metodeBayar)?.label ?? METODE_LABELS[t.metodeBayar] ?? t.metodeBayar.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
             bg={(METODE_COLORS[t.metodeBayar] || {bg:"#f0f0f0"}).bg}
             tc={(METODE_COLORS[t.metodeBayar] || {tc:MT}).tc}/>
         </div>

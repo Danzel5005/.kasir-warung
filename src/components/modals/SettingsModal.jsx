@@ -29,7 +29,7 @@ export default function SettingsModal({ settingsH, authH }) {
           background: W,
           borderRadius: RADIUS.lg,
           padding: "20px",
-          width: 420,
+          width: "flex",
           maxWidth: "95vw",
           boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
           display: "flex",
@@ -64,87 +64,8 @@ export default function SettingsModal({ settingsH, authH }) {
             onClick={() => setTab("printer")}
             style={{
               background: "none",
-              border: "none",
-              borderBottom: tab === "printer" ? `2px solid ${G}` : "none",
-              cursor: "pointer",
-              fontFamily: "inherit",
-              fontSize: TYPOGRAPHY.small.fontSize,
-              fontWeight: tab === "printer" ? 700 : 600,
-              color: tab === "printer" ? G : MT,
-              paddingBottom: 6,
-            }}
-          >
-            🖨️ Printer
-          </button>
-          <button
-            onClick={() => setTab("warung")}
-            style={{
-              background: "none",
-              border: "none",
-              borderBottom: tab === "warung" ? `2px solid ${G}` : "none",
-              cursor: "pointer",
-              fontFamily: "inherit",
-              fontSize: TYPOGRAPHY.small.fontSize,
-              fontWeight: tab === "warung" ? 700 : 600,
-              color: tab === "warung" ? G : MT,
-              paddingBottom: 6,
-            }}
-          >
-            🏪 Nama Warung
-          </button>
-          <button
-            onClick={() => setTab("payment")}
-            style={{
-              background: "none",
-              border: "none",
-              borderBottom: tab === "payment" ? `2px solid ${G}` : "none",
-              cursor: "pointer",
-              fontFamily: "inherit",
-              fontSize: TYPOGRAPHY.small.fontSize,
-              fontWeight: tab === "payment" ? 700 : 600,
-              color: tab === "payment" ? G : MT,
-              paddingBottom: 6,
-            }}
-          >
-            💳 Metode Bayar
-          </button>
-          <button
-            onClick={() => setTab("qris")}
-            style={{
-              background: "none",
-              border: "none",
-              borderBottom: tab === "qris" ? `2px solid ${G}` : "none",
-              cursor: "pointer",
-              fontFamily: "inherit",
-              fontSize: TYPOGRAPHY.small.fontSize,
-              fontWeight: tab === "qris" ? 700 : 600,
-              color: tab === "qris" ? G : MT,
-              paddingBottom: 6,
-            }}
-          >
-            📱 QRIS
-          </button>
-          <button
-            onClick={() => setTab("receipt")}
-            style={{
-              background: "none",
-              border: "none",
-              borderBottom: tab === "receipt" ? `2px solid ${G}` : "none",
-              cursor: "pointer",
-              fontFamily: "inherit",
-              fontSize: TYPOGRAPHY.small.fontSize,
-              fontWeight: tab === "receipt" ? 700 : 600,
-              color: tab === "receipt" ? G : MT,
-              paddingBottom: 6,
-            }}
-          >
-            🧾 Resi
-          </button>
-          <button
-            onClick={() => setTab("users")}
-            style={{
-              background: "none",
-              border: "none",
+              border: `2px solid ${tab === "users" ? G : MT}`,
+              padding: "6px 12px",
               borderBottom: tab === "users" ? `2px solid ${G}` : "none",
               cursor: "pointer",
               fontFamily: "inherit",
@@ -154,7 +75,92 @@ export default function SettingsModal({ settingsH, authH }) {
               paddingBottom: 6,
             }}
           >
-            👥 Kelola Pengguna
+          Printer
+          </button>
+          <button
+            onClick={() => setTab("warung")}
+            style={{
+              background: "none",
+              border: `2px solid ${tab === "users" ? G : MT}`,
+              padding: "6px 12px",
+              borderBottom: tab === "users" ? `2px solid ${G}` : "none",
+              cursor: "pointer",
+              fontFamily: "inherit",
+              fontSize: TYPOGRAPHY.small.fontSize,
+              fontWeight: tab === "users" ? 700 : 600,
+              color: tab === "users" ? G : MT,
+              paddingBottom: 6,
+            }}
+          >
+          Nama Warung
+          </button>
+          <button
+            onClick={() => setTab("payment")}
+            style={{
+              background: "none",
+              border: `2px solid ${tab === "users" ? G : MT}`,
+              padding: "6px 12px",
+              borderBottom: tab === "users" ? `2px solid ${G}` : "none",
+              cursor: "pointer",
+              fontFamily: "inherit",
+              fontSize: TYPOGRAPHY.small.fontSize,
+              fontWeight: tab === "users" ? 700 : 600,
+              color: tab === "users" ? G : MT,
+              paddingBottom: 6,
+            }}
+          >
+          Metode Bayar
+          </button>
+          <button
+            onClick={() => setTab("qris")}
+            style={{
+              background: "none",
+              border: `2px solid ${tab === "users" ? G : MT}`,
+              padding: "6px 12px",
+              borderBottom: tab === "users" ? `2px solid ${G}` : "none",
+              cursor: "pointer",
+              fontFamily: "inherit",
+              fontSize: TYPOGRAPHY.small.fontSize,
+              fontWeight: tab === "users" ? 700 : 600,
+              color: tab === "users" ? G : MT,
+              paddingBottom: 6,
+            }}
+          >
+          QRIS
+          </button>
+          <button
+            onClick={() => setTab("receipt")}
+            style={{
+              background: "none",
+              border: `2px solid ${tab === "users" ? G : MT}`,
+              padding: "6px 12px",
+              borderBottom: tab === "users" ? `2px solid ${G}` : "none",
+              cursor: "pointer",
+              fontFamily: "inherit",
+              fontSize: TYPOGRAPHY.small.fontSize,
+              fontWeight: tab === "users" ? 700 : 600,
+              color: tab === "users" ? G : MT,
+              paddingBottom: 6,
+            }}
+          >
+          Resi
+          </button>
+          <button
+            onClick={() => setTab("users")}
+            style={{
+              background: "none",
+              border: `2px solid ${tab === "users" ? G : MT}`,
+              padding: "6px 12px",
+              borderBottom: tab === "users" ? `2px solid ${G}` : "none",
+              cursor: "pointer",
+              fontFamily: "inherit",
+              fontSize: TYPOGRAPHY.small.fontSize,
+              fontWeight: tab === "users" ? 700 : 600,
+              color: tab === "users" ? G : MT,
+              paddingBottom: 6,
+            }}
+          >
+          Kelola Pengguna
           </button>
         </div>
 

@@ -34,6 +34,18 @@ function useSettings({ toast_ }) {
   const [warungPhoneInput, setWarungPhoneInput] = useState("");
   const logoRef = useRef();
 
+  // Helper to auto-detect QRIS payment methods by name (case insensitive)
+  const normalizePaymentMethodCategory = (methods) => {
+    if (!Array.isArray(methods)) return methods;
+    return methods.map((m) => {
+      // If label contains "QRIS" (case insensitive) and category is not already "qris", auto-set it
+      if (m.label && m.label.toLowerCase().includes("qris") && m.category !== "qris") {
+        return { ...m, category: "qris" };
+      }
+      return m;
+    });
+  };
+
   // deps kosong aman: hanya setter, tidak baca state apapun.
   const loadInitial = useCallback((savedLogo, savedSettings) => {
     setLogo(savedLogo || null);
@@ -41,6 +53,9 @@ function useSettings({ toast_ }) {
     // Ensure paymentMethods exist; if not, use defaults
     if (!s.paymentMethods || !Array.isArray(s.paymentMethods) || s.paymentMethods.length === 0) {
       s.paymentMethods = DEFAULT_PAYMENT_METHODS;
+    } else {
+      // Auto-detect QRIS payment methods by name
+      s.paymentMethods = normalizePaymentMethodCategory(s.paymentMethods);
     }
     // Ensure receiptAdditionals exist; if not, use defaults
     if (!s.receiptAdditionals || !Array.isArray(s.receiptAdditionals) || s.receiptAdditionals.length === 0) {
@@ -106,10 +121,13 @@ function useSettings({ toast_ }) {
       return;
     }
     
+    // Auto-detect QRIS category based on label (case insensitive)
+    const isQris = label.toLowerCase().includes("qris");
+    
     const newMethod = {
       key: `custom_${Date.now()}`,
       label: label,
-      category: "custom"
+      category: isQris ? "qris" : "custom"
     };
     
     const updated = [...settings.paymentMethods, newMethod];

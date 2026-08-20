@@ -5,7 +5,7 @@ import { METODE_LABELS} from "../../constants/payments.js";
 import { METODE_COLORS,G, OR, W, BD, MT } from "../../constants/colors.js";
 import { row, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/theme.js";
 
-export default function ReceiptModal({ receipt, logo, printReceipt, setReceipt, receiptAdditionals, qrisImages }) {
+export default function ReceiptModal({ receipt, logo, printReceipt, setReceipt, receiptAdditionals, qrisImages, paymentMethods = [] }) {
   const [isPrinting, setIsPrinting] = useState(false);
   const [progress, setProgress] = useState(0);
 
@@ -84,24 +84,33 @@ export default function ReceiptModal({ receipt, logo, printReceipt, setReceipt, 
               TRX #{receipt.id}
             </div>
           )}
-          <div style={{ fontSize:TYPOGRAPHY.label.fontSize, fontWeight:700, color:(METODE_COLORS[receipt.metodeBayar] || { tc:MT }).tc }}>
-            {METODE_LABELS[receipt.metodeBayar] || receipt.metodeBayar}
-          </div>
-          <div style={{ borderTop:"1px dashed #ccc", margin:"7px 0" }}/>
-
-          {/* QRIS Image for QRIS payments */}
           {(() => {
-            const isQris = receipt.metodeBayar && receipt.metodeBayar.startsWith("qris");
+            // Use stored label from transaction (metodeBayarLabel), fallback to lookup, NEVER show raw key
+            const metodeLabel = receipt.metodeBayarLabel
+              ?? paymentMethods.find(m => m.key === receipt.metodeBayar)?.label 
+              ?? METODE_LABELS[receipt.metodeBayar] 
+              ?? receipt.metodeBayar.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            const isQris = paymentMethods.find(m => m.key === receipt.metodeBayar)?.category === "qris" 
+              || (receipt.metodeBayar && receipt.metodeBayar.startsWith("qris"));
             const qrisImage = isQris && qrisImages && qrisImages[receipt.metodeBayar];
-            return qrisImage ? (
-              <div style={{ marginBottom: 10 }}>
-                <img 
-                  src={qrisImage} 
-                  alt={`QRIS ${METODE_LABELS[receipt.metodeBayar] || receipt.metodeBayar}`} 
-                  style={{ maxWidth: "100%", maxHeight: "150px", borderRadius: RADIUS.md, border: `1px solid ${BD}` }} 
-                />
-              </div>
-            ) : null;
+            return (
+              <>
+                <div style={{ fontSize:TYPOGRAPHY.label.fontSize, fontWeight:700, color:(METODE_COLORS[receipt.metodeBayar] || { tc:MT }).tc }}>
+                  {metodeLabel}
+                </div>
+                <div style={{ borderTop:"1px dashed #ccc", margin:"7px 0" }}/>
+                {/* QRIS Image for QRIS payments */}
+                {qrisImage ? (
+                  <div style={{ marginBottom: 10 }}>
+                    <img 
+                      src={qrisImage} 
+                      alt={`QRIS ${metodeLabel}`} 
+                      style={{ maxWidth: "100%", maxHeight: "150px", borderRadius: RADIUS.md, border: `1px solid ${BD}` }} 
+                    />
+                  </div>
+                ) : null}
+              </>
+            );
           })()}
         </div>
 
@@ -135,13 +144,19 @@ export default function ReceiptModal({ receipt, logo, printReceipt, setReceipt, 
 
           {/* QRIS Image for QRIS payments (also at bottom) */}
           {(() => {
-            const isQris = receipt.metodeBayar && receipt.metodeBayar.startsWith("qris");
+            // Use stored label from transaction (metodeBayarLabel), fallback to lookup, NEVER show raw key
+            const metodeLabel = receipt.metodeBayarLabel
+              ?? paymentMethods.find(m => m.key === receipt.metodeBayar)?.label 
+              ?? METODE_LABELS[receipt.metodeBayar] 
+              ?? receipt.metodeBayar.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            const isQris = paymentMethods.find(m => m.key === receipt.metodeBayar)?.category === "qris" 
+              || (receipt.metodeBayar && receipt.metodeBayar.startsWith("qris"));
             const qrisImage = isQris && qrisImages && qrisImages[receipt.metodeBayar];
             return qrisImage ? (
               <div style={{ textAlign: "center", marginBottom: 10 }}>
                 <img 
                   src={qrisImage} 
-                  alt={`QRIS ${METODE_LABELS[receipt.metodeBayar] || receipt.metodeBayar}`} 
+                  alt={`QRIS ${metodeLabel}`} 
                   style={{ maxWidth: "100%", maxHeight: "150px", borderRadius: RADIUS.md, border: `1px solid ${BD}` }} 
                 />
               </div>

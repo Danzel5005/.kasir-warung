@@ -93,6 +93,9 @@ function csvMetodeBayar(trxs, at, paymentMethods = []) {
     : {"cash":"Tunai","debit-bca":"Debit BCA","debit-bni":"Debit BNI","qris-bca":"QRIS BCA","qris-bni":"QRIS BNI","transfer-bca":"Debit BCA","qris":"QRIS BCA"};
   const normalize = m => m==="transfer-bca"?"debit-bca":m==="qris"?"qris-bca":m;
 
+  // Helper to get label, never show raw key
+  const getLabel = (key) => LABELS_M[key] ?? key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
   // Per hari per metode
   const byDay = {};
   trxs.forEach(t => {
@@ -109,7 +112,7 @@ function csvMetodeBayar(trxs, at, paymentMethods = []) {
   Object.values(byDay).forEach(day => {
     METHODS.forEach(m => {
       const d = day.data[m];
-      if(d) rows.push([day.hari, day.tgl, LABELS_M[m] || m, d.trx, d.total, at].join(","));
+      if(d) rows.push([day.hari, day.tgl, getLabel(m), d.trx, d.total, at].join(","));
     });
     rows.push("");
   });
@@ -118,7 +121,7 @@ function csvMetodeBayar(trxs, at, paymentMethods = []) {
   const sumRows = METHODS.map(m => {
     const filtered = trxs.filter(t => normalize(t.metodeBayar)===m);
     const tot = filtered.reduce((s,t)=>s+t.total,0);
-    return ["TOTAL","Semua Hari", LABELS_M[m] || m, filtered.length, tot, at].join(",");
+    return ["TOTAL","Semua Hari", getLabel(m), filtered.length, tot, at].join(",");
   });
   const grandTotal = trxs.reduce((s,t)=>s+t.total,0);
   sumRows.push(["GRAND TOTAL","","Semua Metode",trxs.length,grandTotal,at].join(","));

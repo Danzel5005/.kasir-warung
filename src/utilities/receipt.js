@@ -50,9 +50,16 @@ const buildAdditionalFields = (data, receiptAdditionals) => {
 };
 
 // Detect QRIS image for a given payment method
+// Custom QRIS methods may have keys like "custom_12345", so we check both the key prefix
+// and also if the qrisImages object has an entry for this method key
 const getQrisImage = (metodeBayar, qrisImages) => {
-  if (!metodeBayar || !metodeBayar.startsWith("qris")) return null;
-  if (!qrisImages) return null;
+  if (!metodeBayar || !qrisImages) return null;
+  // First check if the key starts with "qris" (legacy/default QRIS methods)
+  if (metodeBayar.startsWith("qris")) {
+    return qrisImages[metodeBayar] || null;
+  }
+  // For custom payment methods, check if qrisImages has an entry for this key
+  // (this covers custom QRIS methods with keys like "custom_12345")
   return qrisImages[metodeBayar] || null;
 };
 
@@ -94,13 +101,17 @@ const buildCategoryTotals = (items, cats = []) => {
   return { taggedCategories, untaggedCategories };
 };
 
-function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName, cats = [], warungAddress = "", warungPhone = "") {
+function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName, cats = [], warungAddress = "", warungPhone = "", paymentMethods = []) {
   const taxEnabled = receiptAdditionals?.find(f => f.key === "tax")?.enabled !== false;
   const serviceEnabled = receiptAdditionals?.find(f => f.key === "service")?.enabled !== false;
   const { pajak, service, total } = calcPrice(trx.subtotal, {
     taxEnabled, serviceEnabled
   });
-  const metodeLabel = globalThis.METODE_LABELS?.[trx.metodeBayar] ?? trx.metodeBayar;
+  // Use stored label from transaction, fallback to lookup, NEVER show raw key
+  const metodeLabel = trx.metodeBayarLabel 
+    ?? paymentMethods.find(m => m.key === trx.metodeBayar)?.label 
+    ?? globalThis.METODE_LABELS?.[trx.metodeBayar] 
+    ?? trx.metodeBayar.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   const qrisImage = getQrisImage(trx.metodeBayar, qrisImages);
   const addFields = buildAdditionalFields(trx, receiptAdditionals);
   const storeName = warungName || trx.warungName || DEFAULT_WARUNG; // [11] dynamic custom name

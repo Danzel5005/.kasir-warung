@@ -154,11 +154,13 @@ export default function PayModal({ cartH, processPayment, setPayModal, paymentMe
               color: getCategoryColor(paymentMethods.find(m => m.key === cartH.metode)?.category || "custom"), fontWeight:600,
             }}>
               {(() => {
-                const cat = paymentMethods.find(m => m.key === cartH.metode)?.category;
-                if (cat === "cash") return "Pembayaran dengan uang cash";
-                if (cat === "debit") return "Pembayaran dengan kartu debit";
-                if (cat === "qris") return "Scan QRIS untuk pembayaran";
-                return "Lanjutkan dengan metode pembayaran ini";
+                const method = paymentMethods.find(m => m.key === cartH.metode);
+                const cat = method?.category;
+                const label = method?.label || cartH.metode.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                if (cat === "cash") return `Pembayaran dengan ${label}`;
+                if (cat === "debit") return `Pembayaran dengan ${label}`;
+                if (cat === "qris") return `Scan ${label} untuk pembayaran`;
+                return `Lanjutkan dengan ${label}`;
               })()}
             </div>
           )}

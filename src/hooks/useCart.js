@@ -181,70 +181,65 @@ function useCart({ toast_, getNow, receiptAdditionals = [] }) {
   // PANGGILAN, bukan closure dependency — TIDAK masuk deps array.
   //
   // PENTING — baca dengan teliti: items, subtotal, metode,
-  // paidNum, kembalian, activeBill, cart SEMUA dibaca langsung dari closure.
-  // activeBill khususnya — variabel yang diduga terlibat race condition
-  // Tahap 2. Dependency array di bawah WAJIB lengkap, atau processPayment
-  // akan selalu pakai snapshot dari render pertama (cart kosong, activeBill
-  // null selamanya) — bug katastropik, bukan cuma stale.
-  const processPayment = useCallback(async ({
-    generateTrxId, activeShift,
-    computeStockDeduction, commitMenu,
-    appendHistory,
-    removeBillLocal,
-    onSuccess,
-  }) => {
-    const t = getNow();
-    const taxEnabled = receiptAdditionals?.find(f => f.key === "tax")?.enabled !== false;
-    const serviceEnabled = receiptAdditionals?.find(f => f.key === "service")?.enabled !== false;
-    const { pajak: p, service: s, total: tot } = calcPrice(subtotal, { taxEnabled, serviceEnabled });
-    
-    // Build receipt additional values for the transaction
-    const receiptAdditionalData = {};
-    if (receiptAdditionals) {
-      receiptAdditionals
-        .filter(f => f.category === "receipt" && f.visible !== false)
-        .forEach(field => {
-          receiptAdditionalData[field.key] = receiptAdditionalValues[field.key] || "";
-        });
-    }
-    
-    const trxId = generateTrxId();
-    const trx = {
-      id: trxId, ...t, items: [...items],
-      subtotal, pajak: p, service: s, total: tot, metodeBayar: metode,
-      bayar: metode === "cash" ? paidNum : tot,
-      kembalian: metode === "cash" ? kembalian : 0,
-      shiftId: activeShift?.id || null, shiftNum: activeShift?.shiftNum || null,
-      operator: activeShift?.operator || "Kasir", // [2] nama pengguna yang login
-      ...receiptAdditionalData, // Include receipt additional fields
-    };
-    const updatedMenu = computeStockDeduction(cart);
-    // activeBill?.id dibaca di SAAT INI, tidak ada await sebelumnya di fungsi
-    // ini yang membuatnya stale — kalau bug race condition masih terjadi,
-    // root cause-nya kemungkinan activeBill SUDAH null di state SEBELUM
-    // fungsi ini dipanggil (lihat catatan setTimeout di file ini bagian atas).
-    const billIdToClose = activeBill?.id || null;
-    const result = await api.processPayment({ trx, updatedMenu, activeBillId: billIdToClose });
+// paidNum, kembalian, cart SEMUA dibaca langsung dari closure.
+// activeBill DIHAPUS dari deps — billIdToClose sekarang dikirim sebagai
+// parameter eksplisit dari App.jsx (via cartH.activeBill) untuk menghindari
+// race condition pada setTimeout di loadBillAndPay.
+const processPayment = useCallback(async ({
+  generateTrxId, activeShift,
+  computeStockDeduction, commitMenu,
+  appendHistory,
+  removeBillLocal,
+  onSuccess,
+  billIdToClose,        // NEW: explicit bill ID to close (from cartH.activeBill)
+  paymentMethods = [],  // NEW: payment methods array to resolve label
+}) => {
+  const t = getNow();
+  const taxEnabled = receiptAdditionals?.find(f => f.key === "tax")?.enabled !== false;
+  const serviceEnabled = receiptAdditionals?.find(f => f.key === "service")?.enabled !== false;
+  const { pajak: p, service: s, total: tot } = calcPrice(subtotal, { taxEnabled, serviceEnabled });
+  
+  // Build receipt additional values for the transaction
+  const receiptAdditionalData = {};
+  if (receiptAdditionals) {
+    receiptAdditionals
+      .filter(f => f.category === "receipt" && f.visible !== false)
+      .forEach(field => {
+        receiptAdditionalData[field.key] = receiptAdditionalValues[field.key] || "";
+      });
+  }
+  
+  // Resolve payment method label for the transaction (never show key)
+  const metodeLabel = paymentMethods.find(m => m.key === metode)?.label 
+    ?? globalThis.METODE_LABELS?.[metode] 
+    ?? metode.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  
+  const trxId = generateTrxId();
+  const trx = {
+    id: trxId, ...t, items: [...items],
+    subtotal, pajak: p, service: s, total: tot, 
+    metodeBayar: metode,
+    metodeBayarLabel: metodeLabel, // NEW: store label in transaction
+    bayar: metode === "cash" ? paidNum : tot,
+    kembalian: metode === "cash" ? kembalian : 0,
+    shiftId: activeShift?.id || null, shiftNum: activeShift?.shiftNum || null,
+    operator: activeShift?.operator || "Kasir", // [2] nama pengguna yang login
+    ...receiptAdditionalData, // Include receipt additional fields
+  };
+  const updatedMenu = computeStockDeduction(cart);
+  const result = await api.processPayment({ trx, updatedMenu, activeBillId: billIdToClose });
 
-    if (!result.ok) { toast_("Gagal menyimpan transaksi", "err"); return null; }
+  if (!result.ok) { toast_("Gagal menyimpan transaksi", "err"); return null; }
 
-    commitMenu(updatedMenu);     // setMenu — commit HANYA setelah IPC sukses
-    appendHistory(trx);          // setHistory(h=>[trx,...h])
-    setTrxId(n => n + 1);
-    // FIX BARU (di luar scope migrasi murni, keputusan eksplisit user):
-    // App.jsx ASLI tidak pernah sinkronkan state `bills` setelah payment —
-    // main.js sudah hapus dari file, tapi React state stale. Baris di bawah
-    // memperbaiki itu TANPA menulis ulang file (lihat useBills.removeBillLocal).
-    removeBillLocal(billIdToClose);
-    clearCart();
-    if (onSuccess) onSuccess(trx);
-    return trx;
-  }, [items, subtotal, metode, paidNum, kembalian, activeBill, cart, toast_, getNow, clearCart]);
-
-  return {
-    cart, drawerOpen, receiptAdditionalValues, receiptAdditionals, metode, paid, activeBill,
-    items, subtotal, pajak, service, total, paidNum, kembalian, canPay,
-    setDrawerOpen, updateReceiptAdditionalValue, setMetode, setPaid,
+  commitMenu(updatedMenu);     // setMenu — commit HANYA setelah IPC sukses
+  appendHistory(trx);          // setHistory(h=>[trx,...h])
+  setTrxId(n => n + 1);
+  // Remove the paid bill from open bills using explicit billIdToClose
+  removeBillLocal(billIdToClose);
+  clearCart();
+  if (onSuccess) onSuccess(trx);
+  return trx;
+}, [items, subtotal, metode, paidNum, kembalian, cart, toast_, getNow, clearCart]);
     addToCart, decCart, delCart, clearCart,
     saveOpenBill, loadBillToCart, processPayment, checkRequiredAdditionals, getCanPay,
   };

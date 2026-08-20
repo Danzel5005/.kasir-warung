@@ -193,6 +193,7 @@ export default function Kasir() {
   }), [cartH.saveOpenBill, billsH.bills, billsH.billId, billsH.persistBills, billsH.setBillId]);
 
   // processPayment butuh potongan dari useHistory, useMenu, useAuth, useBills
+  // FIX: Pass billIdToClose and paymentMethods explicitly to avoid race condition
   const processPayment = useCallback(() => cartH.processPayment({
     generateTrxId: historyH.generateTrxId,
     activeShift: authH.activeShift,
@@ -200,10 +201,13 @@ export default function Kasir() {
     commitMenu: menuH.setMenu,
     appendHistory: (trx) => { historyH.appendHistory(trx); setReceipt(trx); setPayModal(false); cartH.setDrawerOpen(false); cartH.clearCart(); },
     removeBillLocal: billsH.removeBillLocal,
+    billIdToClose: cartH.activeBill?.id || null,     // NEW: explicit bill ID from activeBill
+    paymentMethods: settingsH.settings.paymentMethods || [], // NEW: payment methods for label resolution
   }), [
     cartH.processPayment, historyH.generateTrxId, authH.activeShift,
     menuH.computeStockDeduction, menuH.setMenu, historyH.appendHistory,
     cartH.setDrawerOpen, cartH.clearCart, billsH.removeBillLocal,
+    cartH.activeBill, settingsH.settings.paymentMethods, // NEW deps
   ]);
 
   // confirmCloseShift butuh clearCart saja — clearBills DIHAPUS
@@ -216,9 +220,9 @@ export default function Kasir() {
   // printReceipt(trx) — generic, dari useSettings.printHTML + buildReceiptHTML
   // PENTING: membaca settingsH.logo langsung. Wajib di deps.
   const printReceipt = useCallback(async (trx) => {
-    const html = buildReceiptHTML(trx, settingsH.logo, settingsH.settings.receiptAdditionals, settingsH.settings.qrisImages, settingsH.settings.warungName, menuH.cats, settingsH.settings.warungAddress, settingsH.settings.warungPhone);
+    const html = buildReceiptHTML(trx, settingsH.logo, settingsH.settings.receiptAdditionals, settingsH.settings.qrisImages, settingsH.settings.warungName, menuH.cats, settingsH.settings.warungAddress, settingsH.settings.warungPhone, settingsH.settings.paymentMethods);
     await settingsH.printHTML(html, "Selesai Mencetak Resi");
-  }, [settingsH.logo, settingsH.printHTML, settingsH.settings.receiptAdditionals, settingsH.settings.qrisImages, settingsH.settings.warungName, settingsH.settings.warungAddress, settingsH.settings.warungPhone, menuH.cats]);
+  }, [settingsH.logo, settingsH.printHTML, settingsH.settings.receiptAdditionals, settingsH.settings.qrisImages, settingsH.settings.warungName, settingsH.settings.warungAddress, settingsH.settings.warungPhone, menuH.cats, settingsH.settings.paymentMethods]);
 
   // printPreview — depend ke cart (items/receiptAdditionalValues), pakai printHTML generic dari settings
   // PENTING: membaca cartH.items/receiptAdditionalValues dan settingsH.logo langsung. Semua wajib di deps.
@@ -474,6 +478,7 @@ const executeConfirmDel = useCallback(() => {
             shiftIdFilter={historyH.shiftIdFilter} setShiftIdFilter={historyH.setShiftIdFilter}
             histByShift={historyH.histByShift}
             shifts={authH.shifts}
+            paymentMethods={settingsH.settings.paymentMethods}
           />
         )}
 
@@ -513,7 +518,7 @@ const executeConfirmDel = useCallback(() => {
 
       {/* ══ MODAL: RESI (klik transaksi atau setelah bayar) ════════════════ */}
       {receipt && (
-        <ReceiptModal receipt={receipt} logo={settingsH.logo} printReceipt={printReceipt} setReceipt={setReceipt} receiptAdditionals={settingsH.settings.receiptAdditionals} qrisImages={settingsH.settings.qrisImages} />
+        <ReceiptModal receipt={receipt} logo={settingsH.logo} printReceipt={printReceipt} setReceipt={setReceipt} receiptAdditionals={settingsH.settings.receiptAdditionals} qrisImages={settingsH.settings.qrisImages} paymentMethods={settingsH.settings.paymentMethods} />
       )}
 
       {/* ══ MODAL: TAMBAH/EDIT MENU ════════════════════════════════════════ */}
