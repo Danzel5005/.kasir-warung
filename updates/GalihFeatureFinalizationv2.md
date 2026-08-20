@@ -7,5 +7,6 @@
 - [5] Add the feature that automatically detects, if a metode bayar has a name "QRIS" (no case sensitive), it automatically shows up as one of the QRIS payment that the user can upload the image in QRIS setting 
 
 # Fix Session 2
-- [6] Konfirmasi bayar doesn't erase the TRX in openbill
-- [7] costum Metode Bayar only show key, not Label - Never Show Key, Always Label
+- [ ] Konfirmasi bayar doesn't erase the TRX in openbill
+- [ ] costum Metode Bayar only show key, not Label - Never Show Key, Always Label
+- [ ] 

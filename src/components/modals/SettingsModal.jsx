@@ -7,9 +7,17 @@ export default function SettingsModal({ settingsH, authH }) {
   const [loadingPrinters, setLoadingPrinters] = useState(false);
   const qrisImageRef = useRef({});
 
+  // Fetch printers when printer tab is active
+  useEffect(() => {
+    if (tab === "printer" && settingsH.printerList.length === 0 && !loadingPrinters) {
+      setLoadingPrinters(true);
+      settingsH.openPrinterModal?.().finally(() => setLoadingPrinters(false));
+    }
+  }, [tab, settingsH.printerList.length, loadingPrinters, settingsH.openPrinterModal]);
 
 
-  return (
+
+return (
     <div
       style={{
         position: "fixed",
@@ -64,14 +72,14 @@ export default function SettingsModal({ settingsH, authH }) {
             onClick={() => setTab("printer")}
             style={{
               background: "none",
-              border: `2px solid ${tab === "users" ? G : MT}`,
+              border: `2px solid ${tab === "printer" ? G : MT}`,
               padding: "6px 12px",
-              borderBottom: tab === "users" ? `2px solid ${G}` : "none",
+              borderBottom: tab === "printer" ? `2px solid ${G}` : "none",
               cursor: "pointer",
               fontFamily: "inherit",
               fontSize: TYPOGRAPHY.small.fontSize,
-              fontWeight: tab === "users" ? 700 : 600,
-              color: tab === "users" ? G : MT,
+              fontWeight: tab === "printer" ? 700 : 600,
+              color: tab === "printer" ? G : MT,
               paddingBottom: 6,
             }}
           >
@@ -81,14 +89,14 @@ export default function SettingsModal({ settingsH, authH }) {
             onClick={() => setTab("warung")}
             style={{
               background: "none",
-              border: `2px solid ${tab === "users" ? G : MT}`,
+              border: `2px solid ${tab === "warung" ? G : MT}`,
               padding: "6px 12px",
-              borderBottom: tab === "users" ? `2px solid ${G}` : "none",
+              borderBottom: tab === "warung" ? `2px solid ${G}` : "none",
               cursor: "pointer",
               fontFamily: "inherit",
               fontSize: TYPOGRAPHY.small.fontSize,
-              fontWeight: tab === "users" ? 700 : 600,
-              color: tab === "users" ? G : MT,
+              fontWeight: tab === "warung" ? 700 : 600,
+              color: tab === "warung" ? G : MT,
               paddingBottom: 6,
             }}
           >
@@ -98,14 +106,14 @@ export default function SettingsModal({ settingsH, authH }) {
             onClick={() => setTab("payment")}
             style={{
               background: "none",
-              border: `2px solid ${tab === "users" ? G : MT}`,
+              border: `2px solid ${tab === "payment" ? G : MT}`,
               padding: "6px 12px",
-              borderBottom: tab === "users" ? `2px solid ${G}` : "none",
+              borderBottom: tab === "payment" ? `2px solid ${G}` : "none",
               cursor: "pointer",
               fontFamily: "inherit",
               fontSize: TYPOGRAPHY.small.fontSize,
-              fontWeight: tab === "users" ? 700 : 600,
-              color: tab === "users" ? G : MT,
+              fontWeight: tab === "payment" ? 700 : 600,
+              color: tab === "payment" ? G : MT,
               paddingBottom: 6,
             }}
           >
@@ -115,14 +123,14 @@ export default function SettingsModal({ settingsH, authH }) {
             onClick={() => setTab("qris")}
             style={{
               background: "none",
-              border: `2px solid ${tab === "users" ? G : MT}`,
+              border: `2px solid ${tab === "qris" ? G : MT}`,
               padding: "6px 12px",
-              borderBottom: tab === "users" ? `2px solid ${G}` : "none",
+              borderBottom: tab === "qris" ? `2px solid ${G}` : "none",
               cursor: "pointer",
               fontFamily: "inherit",
               fontSize: TYPOGRAPHY.small.fontSize,
-              fontWeight: tab === "users" ? 700 : 600,
-              color: tab === "users" ? G : MT,
+              fontWeight: tab === "qris" ? 700 : 600,
+              color: tab === "qris" ? G : MT,
               paddingBottom: 6,
             }}
           >
@@ -132,14 +140,14 @@ export default function SettingsModal({ settingsH, authH }) {
             onClick={() => setTab("receipt")}
             style={{
               background: "none",
-              border: `2px solid ${tab === "users" ? G : MT}`,
+              border: `2px solid ${tab === "receipt" ? G : MT}`,
               padding: "6px 12px",
-              borderBottom: tab === "users" ? `2px solid ${G}` : "none",
+              borderBottom: tab === "receipt" ? `2px solid ${G}` : "none",
               cursor: "pointer",
               fontFamily: "inherit",
               fontSize: TYPOGRAPHY.small.fontSize,
-              fontWeight: tab === "users" ? 700 : 600,
-              color: tab === "users" ? G : MT,
+              fontWeight: tab === "receipt" ? 700 : 600,
+              color: tab === "receipt" ? G : MT,
               paddingBottom: 6,
             }}
           >
@@ -805,5 +813,5 @@ export default function SettingsModal({ settingsH, authH }) {
         </div>
       </div>
     </div>
-  );
+  )
 }
