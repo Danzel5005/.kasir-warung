@@ -6,6 +6,16 @@ export default function SettingsModal({ settingsH, authH }) {
   const [tab, setTab] = useState("printer"); // "printer", "payment", "qris", or "receipt"
   const [loadingPrinters, setLoadingPrinters] = useState(false);
   const qrisImageRef = useRef({});
+  const [newUser, setNewUser] = useState({ username: "", password: "", nama: "" });
+
+  const handleAddUser = async () => {
+    const u = newUser.username.trim();
+    const p = newUser.password.trim();
+    const n = newUser.nama.trim();
+    if (!u || !p || !n) return;
+    const ok = await authH.addUser({ username: u, password: p, nama: n });
+    if (ok) setNewUser({ username: "", password: "", nama: "" });
+  };
 
   // Fetch printers when printer tab is active
   useEffect(() => {
@@ -752,7 +762,7 @@ return (
                         <span style={{ fontSize: TYPOGRAPHY.label.fontSize, color: MT, fontStyle: "italic" }}>Akun sendiri</span>
                       ) : (
                         <button
-                          onClick={() => settingsH.authH.deleteUser(u.username)}
+                          onClick={() => authH.deleteUser(u.username)}
                           style={{ background: COLOR_PALETTE.dangerLight, color: COLOR_PALETTE.danger, border: "none", borderRadius: RADIUS.sm, padding: "4px 8px", cursor: "pointer", fontFamily: "inherit", fontSize: TYPOGRAPHY.label.fontSize, fontWeight: 600 }}
                         >Hapus</button>
                       )}
@@ -770,19 +780,30 @@ return (
                   <input
                     type="text"
                     placeholder="Nama Lengkap (e.g., Kasir Budi)"
+                    value={newUser.nama}
+                    onChange={e => setNewUser(f => ({ ...f, nama: e.target.value }))}
                     style={inp}
                   />
                   <input
                     type="text"
                     placeholder="Username (e.g., kasir1)"
+                    value={newUser.username}
+                    onChange={e => setNewUser(f => ({ ...f, username: e.target.value }))}
                     style={inp}
                   />
                   <input
                     type="password"
                     placeholder="Password (min. 4 karakter)"
+                    value={newUser.password}
+                    onChange={e => setNewUser(f => ({ ...f, password: e.target.value }))}
+                    onKeyDown={e => { if (e.key === "Enter") handleAddUser(); }}
                     style={inp}
                   />
-                  <button style={{ padding: "8px 14px", background: G, color: W, border: "none", borderRadius: RADIUS.md, cursor: "pointer", fontFamily: "inherit", fontSize: TYPOGRAPHY.small.fontSize, fontWeight: 700 }}>
+                  <button
+                    onClick={handleAddUser}
+                    disabled={!newUser.username.trim() || !newUser.password.trim() || !newUser.nama.trim()}
+                    style={{ padding: "8px 14px", background: (newUser.username.trim() && newUser.password.trim() && newUser.nama.trim()) ? G : "#aaa", color: W, border: "none", borderRadius: RADIUS.md, cursor: (newUser.username.trim() && newUser.password.trim() && newUser.nama.trim()) ? "pointer" : "not-allowed", fontFamily: "inherit", fontSize: TYPOGRAPHY.small.fontSize, fontWeight: 700 }}
+                  >
                     + Tambah Pengguna
                   </button>
                 </div>

@@ -1,0 +1,5 @@
+- [x] Saat konfirmasi bayar "Gagal menyimpan transaksi".Walaupun menggunakan metode QRIS atau tunai yang sudah melebihi harga. 
+- [x] Tidak bisa menambahkan pengguna
+- [ ] Jika pembelian item melebihi jumlah stok, tetap bisa pembelian. Seharusnya tidak boleh
+- [ ] Tambahkan Laporan stok di csvbuild
+- [ ] Rangkuman "item" jangan "menu"

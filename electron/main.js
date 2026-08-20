@@ -61,6 +61,7 @@ const FILES = {
   settings: path.join(DATA_DIR, "settings.json"),
   shifts: path.join(DATA_DIR, "shifts.json"),
   qris: path.join(DATA_DIR, "qris.json"),   // { "qris-bca": base64, "qris-bni": base64 }
+  users: path.join(DATA_DIR, "users.json"), // User accounts
   wal: path.join(DATA_DIR, "trx.wal"),
   backups: path.join(DATA_DIR, "backups"),
   db: path.join(DATA_DIR, "kasir.db"),     // SQLite database
@@ -92,13 +93,13 @@ function initDB() {
     // Create tables if not exist
     db.exec(`
       CREATE TABLE IF NOT EXISTS transactions (
-        id INTEGER PRIMARY KEY,
+        id TEXT PRIMARY KEY,
         data TEXT NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
       
       CREATE TABLE IF NOT EXISTS shifts (
-        id INTEGER PRIMARY KEY,
+        id TEXT PRIMARY KEY,
         data TEXT NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
@@ -132,7 +133,7 @@ function migrateJSONToSQLite() {
     if (fs.existsSync(FILES.trx)) {
       const trxList = rJSON(FILES.trx) || [];
       if (trxList.length > 0) {
-        const stmt = db.prepare("INSERT INTO transactions (id, data) VALUES (?, ?)");
+        const stmt = db.prepare("INSERT OR IGNORE INTO transactions (id, data) VALUES (?, ?)");
         const insertMany = db.transaction((items) => {
           for (const item of items) {
             stmt.run(item.id || null, JSON.stringify(item));
@@ -151,7 +152,7 @@ function migrateJSONToSQLite() {
     if (fs.existsSync(FILES.shifts)) {
       const shiftsList = rJSON(FILES.shifts) || [];
       if (shiftsList.length > 0) {
-        const stmt = db.prepare("INSERT INTO shifts (id, data) VALUES (?, ?)");
+        const stmt = db.prepare("INSERT OR IGNORE INTO shifts (id, data) VALUES (?, ?)");
         const insertMany = db.transaction((items) => {
           for (const item of items) {
             stmt.run(item.id || null, JSON.stringify(item));
@@ -346,8 +347,7 @@ ipcMain.handle("trx-delete", (_e, id) => {
   }
   
   try {
-    // Get the record to delete
-    const stmt = db.prepare("DELETE FROM transactions WHERE json_extract(data, '$.id') = ?");
+    const stmt = db.prepare("DELETE FROM transactions WHERE id = ?");
     stmt.run(id);
     return { ok: true };
   } catch (err) {
@@ -467,6 +467,10 @@ ipcMain.handle("cats-save", (_e, list) => { atomicWrite(FILES.cats, list); retur
 // ── Settings
 ipcMain.handle("settings-load", () => rJSON(FILES.settings) || {});
 ipcMain.handle("settings-save", (_e, data) => { atomicWrite(FILES.settings, data); return { ok: true }; });
+
+// ── Users
+ipcMain.handle("users-load", () => rJSON(FILES.users) || []);
+ipcMain.handle("users-save", (_e, list) => { atomicWrite(FILES.users, list); return { ok: true }; });
 
 // ── Shifts (SQLite)
 ipcMain.handle("shifts-load", () => {

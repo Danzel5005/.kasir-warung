@@ -5,7 +5,7 @@
   "author": {
     "name": "Danzel Tampilang",
     "email": "danzeltampilang@gmail.com",
-    "whatsapp": "https://wa.me/6289502417252"
+    "url": "https://wa.me/6289502417252"
     },
   "main": "electron/main.js",
   "scripts": {
