@@ -2,6 +2,11 @@
   "name": "kasir-warung",
   "version": "1.0.0",
   "description": "Aplikasi Kasir",
+  "author": {
+    "name": "Danzel Tampilang",
+    "email": "danzeltampilang@gmail.com",
+    "whatsapp": "https://wa.me/6289502417252"
+    },
   "main": "electron/main.js",
   "scripts": {
     "dev": "vite",
@@ -42,6 +47,7 @@
     "nodeGypRebuild": false,
     "npmRebuild": false,
     "win": {
+      "icon":"src/assets/icon.ico",
       "target": [
         {
           "target": "nsis",
