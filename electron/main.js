@@ -72,10 +72,22 @@ let db = null;
 
 function initDB() {
   try {
+    console.log('[Main] Loading better-sqlite3...');
     const Database = require("better-sqlite3");
+    console.log('[Main] better-sqlite3 loaded');
     ensureDir();
-    db = new Database(FILES.db);
-    db.pragma("journal_mode = WAL");  // Write-Ahead Logging for better concurrency
+    console.log('[Main] DATA_DIR:', DATA_DIR);
+    console.log('[Main] FILES.db:', FILES.db);
+    console.log('[Main] Opening database...');
+    try {
+      db = new Database(FILES.db);
+      console.log('[Main] Database opened');
+    } catch (dbErr) {
+      console.error('[Main] Database open FAILED:', dbErr.message, dbErr.stack);
+      throw dbErr;
+    }
+    db.pragma("journal_mode = WAL");
+    console.log('[Main] WAL mode set');
     
     // Create tables if not exist
     db.exec(`
@@ -94,11 +106,12 @@ function initDB() {
       CREATE INDEX IF NOT EXISTS idx_trx_created ON transactions(created_at);
       CREATE INDEX IF NOT EXISTS idx_shifts_created ON shifts(created_at);
     `);
+    console.log('[Main] Tables created');
     
     console.log("[DB] SQLite initialized successfully");
     return true;
   } catch (err) {
-    console.error("[DB] Failed to initialize SQLite:", err.message);
+    console.error("[DB] Failed to initialize SQLite:", err.message, err.stack);
     return false;
   }
 }
@@ -594,6 +607,7 @@ ipcMain.handle("get-data-path", () => DATA_DIR);
 
 let mainWin;
 function createWindow() {
+  console.log('[Main] Creating BrowserWindow...');
   mainWin = new BrowserWindow({
     width: 1400, height: 860, minWidth: 1020, minHeight: 680,
     title: "Kasir — Warung",
@@ -603,19 +617,53 @@ function createWindow() {
       contextIsolation: true,
     },
   });
+  console.log('[Main] BrowserWindow created, loading...');
   mainWin.setMenuBarVisibility(false);
-  if (isDev) mainWin.loadURL("http://localhost:5173");
-  else mainWin.loadFile(path.join(__dirname, "../dist/index.html"));
+  if (isDev) {
+    console.log('[Main] Loading dev URL: http://localhost:5173');
+    mainWin.loadURL("http://localhost:5173");
+  } else {
+    const filePath = path.join(__dirname, "../dist/index.html");
+    console.log('[Main] Loading file:', filePath);
+    mainWin.loadFile(filePath);
+  }
+  
+  mainWin.webContents.on('did-finish-load', () => {
+    console.log('[Main] Page loaded successfully');
+  });
+  
+  mainWin.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    console.error('[Main] Failed to load:', errorCode, errorDescription);
+  });
 }
 
 app.whenReady().then(() => {
-  // Jalankan recovery & backup SEBELUM window dibuka
-  initDB();                   // Inisialisasi SQLite
-  migrateJSONToSQLite();      // Migrasi data JSON ke SQLite (jika belum)
-  walRecover();               // pulihkan transaksi yang crash sebelum tersimpan
-  dailyBackup();              // buat backup harian kalau belum ada hari ini
-
-  createWindow();
+  console.log('[Main] App ready, initializing...');
+  
+  process.on('uncaughtException', (err) => {
+    console.error('[Main] Uncaught exception:', err);
+  });
+  
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('[Main] Unhandled rejection:', reason);
+  });
+  
+  try {
+    // Jalankan recovery & backup SEBELUM window dibuka
+    console.log('[Main] Initializing DB...');
+    initDB();                   // Inisialisasi SQLite
+    console.log('[Main] Migrating JSON...');
+    migrateJSONToSQLite();      // Migrasi data JSON ke SQLite (jika belum)
+    console.log('[Main] WAL recover...');
+    walRecover();               // pulihkan transaksi yang crash sebelum tersimpan
+    console.log('[Main] Daily backup...');
+    dailyBackup();              // buat backup harian kalau belum ada hari ini
+    console.log('[Main] Creating window...');
+    createWindow();
+    console.log('[Main] Window created');
+  } catch (err) {
+    console.error('[Main] Error during startup:', err);
+  }
   app.on("activate", () => {
     if (!BrowserWindow.getAllWindows().length) createWindow();
   });
