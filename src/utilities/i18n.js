@@ -3,7 +3,7 @@
 const translations = {
   id: {
     // Nav & Header
-    "app.title": "Kasir — restaurant",
+    "app.title": "Kasir — Warung",
     "nav.kasir": "Kasir",
     "nav.bills": "Open Bill",
     "nav.history": "Riwayat",
@@ -17,16 +17,12 @@ const translations = {
     // View Kasir
     "kasir.searchPlaceholder": "Cari nama menu atau deskripsi...",
     "kasir.allCategories": "Semua Kategori",
-    "kasir.cartTitle": "Pesanan Saat Ini",
-    "kasir.table": "Meja",
-    "kasir.pax": "Pax",
+"kasir.cartTitle": "Pesanan Saat Ini",
     "kasir.emptyCart": "Keranjang Kosong",
     "kasir.emptyCartSub": "Klik item menu di sebelah kiri untuk menambahkan ke keranjang pesanan.",
     "kasir.saveBill": "Simpan Open Bill",
     "kasir.payNow": "Bayar Sekarang",
     "kasir.subtotal": "Subtotal",
-    "kasir.service": "Service 6%",
-    "kasir.tax": "Pajak 10%",
     "kasir.total": "Total",
 
     // View Open Bill
@@ -124,15 +120,11 @@ const translations = {
     "kasir.searchPlaceholder": "Search menu item or description...",
     "kasir.allCategories": "All Categories",
     "kasir.cartTitle": "Current Order",
-    "kasir.table": "Table",
-    "kasir.pax": "Pax",
     "kasir.emptyCart": "Cart is Empty",
     "kasir.emptyCartSub": "Click menu items on the left to add them to the current order.",
     "kasir.saveBill": "Save Open Bill",
     "kasir.payNow": "Pay Now",
     "kasir.subtotal": "Subtotal",
-    "kasir.service": "Service 6%",
-    "kasir.tax": "Tax 10%",
     "kasir.total": "Total",
 
     // View Open Bill

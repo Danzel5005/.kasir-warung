@@ -42,17 +42,13 @@ function ViewOpenBill({
               <div style={{...row,marginBottom:7}}>
                 <div style={{display:"flex",gap:7,alignItems:"center"}}>
                   {<Tag label="BELUM DIBAYAR" bg="#fff4e0" tc="#b87a00"/>}
-                  <span style={{fontSize:TYPOGRAPHY.body.fontSize,fontWeight:700}}>Meja {bill.tableNum}</span>
-                  <span style={{fontSize:TYPOGRAPHY.label.fontSize,color:MT}}>#{bill.id}</span>
-                  {bill.pax>0&&<span style={{fontSize:TYPOGRAPHY.label.fontSize,color:COLOR_PALETTE.info,fontWeight:600}}>{bill.pax} pax</span>}
+                  {bill.tableNum && <span style={{fontSize:TYPOGRAPHY.body.fontSize,fontWeight:700}}>{bill.tableNum}</span>}
                 </div>
                 <span style={{fontSize:TYPOGRAPHY.label.fontSize,color:MT}}>{dur<60?`${dur} mnt lalu`:`${Math.floor(dur/60)} jam lalu`}</span>
               </div>
               <div style={{fontSize:TYPOGRAPHY.label.fontSize,color:MT,marginBottom:7}}>{bill.items.map(i=>`${i.qty}x ${i.nama}`).join(" · ")}</div>
               <div style={{display:"flex",gap:10,fontSize:TYPOGRAPHY.small.fontSize,marginBottom:9,flexWrap:"wrap"}}>
                 <span>Sub: <b>{fmt(sub)}</b></span>
-                <span style={{color:MT}}>Pajak: {fmt(p)}</span>
-                <span style={{color:MT}}>Service: {fmt(s)}</span>
                 <span style={{color:OR,fontWeight:700}}>Total: {fmt(tot)}</span>
               </div>
               <div style={{display:"flex",gap:7}}>

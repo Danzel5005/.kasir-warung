@@ -13,7 +13,7 @@ export default function CloseShiftModal({ authH, confirmCloseShift }) {
           Shift ini dimulai pukul <b>{authH.activeShift?.startJam}</b> oleh <b>{authH.activeShift?.operator}</b>.
         </div>
         <div style={{ background:COLOR_PALETTE.secondaryLight, border:`1px solid ${COLOR_PALETTE.border}`, borderRadius:RADIUS.md, padding:"9px 12px", marginBottom:16, fontSize:TYPOGRAPHY.label.fontSize, color:COLOR_PALETTE.warning, textAlign:"left" }}>
-          ⚠️ Semua open bill akan dihapus. Pastikan semua transaksi sudah diproses sebelum menutup shift.
+          ⚠️ Open bill TIDAK akan dihapus otomatis. Pastikan transaksi yang sudah dibayar sudah diproses (bayar) sebelum menutup shift. Open bill yang belum dibayar tetap tersedia di shift berikutnya.
         </div>
         <div style={{ display:"flex", gap:8 }}>
           <button

@@ -1,19 +1,14 @@
 import { useState, useCallback } from "react";
-import { DEFAULT_USERS } from "../utilities/users.js";
+import { DEFAULT_USERS, isAdminUser } from "../utilities/users.js";
 import { api } from "../utilities/utils.js";
 
 // useAuth — login & shift lifecycle.
 // Constraint: tidak import useBills/useCart langsung. Saat shift ditutup,
-// dia HARUS mengosongkan open bills + cart — tapi itu didapat lewat
-// `onShiftClosed({clearBills, clearCart})` yang dipanggil App.jsx, BUKAN
-// import langsung. Ini menjaga data-flow tetap terlihat di satu tempat (App.jsx).
+// cart dikosongkan lewat clearCart (dipanggil App.jsx), BUKAN import langsung.
+// PENTING: open bill TIDAK PERNAH dihapus otomatis saat tutup shift — hanya
+// dihapus jika user sudah membayar (processPayment -> removeBillLocal).
 //
-// CATATAN PERILAKU (tidak diubah dari App.jsx asli, sengaja dipertahankan):
-// confirmCloseShift menghapus SEMUA open bill tanpa undo — ini "silent
-// destructive operation" yang sudah pernah diflag sebelumnya (lihat
-// YKK-Dev-Log catatan internal), TIDAK diperbaiki di sini karena di luar
-// scope migrasi murni. Kalau mau ditambah undo, itu perubahan behavior
-// terpisah yang butuh keputusan eksplisit kamu.
+
 function useAuth({ getNow, toast_ }) {
   const [activeShift, setActiveShift] = useState(null);
   const [shifts, setShifts]           = useState([]);
@@ -21,6 +16,7 @@ function useAuth({ getNow, toast_ }) {
   const [closingShift, setClosingShift] = useState(false);
   const [selectedShiftId, setSelectedShiftId] = useState(null); // null = aktif
   const [users, setUsers]             = useState([]); // dynamic users from storage
+  const [currentUser, setCurrentUser] = useState(null); // logged-in user object
 
   // deps kosong aman: hanya setter, tidak baca state apapun.
   const loadInitial = useCallback((savedShifts, savedUsers) => {
@@ -61,14 +57,18 @@ function useAuth({ getNow, toast_ }) {
     setShifts(next);
     setActiveShift(shift);
     setSelectedShiftId(shift.id);
+    // Simpan user yang login saat ini (untuk cek hak admin saat kelola pengguna)
+    setCurrentUser(u);
     setLoginForm({ username: "", password: "", error: "" });
   }, [loginForm, users, shifts, getNow]);
 
-  // onShiftClosed: {clearBills, clearCart} — dipass dari App.jsx SAAT DIPANGGIL
+  // onShiftClosed: {clearCart} — dipass dari App.jsx SAAT DIPANGGIL
   // (argumen panggilan, bukan closure dependency), jadi TIDAK masuk deps array.
   // PENTING: membaca activeShift dan shifts LANGSUNG dari closure. Wajib
   // [activeShift, shifts, getNow, toast_] di deps.
-  const confirmCloseShift = useCallback(async ({ clearBills, clearCart }) => {
+  // CATATAN: clearBills DIHAPUS — open bill TIDAK PERNAH dihapus otomatis saat tutup shift.
+  // Open bill hanya dihapus jika user sudah membayar/bayar (proses payment).
+  const confirmCloseShift = useCallback(async ({ clearCart }) => {
     const t = getNow();
     const closed = { ...activeShift, endTime: t.timestamp, endJam: `${t.jam}:${t.mnt}`, status: "closed" };
     const next = shifts.map(s => s.id === closed.id ? closed : s);
@@ -77,8 +77,8 @@ function useAuth({ getNow, toast_ }) {
     setActiveShift(null);
     setClosingShift(false);
     setSelectedShiftId(null);
-    // Clear open bills saat shift ditutup (perilaku asli dipertahankan, lihat catatan di atas)
-    await clearBills();
+    // HAPUS: clearBills() — open bill TIDAK dihapus otomatis
+    // Open bill hanya dihapus melalui proses bayar (processPayment) yang memanggil removeBillLocal
     clearCart();
     toast_(`Shift ${closed.shiftNum} ditutup — ${closed.startJam} s/d ${closed.endJam}`, "ok");
   }, [activeShift, shifts, getNow, toast_]);
@@ -98,21 +98,31 @@ function useAuth({ getNow, toast_ }) {
     return true;
   }, [users, toast_]);
 
-  // PENTING: membaca users LANGSUNG dari closure. Wajib [users, toast_] di deps.
+  // PENTING: membaca users & currentUser LANGSUNG dari closure. Wajib [users, currentUser, toast_] di deps.
   const deleteUser = useCallback(async (username) => {
+    // Hanya admin yang boleh hapus pengguna.
+    if (!isAdminUser(currentUser)) {
+      toast_("Hanya admin yang dapat menghapus pengguna", "err");
+      return;
+    }
     // Cegah hapus admin utama
     if (username === "admin") {
       toast_("Tidak dapat menghapus pengguna utama", "err");
+      return;
+    }
+    // Admin tidak bisa hapus dirinya sendiri
+    if (currentUser && currentUser.username === username) {
+      toast_("Tidak dapat menghapus akun sendiri", "err");
       return;
     }
     const next = users.filter(u => u.username !== username);
     await api.saveUsers(next);
     setUsers(next);
     toast_(`Pengguna "${username}" dihapus`, "ok");
-  }, [users, toast_]);
+  }, [users, currentUser, toast_]);
 
   return {
-    activeShift, shifts, loginForm, closingShift, selectedShiftId, users,
+    activeShift, shifts, loginForm, closingShift, selectedShiftId, users, currentUser,
     setLoginForm, setClosingShift, setSelectedShiftId,
     loadInitial, doLogin, confirmCloseShift,
     addUser, deleteUser,

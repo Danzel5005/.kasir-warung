@@ -18,8 +18,9 @@ function getNow() {
 
 const fmt   = (n) => `Rp ${Number(n||0).toLocaleString("id-ID")}`;
 const fmtNum = (n) => Number(n||0).toLocaleString("id-ID");
+const DEFAULT_WARUNG = "Warung";
 
-// Helper function to format additionals
+// Helper function to format drink additionals (cupsize/sugar/temperature)
 const formatAdditionals = (additionals) => {
   if (!additionals) return "";
   const parts = [];
@@ -35,177 +36,239 @@ const formatAdditionals = (additionals) => {
   return parts.join(" • ");
 };
 
-function buildReceiptHTML(trx, logo, receiptAdditionals) {
+// Build receipt additional fields (from Resi settings) into KV rows
+const buildAdditionalFields = (data, receiptAdditionals) => {
+  if (!receiptAdditionals || !receiptAdditionals.length) return "";
+  return receiptAdditionals
+    .filter(f => f.category === "receipt" && f.visible !== false)
+    .map(field => {
+      const val = data?.[field.key];
+      if (val === undefined || val === null || val === "") return "";
+      return `<div class="kv"><span class="k">${field.label.toUpperCase()}</span><span class="v">${val}</span></div>`;
+    })
+    .join("");
+};
+
+// Detect QRIS image for a given payment method
+const getQrisImage = (metodeBayar, qrisImages) => {
+  if (!metodeBayar || !metodeBayar.startsWith("qris")) return null;
+  if (!qrisImages) return null;
+  return qrisImages[metodeBayar] || null;
+};
+
+// Get category display name (resolves key to label if cats provided, case-sensitive)
+const getCategoryName = (cat, cats) => {
+  if (!cat) return "";
+  if (cats && cats.length) {
+    const found = cats.find(c => c.key === cat);
+    if (found) return found.label;
+  }
+  return cat;
+};
+
+// Calculate category totals (with key-to-label resolution)
+const buildCategoryTotals = (items, cats = []) => {
+  const taggedCategories = {};
+  const untaggedCategories = {};
+
+  items.forEach(item => {
+    const cat = item.kategori || "Lainnya";
+    const qty = item.qty || 0;
+    const isRokok = item.tags?.includes("rokok") || item.kategori?.toLowerCase() === "rokok";
+    const catLabel = getCategoryName(cat, cats);
+
+    if (isRokok) {
+      if (!taggedCategories["ROKOK"]) taggedCategories["ROKOK"] = 0;
+      taggedCategories["ROKOK"] += qty;
+    } else if (item.tags && item.tags.length > 0) {
+      item.tags.forEach(tag => {
+        if (!taggedCategories[tag]) taggedCategories[tag] = 0;
+        taggedCategories[tag] += qty;
+      });
+    } else {
+      if (!untaggedCategories[catLabel]) untaggedCategories[catLabel] = 0;
+      untaggedCategories[catLabel] += qty;
+    }
+  });
+
+  return { taggedCategories, untaggedCategories };
+};
+
+function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName, cats = [], warungAddress = "", warungPhone = "") {
   const taxEnabled = receiptAdditionals?.find(f => f.key === "tax")?.enabled !== false;
   const serviceEnabled = receiptAdditionals?.find(f => f.key === "service")?.enabled !== false;
-  const { pajak, service, total } = calcPrice(trx.subtotal, { 
+  const { pajak, service, total } = calcPrice(trx.subtotal, {
     taxEnabled, serviceEnabled
   });
   const metodeLabel = globalThis.METODE_LABELS?.[trx.metodeBayar] ?? trx.metodeBayar;
+  const qrisImage = getQrisImage(trx.metodeBayar, qrisImages);
+  const addFields = buildAdditionalFields(trx, receiptAdditionals);
+  const storeName = warungName || trx.warungName || DEFAULT_WARUNG; // [11] dynamic custom name
+  const operatorName = trx.operator || "Kasir"; // [2] dynamic operator name from transaction
+  const addressLine = warungAddress || trx.warungAddress || "";
+  const phoneLine = warungPhone || trx.warungPhone || "";
+  const { taggedCategories, untaggedCategories } = buildCategoryTotals(trx.items, cats);
+
   const rows = trx.items.map(i=>{
     const addStr = formatAdditionals(i.additionals);
-    return `<div class="row"><span>${i.qty}x ${i.nama}</span><span>${fmt(i.harga*i.qty)}</span></div>${addStr?`<div class="row-sub"><span>${addStr}</span></div>`:""}`
+    const cat = i.kategori ? `<span class="item-tag">${getCategoryName(i.kategori, cats)}</span>` : "";
+    const itemTotal = fmt(i.harga * i.qty);
+    return `<div class="item">
+      <div class="item-row1"><span>${i.qty}x ${i.nama}</span><span>${itemTotal}</span></div>
+      <div class="item-row2">${cat}<span>@ ${fmt(i.harga)}</span></div>
+      ${addStr?`<div class="item-row2"><span>${addStr}</span></div>`:""}
+    </div>`
   }).join("");
+
+  const renderCatTotals = (catMap) => Object.entries(catMap)
+    .map(([catKey, qty]) => `<div class="cat-line"><span>TOTAL (${getCategoryName(catKey, cats)}) :</span><span>${qty}</span></div>`)
+    .join("");
+
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
-    *{margin:0;padding:0;box-sizing:border-box;
-    -weblit-print-color-adjust:exact;
-    print-color-adjust:exact;}
-    body{font-family:monospace;
-    font-size:12px;
-    width:80mm;
-    padding:3mm;
-    -webkit-front-smoothing:none;
-    font-smooth:never;}
-    @media print{
-    @page{size:80mm auto;
-    margin:0mm;}
-    body{width:80mm;padding:2mm;}
+    :root{
+      --paper:#fdfdf9; --ink:#1c1c1c; --muted:#1c1c1c; --line:#1c1c1c;
+      --bg:#eceae2; --header-tag:#c0392b; --body-tag:#1f6f50; --footer-tag:#2f5aa8;
     }
-
-    .center{text-align:center;} .bold{font-weight:700;} .row{display:flex;justify-content:space-between;margin-bottom:2px;}
-    .row-sub{display:flex;justify-content:flex-start;margin-bottom:3px;margin-left:8px;font-size:10px;color:#666;margin-top:-2px;}
-    .line{border-top:1px dashed #000;margin:5px 0;} .logo{width:40px;height:40px;object-fit:cover;border-radius:4px;}
-    h2{font-size:8px;} .big{font-size:9px;}
-
+    *{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-weight:700;}
+    body{font-family:'Courier New', ui-monospace, Menlo, monospace;font-size:12px;width:80mm;padding:3mm;color:var(--ink);background:var(--bg);font-weight:700;}
+    @media print{@page{size:80mm auto;margin:0mm;} body{width:80mm;padding:2mm;}}
+    .receipt{background:var(--paper);padding:6px 8px 2px;position:relative;}
+    .section{position:relative;padding:6px 0;}
+    .section + .section{border-top:1px dashed #999;}
+    .center{text-align:center;} .bold{font-weight:700;}
+    .store-name{font-size:15px;font-weight:700;} .store-line{font-size:12px;margin-top:2px;font-weight:700;}
+    .kv{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;margin:2px 0;font-weight:700;}
+    .kv .k{font-weight:700;white-space:nowrap;} .kv .v{text-align:right;font-weight:700;}
+    .item{margin:6px 0;font-size:12.5px;font-weight:700;}
+    .item-row1{display:flex;justify-content:space-between;gap:6px;font-weight:700;}
+    .item-row2{display:flex;justify-content:space-between;font-size:11.5px;margin-top:1px;font-weight:700;}
+    .item-tag{font-size:10px;border:1px solid #bbb;border-radius:3px;padding:0 4px;font-weight:700;}
+    .dst{text-align:center;font-size:12px;margin:6px 0;font-weight:700;}
+    .totals{margin-top:6px;border-top:1px dashed #999;padding-top:6px;font-weight:700;}
+    .totals .kv.grand{font-size:14px;padding-top:4px;margin-top:4px;border-top:1px solid var(--line);font-weight:700;}
+    .payment-note{margin-top:8px;text-align:center;font-size:11.5px;border:1px dashed #999;padding:6px;font-weight:700;}
+    .qris-img{display:block;margin:8px auto;max-width:60mm;max-height:60mm;}
+    .footer-note{text-align:center;font-size:11px;margin-top:8px;font-weight:700;}
+    .cat-line{display:flex;justify-content:space-between;font-size:12px;margin:3px 0;font-weight:700;}
+    .footer-list{font-size:11px;margin-top:6px;font-weight:700;}
+    .footer-list div{margin:2px 0;font-weight:700;}
   </style></head><body>
-    <div class="center">
-      ${logo?`<img src="${logo}" class="logo" /><br/>`:""}
-      <h2 class="bold">restaurant</h2>
-      <div>${trx.hari},
-      ${trx.tgl}
-      ${trx.bln}
-      ${trx.thn} &bull;
-      ${trx.jam}:${trx.mnt}:${trx.dtk}
+    <div class="receipt">
+      <!-- HEADER -->
+      <div class="section header">
+        ${logo?`<img src="${logo}" class="qris-img" style="max-height:30mm;max-width:30mm;border-radius:4px;" /><br/>`:""}
+        <div class="store-name center bold">${storeName}</div>
+        ${addressLine?`<div class="store-line center">${addressLine}</div>`:""}
+        ${phoneLine?`<div class="store-line center">Telp: ${phoneLine}</div>`:""}
+        <div class="store-line center">${trx.hari}, ${trx.tgl} ${trx.bln} ${trx.thn} &bull; ${trx.jam}:${trx.mnt}:${trx.dtk}</div>
+        <div class="kv"><span class="k">NO TRX</span><span class="v">${trx.id}</span></div>
+        ${addFields}
+        <div class="kv"><span class="k">KASIR</span><span class="v">${operatorName}</span></div>
+        <div class="kv"><span class="k">METODE</span><span class="v">${metodeLabel}</span></div>
       </div>
-      <div class="bold">Meja ${trx.meja} &bull; TRX #${trx.id}${trx.pax?` &bull; ${trx.pax} Pax`:""}</div>
-      <div>${metodeLabel}</div>
+
+      <!-- BODY -->
+      <div class="section body">
+        ${rows}
+        <div class="dst">...............................</div>
+        <div class="totals">
+          <div class="kv"><span class="k">SubTotal</span><span class="v">${fmt(trx.subtotal)}</span></div>
+          <div class="kv grand bold"><span class="k">TOTAL</span><span class="v">${fmt(total)}</span></div>
+          ${trx.metodeBayar==="cash"?`<div class="kv"><span class="k">Bayar</span><span class="v">${fmt(trx.bayar)}</span></div><div class="kv"><span class="k">Kembalian</span><span class="v">${fmt(trx.kembalian)}</span></div>`:""}
+        </div>
+        <div class="payment-note">${trx.metodeBayar==="cash"?"LUNAS":"SILAKAN SCAN QRIS DI BAWAH"}</div>
+        ${qrisImage?`<img src="${qrisImage}" class="qris-img" alt="QRIS" />`:""}
+      </div>
+
+      <!-- FOOTER -->
+      <div class="section footer">
+        ${Object.keys(untaggedCategories).length ? `<div class="footer-list">${renderCatTotals(untaggedCategories)}</div>` : ""}
+        ${Object.keys(taggedCategories).length ? `<div class="footer-list"><div class="bold">TAGGED</div>${renderCatTotals(taggedCategories)}</div>` : ""}
+        <div class="footer-note">Terima kasih atas kunjungan Anda!<br/>Selamat menikmati</div>
+      </div>
     </div>
-    <div class="line"></div>
-    ${rows}
-    <div class="line"></div>
-    <div class="row"><span>Subtotal</span><span>${fmt(trx.subtotal)}</span></div>
-    ${(serviceEnabled ?? true) ? `<div class="row"><span>Service 6% </span><span>${fmt(service)}</span></div>` : ""}
-    ${(taxEnabled ?? true) ? `<div class="row"><span>Pajak 10%</span><span>${fmt(pajak)}</span></div>` : ""}
-    <div class="line"></div>
-    <div class="row big bold"><span>TOTAL</span><span>${fmt(total)}</span></div>
-    ${trx.metodeBayar==="cash"?`<div class="row"><span>Bayar</span><span>${fmt(trx.bayar)}</span></div><div class="row"><span>Kembalian</span><span>${fmt(trx.kembalian)}</span></div>`:""}
-    <div class="line"></div>
-    <div class="center">Terima kasih atas kunjungan Anda!<br/>Selamat menikmati</div>
   </body></html>`;
 }
-function buildPreviewHTML(tableNum, pax, items, logo, receiptAdditionals) {
+
+function buildPreviewHTML(receiptAdditionalValues, items, logo, receiptAdditionals, warungName, cats = [], warungAddress = "", warungPhone = "") {
   const subtotal = items.reduce((s, i) => s + i.harga * i.qty, 0);
   const taxEnabled = receiptAdditionals?.find(f => f.key === "tax")?.enabled !== false;
   const serviceEnabled = receiptAdditionals?.find(f => f.key === "service")?.enabled !== false;
   const { pajak, service, total } = calcPrice(subtotal, { taxEnabled, serviceEnabled });
   const t = getNow();
+  const addFields = buildAdditionalFields(receiptAdditionalValues, receiptAdditionals);
+  const storeName = warungName || DEFAULT_WARUNG;
+  const addressLine = warungAddress || "";
+  const phoneLine = warungPhone || "";
+  const { taggedCategories, untaggedCategories } = buildCategoryTotals(items, cats);
+
   const rows = items.map(i => {
     const addStr = formatAdditionals(i.additionals);
-    return `<div class="row"><span>${i.qty}x ${i.nama}</span><span>${fmt(i.harga * i.qty)}</span></div>${addStr?`<div class="row-sub"><span>${addStr}</span></div>`:""}`
+    const cat = i.kategori ? `<span class="item-tag">${getCategoryName(i.kategori, cats)}</span>` : "";
+    const itemTotal = fmt(i.harga * i.qty);
+    return `<div class="item">
+      <div class="item-row1"><span>${i.qty}x ${i.nama}</span><span>${itemTotal}</span></div>
+      <div class="item-row2">${cat}<span>@ ${fmt(i.harga)}</span></div>
+      ${addStr?`<div class="item-row2"><span>${addStr}</span></div>`:""}
+    </div>`
   }).join("");
-  return `<!DOCTYPE html>
-  <html>
-    <head>
-    <meta charset="utf-8">
-      <style>
-          * {
-            margin:0;
-          padding:0;
-          box-sizing:border-box;
-          -webkit-print-color-adjust:exact;
-          print-color-adjust:exact;
-            }
-            html
-              {
-                width:80mm;
-                margin:0;
-                padding:0;
-              }
-            body
-              {
-                font-family:monospace;
-                font-size:14px;
-                width:80mm;
-                padding:2mm;
-                -webkit-font-smoothing:none;
-                font-smooth:never;
-                margin:0;
-                text-align:left;
-              }
-            @media print
-              {
-              @page
-                {
-                  size:80mm auto;
-                  margin:0 ;
-                }
-              html,body
-                {
-                  margin:0;
-                  padding:0;
-                  width:80mm;
-                  overflow:hidden;
-                }
-              }
-            .center{
-            text-align:center;
-              }
-            .bold{
-            font-weight:700;
-            }
-            .row{
-            display:flex;
-            justify-content:space-between;
-            margin-bottom:2px;
-            }
-            .row-sub{
-            display:flex;
-            justify-content:flex-start;
-            margin-bottom:3px;
-            margin-left:8px;
-            font-size:11px;
-            color:#666;
-            margin-top:-2px;
-            }
-            .line{
-            border-top:1px dashed #000;
-            margin:5px 0;
-            }
-            .logo{
-            width:40px;
-            height:40px;
-            object-fit:cover;
-            border-radius:4px;
-            }
-            h2{
-            font-size:10px;
-            }
-            .big{
-            font-size:12px;
-            }
-      </style>
-  </head>
 
-  <body>
-    <div class="center">
-      ${logo ? `<img src="${logo}" class="logo" /><br/>` : ""}
-      <h2 class="bold">restaurant</h2>
-      <div>${t.hari}, ${t.tgl} ${t.bln} ${t.thn} &bull;
-       ${t.jam}:${t.mnt}</div>
-      <div class="bold">Meja ${tableNum}${pax ? ` &bull; ${pax} Pax` : ""}
+  const renderCatTotals = (catMap) => Object.entries(catMap)
+    .map(([catKey, qty]) => `<div class="cat-line"><span>TOTAL (${getCategoryName(catKey, cats)}) :</span><span>${qty}</span></div>`)
+    .join("");
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+    :root{
+      --paper:#fdfdf9; --ink:#1c1c1c; --muted:#1c1c1c; --line:#1c1c1c;
+      --bg:#eceae2; --header-tag:#c0392b; --body-tag:#1f6f50; --footer-tag:#2f5aa8;
+    }
+    *{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-weight:700;}
+    body{font-family:'Courier New', ui-monospace, Menlo, monospace;font-size:12px;width:80mm;padding:3mm;color:var(--ink);background:var(--bg);font-weight:700;}
+    @media print{@page{size:80mm auto;margin:0mm;} body{width:80mm;padding:2mm;}}
+    .receipt{background:var(--paper);padding:6px 8px 2px;position:relative;}
+    .section{position:relative;padding:6px 0;}
+    .section + .section{border-top:1px dashed #999;}
+    .center{text-align:center;} .bold{font-weight:700;}
+    .store-name{font-size:15px;font-weight:700;} .store-line{font-size:12px;margin-top:2px;font-weight:700;}
+    .kv{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;margin:2px 0;font-weight:700;}
+    .kv .k{font-weight:700;white-space:nowrap;} .kv .v{text-align:right;font-weight:700;}
+    .item{margin:6px 0;font-size:12.5px;font-weight:700;}
+    .item-row1{display:flex;justify-content:space-between;gap:6px;font-weight:700;}
+    .item-row2{display:flex;justify-content:space-between;font-size:11.5px;margin-top:1px;font-weight:700;}
+    .item-tag{font-size:10px;border:1px solid #bbb;border-radius:3px;padding:0 4px;font-weight:700;}
+    .dst{text-align:center;font-size:12px;margin:6px 0;font-weight:700;}
+    .totals{margin-top:6px;border-top:1px dashed #999;padding-top:6px;font-weight:700;}
+    .totals .kv.grand{font-size:14px;padding-top:4px;margin-top:4px;border-top:1px solid var(--line);font-weight:700;}
+    .preview-tag{text-align:center;font-size:9px;margin-top:4px;font-weight:700;}
+    .footer-note{text-align:center;font-size:11px;margin-top:8px;font-weight:700;}
+    .cat-line{display:flex;justify-content:space-between;font-size:12px;margin:3px 0;font-weight:700;}
+    .footer-list{font-size:11px;margin-top:6px;font-weight:700;}
+    .footer-list div{margin:2px 0;font-weight:700;}
+  </style></head><body>
+    <div class="receipt">
+      <div class="section header">
+        ${logo?`<img src="${logo}" style="display:block;margin:0 auto 4px;max-height:30mm;max-width:30mm;border-radius:4px;" /><br/>`:""}
+        <div class="store-name center bold">${storeName}</div>
+        ${addressLine?`<div class="store-line center">${addressLine}</div>`:""}
+        ${phoneLine?`<div class="store-line center">Telp: ${phoneLine}</div>`:""}
+        <div class="store-line center">${t.hari}, ${t.tgl} ${t.bln} ${t.thn} &bull; ${t.jam}:${t.mnt}</div>
+        ${addFields}
       </div>
-      <div style="font-size:9px;color:#888;">-- PREVIEW TAGIHAN --</div>
+      <div class="section body">
+        ${rows}
+        <div class="dst">...............................</div>
+        <div class="totals">
+          <div class="kv"><span class="k">SubTotal</span><span class="v">${fmt(subtotal)}</span></div>
+          <div class="kv grand bold"><span class="k">TOTAL</span><span class="v">${fmt(total)}</span></div>
+        </div>
+      </div>
+      <div class="section footer">
+        ${Object.keys(untaggedCategories).length ? `<div class="footer-list">${renderCatTotals(untaggedCategories)}</div>` : ""}
+        ${Object.keys(taggedCategories).length ? `<div class="footer-list"><div class="bold">TAGGED</div>${renderCatTotals(taggedCategories)}</div>` : ""}
+        <div class="footer-note">Belum Lunas</div>
+      </div>
     </div>
-    <div class="line"></div>
-    ${rows}
-    <div class="line"></div>
-    <div class="row"><span>Subtotal</span><span>${fmt(subtotal)}</span></div>
-    ${(serviceEnabled ?? true) ? `<div class="row"><span>Service (6%)</span><span>${fmt(service)}</span></div>` : ""}
-    ${(taxEnabled ?? true) ? `<div class="row"><span>Pajak (10%)</span><span>${fmt(pajak)}</span></div>` : ""}
-    <div class="line"></div>
-    <div class="row big bold"><span>TOTAL</span><span>${fmt(total)}</span></div>
-    <div class="line"></div>
-    <div class="center">Belum lunas — mohon menunggu</div>
   </body></html>`;
 }
-export {buildReceiptHTML, buildPreviewHTML, fmt, fmtNum};
+
+export {buildReceiptHTML, buildPreviewHTML, fmt, fmtNum, DEFAULT_WARUNG};

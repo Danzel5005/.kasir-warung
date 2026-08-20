@@ -36,14 +36,6 @@ function useBills({ toast_, addUndo }) {
     addUndo("Hapus Semua Open Bill", async () => { await api.restoreBills(snap); setBills(snap); });
   }, [bills, addUndo]);
 
-  // Dipakai useAuth (confirmCloseShift) lewat App.jsx — TIDAK ada undo,
-  // perilaku asli dipertahankan (lihat catatan di useAuth.js).
-  // deps kosong aman: tidak baca state, cuma setter.
-  const clearBillsSilent = useCallback(async () => {
-    await api.clearBills();
-    setBills([]);
-  }, []);
-
   // Dipakai App.jsx saat menambah/update bill dari cart (saveOpenBill di useCart)
   // dan saat payment sukses (hapus bill yang baru dibayar).
   // deps kosong aman: `updated` datang sebagai argumen, tidak baca state luar.
@@ -70,7 +62,7 @@ function useBills({ toast_, addUndo }) {
   return {
     bills, billId,
     setBillId,
-    loadInitial, closeBill, clearAllBills, clearBillsSilent, persistBills, removeBillLocal,
+    loadInitial, closeBill, clearAllBills, persistBills, removeBillLocal,
   };
 }
 

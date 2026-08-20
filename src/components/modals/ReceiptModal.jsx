@@ -5,7 +5,7 @@ import { METODE_LABELS} from "../../constants/payments.js";
 import { METODE_COLORS,G, OR, W, BD, MT } from "../../constants/colors.js";
 import { row, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/theme.js";
 
-export default function ReceiptModal({ receipt, logo, printReceipt, setReceipt, receiptAdditionals }) {
+export default function ReceiptModal({ receipt, logo, printReceipt, setReceipt, receiptAdditionals, qrisImages }) {
   const [isPrinting, setIsPrinting] = useState(false);
   const [progress, setProgress] = useState(0);
 
@@ -61,10 +61,12 @@ export default function ReceiptModal({ receipt, logo, printReceipt, setReceipt, 
         {/* Header */}
         <div style={{ padding:"20px 17px", flex:"0 0 auto", textAlign:"center" }}>
           {logo
-            ? <img src={logo} alt="logo" style={{ width:42, height:42, objectFit:"cover", borderRadius:RADIUS.md, marginBottom:5 }}/>
-            : <div style={{ width:42, height:42, background:G, borderRadius:RADIUS.md, display:"flex", alignItems:"center", justifyContent:"center", fontSize:TYPOGRAPHY.small.fontSize, fontWeight:700, color:W, margin:"0 auto 5px" }}>YKK</div>
+            ? <img src={logo} alt="logo" style={{ width:42, height:42, objectFit:"cover", borderRadius:RADIUS.md, marginBottom:5 }}/> 
+            : <div style={{ width:42, height:42, background:G, borderRadius:RADIUS.md, display:"flex", alignItems:"center", justifyContent:"center", fontSize:TYPOGRAPHY.small.fontSize, fontWeight:700, color:W, margin:"0 auto 5px" }}>YKK</div> 
           }
-          <div style={{ fontWeight:700, fontSize:TYPOGRAPHY.body.fontSize, color:G }}>restaurant</div>
+          <div style={{ fontWeight:700, fontSize:TYPOGRAPHY.body.fontSize, color:G }}>
+            {receipt.warungName || "Warung"}
+          </div>
           <div style={{ fontSize:TYPOGRAPHY.label.fontSize, color:MT }}>{receipt.hari}, {receipt.tgl} {receipt.bln} {receipt.thn}</div>
           {receiptAdditionals && receiptAdditionals.length > 0 ? (
             <div style={{ fontSize:TYPOGRAPHY.label.fontSize, color:COLOR_PALETTE.info, fontWeight:700, marginTop:2 }}>
@@ -79,13 +81,28 @@ export default function ReceiptModal({ receipt, logo, printReceipt, setReceipt, 
             </div>
           ) : (
             <div style={{ fontSize:TYPOGRAPHY.label.fontSize, color:COLOR_PALETTE.info, fontWeight:700, marginTop:2 }}>
-              Meja {receipt.meja}{receipt.pax > 0 ? ` · ${receipt.pax} pax` : ""} · TRX #{receipt.id}
+              TRX #{receipt.id}
             </div>
           )}
           <div style={{ fontSize:TYPOGRAPHY.label.fontSize, fontWeight:700, color:(METODE_COLORS[receipt.metodeBayar] || { tc:MT }).tc }}>
             {METODE_LABELS[receipt.metodeBayar] || receipt.metodeBayar}
           </div>
           <div style={{ borderTop:"1px dashed #ccc", margin:"7px 0" }}/>
+
+          {/* QRIS Image for QRIS payments */}
+          {(() => {
+            const isQris = receipt.metodeBayar && receipt.metodeBayar.startsWith("qris");
+            const qrisImage = isQris && qrisImages && qrisImages[receipt.metodeBayar];
+            return qrisImage ? (
+              <div style={{ marginBottom: 10 }}>
+                <img 
+                  src={qrisImage} 
+                  alt={`QRIS ${METODE_LABELS[receipt.metodeBayar] || receipt.metodeBayar}`} 
+                  style={{ maxWidth: "100%", maxHeight: "150px", borderRadius: RADIUS.md, border: `1px solid ${BD}` }} 
+                />
+              </div>
+            ) : null;
+          })()}
         </div>
 
         {/* Body (scrollable) */}
@@ -97,42 +114,40 @@ export default function ReceiptModal({ receipt, logo, printReceipt, setReceipt, 
             </div>
           ))}
           <div style={{ borderTop:"1px dashed #ccc", margin:"7px 0" }}/>
-          <div style={{ ...row, fontSize:TYPOGRAPHY.label.fontSize, color:MT }}><span>Subtotal</span><span>{fmt(receipt.subtotal)}</span></div>
-          {receiptAdditionals ? (
-            <>
-              {(receiptAdditionals.find(f => f.key === "service")?.enabled !== false) && (
-                <div style={{ ...row, fontSize:TYPOGRAPHY.label.fontSize, color:MT, marginBottom:2 }}>
-                  <span>Service 6%</span>
-                  <span>{fmt(receipt.service ?? calcPrice(receipt.subtotal).service)}</span>
+
+          {/* Custom receipt additionals fields (if any) */}
+          {receiptAdditionals && receiptAdditionals.length > 0 && (
+            receiptAdditionals
+              .filter(f => f.category === "receipt" && f.visible !== false)
+              .map((field, idx) => (
+                <div key={field.key} style={{ ...row, fontSize:TYPOGRAPHY.label.fontSize, color:MT, marginBottom:2 }}>
+                  <span>{field.label}</span>
+                  <span>{receipt[field.key] || "-"}</span>
                 </div>
-              )}
-              {(receiptAdditionals.find(f => f.key === "tax")?.enabled !== false) && (
-                <div style={{ ...row, fontSize:TYPOGRAPHY.label.fontSize, color:MT }}>
-                  <span>Pajak 10%</span>
-                  <span>{fmt(receipt.pajak ?? calcPrice(receipt.subtotal).pajak)}</span>
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              <div style={{ ...row, fontSize:TYPOGRAPHY.label.fontSize, color:MT, marginBottom:2 }}>
-                <span>Service 6%</span>
-                <span>{fmt(receipt.service ?? calcPrice(receipt.subtotal).service)}</span>
-              </div>
-              <div style={{ ...row, fontSize:TYPOGRAPHY.label.fontSize, color:MT }}>
-                <span>Pajak 10%</span>
-                <span>{fmt(receipt.pajak ?? calcPrice(receipt.subtotal).pajak)}</span>
-              </div>
-            </>
+              ))
           )}
+
+          <div style={{ ...row, fontSize:TYPOGRAPHY.label.fontSize, color:MT }}><span>Subtotal</span><span>{fmt(receipt.subtotal)}</span></div>
           <div style={{ ...row, fontSize:TYPOGRAPHY.body.fontSize, fontWeight:700, marginTop:3 }}>
             <span>TOTAL</span><span style={{ color:OR }}>{fmt(receipt.total)}</span>
           </div>
-          {receipt.metodeBayar === "cash" && (<>
-            <div style={{ ...row, fontSize:TYPOGRAPHY.label.fontSize, color:COLOR_PALETTE.primary }}><span>Bayar</span><span>{fmt(receipt.bayar)}</span></div>
-            <div style={{ ...row, fontSize:TYPOGRAPHY.label.fontSize, color:COLOR_PALETTE.primary }}><span>Kembalian</span><span>{fmt(receipt.kembalian)}</span></div>
-          </>)}
           <div style={{ borderTop:"1px dashed #ccc", margin:"7px 0" }}/>
+
+          {/* QRIS Image for QRIS payments (also at bottom) */}
+          {(() => {
+            const isQris = receipt.metodeBayar && receipt.metodeBayar.startsWith("qris");
+            const qrisImage = isQris && qrisImages && qrisImages[receipt.metodeBayar];
+            return qrisImage ? (
+              <div style={{ textAlign: "center", marginBottom: 10 }}>
+                <img 
+                  src={qrisImage} 
+                  alt={`QRIS ${METODE_LABELS[receipt.metodeBayar] || receipt.metodeBayar}`} 
+                  style={{ maxWidth: "100%", maxHeight: "150px", borderRadius: RADIUS.md, border: `1px solid ${BD}` }} 
+                />
+              </div>
+            ) : null;
+          })()}
+
           <div style={{ textAlign:"center", fontSize:TYPOGRAPHY.label.fontSize, color:MT }}>Terima kasih atas kunjungan Anda!</div>
         </div>
 

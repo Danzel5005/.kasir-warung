@@ -1,21 +1,13 @@
 import { useState, useEffect, useRef } from "react";
-import { G, W, BD, MT } from "../../constants/colors.js";
+import { G, W, BD, MT, LT } from "../../constants/colors.js";
 import { row, inp, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/theme.js";
 
-export default function SettingsModal({ settingsH }) {
+export default function SettingsModal({ settingsH, authH }) {
   const [tab, setTab] = useState("printer"); // "printer", "payment", "qris", or "receipt"
   const [loadingPrinters, setLoadingPrinters] = useState(false);
   const qrisImageRef = useRef({});
 
-  // Load printers when printer tab is opened
-  useEffect(() => {
-    if (tab === "printer" && settingsH.printerList.length === 0 && !loadingPrinters) {
-      setLoadingPrinters(true);
-      settingsH.openPrinterModal().then(() => setLoadingPrinters(false));
-    }
-  }, [tab]);
 
-  if (!settingsH.settingsModal) return null;
 
   return (
     <div
@@ -85,6 +77,22 @@ export default function SettingsModal({ settingsH }) {
             🖨️ Printer
           </button>
           <button
+            onClick={() => setTab("warung")}
+            style={{
+              background: "none",
+              border: "none",
+              borderBottom: tab === "warung" ? `2px solid ${G}` : "none",
+              cursor: "pointer",
+              fontFamily: "inherit",
+              fontSize: TYPOGRAPHY.small.fontSize,
+              fontWeight: tab === "warung" ? 700 : 600,
+              color: tab === "warung" ? G : MT,
+              paddingBottom: 6,
+            }}
+          >
+            🏪 Nama Warung
+          </button>
+          <button
             onClick={() => setTab("payment")}
             style={{
               background: "none",
@@ -131,6 +139,22 @@ export default function SettingsModal({ settingsH }) {
             }}
           >
             🧾 Resi
+          </button>
+          <button
+            onClick={() => setTab("users")}
+            style={{
+              background: "none",
+              border: "none",
+              borderBottom: tab === "users" ? `2px solid ${G}` : "none",
+              cursor: "pointer",
+              fontFamily: "inherit",
+              fontSize: TYPOGRAPHY.small.fontSize,
+              fontWeight: tab === "users" ? 700 : 600,
+              color: tab === "users" ? G : MT,
+              paddingBottom: 6,
+            }}
+          >
+            👥 Kelola Pengguna
           </button>
         </div>
 
@@ -198,6 +222,162 @@ export default function SettingsModal({ settingsH }) {
             </div>
           )}
 
+          {/* Warung Name Tab */}
+          {tab === "warung" && (
+            <div>
+              <div style={{ fontSize: TYPOGRAPHY.label.fontSize, color: MT, fontWeight: 600, marginBottom: 10 }}>
+                Atur nama warung/kios/restoran, alamat, dan nomor telepon yang akan tampil di resi pembayaran.
+              </div>
+
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: TYPOGRAPHY.label.fontSize, fontWeight: 600, color: G, marginBottom: 8 }}>
+                  Info Warung Saat Ini:
+                </div>
+                <div style={{ padding: "12px", background: COLOR_PALETTE.primaryLight, borderRadius: RADIUS.md, border: `1px solid #b8ccf0` }}>
+                  <div style={{ fontSize: TYPOGRAPHY.body.fontSize, fontWeight: 700, color: G }}>
+                    {settingsH.settings.warungName || "Warung (default)"}
+                  </div>
+                  {settingsH.settings.warungAddress && (
+                    <div style={{ fontSize: TYPOGRAPHY.small.fontSize, color: MT, marginTop: 4 }}>
+                      {settingsH.settings.warungAddress}
+                    </div>
+                  )}
+                  {settingsH.settings.warungPhone && (
+                    <div style={{ fontSize: TYPOGRAPHY.small.fontSize, color: MT, marginTop: 2 }}>
+                      Telp: {settingsH.settings.warungPhone}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ paddingTop: 12, borderTop: `1px solid ${BD}` }}>
+                <div style={{ fontSize: TYPOGRAPHY.label.fontSize, fontWeight: 600, color: G, marginBottom: 8 }}>
+                  Ubah Nama Warung:
+                </div>
+                <div style={{ display: "flex", gap: 7 }}>
+                  <input
+                    type="text"
+                    value={settingsH.warungNameInput}
+                    onChange={(e) => settingsH.setWarungNameInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && settingsH.setWarungName(settingsH.warungNameInput)}
+                    placeholder="Nama warung/kios/restoran Anda"
+                    style={{
+                      flex: 1,
+                      padding: "8px 10px",
+                      border: `1px solid ${BD}`,
+                      borderRadius: RADIUS.md,
+                      fontFamily: "inherit",
+                      fontSize: TYPOGRAPHY.small.fontSize,
+                    }}
+                  />
+                  <button
+                    onClick={() => settingsH.setWarungName(settingsH.warungNameInput)}
+                    style={{
+                      padding: "8px 14px",
+                      background: G,
+                      color: W,
+                      border: "none",
+                      borderRadius: RADIUS.md,
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                      fontSize: TYPOGRAPHY.small.fontSize,
+                      fontWeight: 700,
+                    }}
+                  >
+                    Simpan
+                  </button>
+                </div>
+                <div style={{ fontSize: TYPOGRAPHY.label.fontSize, color: MT, marginTop: 8 }}>
+                  Kosongkan untuk kembali ke default "Warung"
+                </div>
+              </div>
+              
+              <div style={{ paddingTop: 12, borderTop: `1px solid ${BD}` }}>
+                <div style={{ fontSize: TYPOGRAPHY.label.fontSize, fontWeight: 600, color: G, marginBottom: 8 }}>
+                  Alamat Warung:
+                </div>
+                <div style={{ display: "flex", gap: 7 }}>
+                  <input
+                    type="text"
+                    value={settingsH.warungAddressInput || ""}
+                    onChange={(e) => settingsH.setWarungAddressInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && settingsH.setWarungAddress(settingsH.warungAddressInput)}
+                    placeholder="Alamat lengkap warung"
+                    style={{
+                      flex: 1,
+                      padding: "8px 10px",
+                      border: `1px solid ${BD}`,
+                      borderRadius: RADIUS.md,
+                      fontFamily: "inherit",
+                      fontSize: TYPOGRAPHY.small.fontSize,
+                    }}
+                  />
+                  <button
+                    onClick={() => settingsH.setWarungAddress(settingsH.warungAddressInput)}
+                    style={{
+                      padding: "8px 14px",
+                      background: G,
+                      color: W,
+                      border: "none",
+                      borderRadius: RADIUS.md,
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                      fontSize: TYPOGRAPHY.small.fontSize,
+                      fontWeight: 700,
+                    }}
+                  >
+                    Simpan
+                  </button>
+                </div>
+                <div style={{ fontSize: TYPOGRAPHY.label.fontSize, color: MT, marginTop: 8 }}>
+                  Kosongkan untuk menghapus alamat
+                </div>
+              </div>
+
+              <div style={{ paddingTop: 12, borderTop: `1px solid ${BD}` }}>
+                <div style={{ fontSize: TYPOGRAPHY.label.fontSize, fontWeight: 600, color: G, marginBottom: 8 }}>
+                  Nomor Telepon Warung:
+                </div>
+                <div style={{ display: "flex", gap: 7 }}>
+                  <input
+                    type="text"
+                    value={settingsH.warungPhoneInput || ""}
+                    onChange={(e) => settingsH.setWarungPhoneInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && settingsH.setWarungPhone(settingsH.warungPhoneInput)}
+                    placeholder="Nomor telepon/WA warung"
+                    style={{
+                      flex: 1,
+                      padding: "8px 10px",
+                      border: `1px solid ${BD}`,
+                      borderRadius: RADIUS.md,
+                      fontFamily: "inherit",
+                      fontSize: TYPOGRAPHY.small.fontSize,
+                    }}
+                  />
+                  <button
+                    onClick={() => settingsH.setWarungPhone(settingsH.warungPhoneInput)}
+                    style={{
+                      padding: "8px 14px",
+                      background: G,
+                      color: W,
+                      border: "none",
+                      borderRadius: RADIUS.md,
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                      fontSize: TYPOGRAPHY.small.fontSize,
+                      fontWeight: 700,
+                    }}
+                  >
+                    Simpan
+                  </button>
+                </div>
+                <div style={{ fontSize: TYPOGRAPHY.label.fontSize, color: MT, marginTop: 8 }}>
+                  Kosongkan untuk menghapus nomor telepon
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Payment Methods Tab */}
           {tab === "payment" && (
             <div>
@@ -225,24 +405,22 @@ export default function SettingsModal({ settingsH }) {
                           {m.category === "cash" ? "💵 Cash" : m.category === "qris" ? "📱 QRIS" : "🏦 Custom"}
                         </div>
                       </div>
-                      {m.category === "custom" && (
-                        <button
-                          onClick={() => settingsH.deletePaymentMethod(m.key)}
-                          style={{
-                            background: COLOR_PALETTE.dangerLight,
-                            color: COLOR_PALETTE.danger,
-                            border: "none",
-                            borderRadius: RADIUS.sm,
-                            padding: "3px 8px",
-                            cursor: "pointer",
-                            fontFamily: "inherit",
-                            fontSize: TYPOGRAPHY.label.fontSize,
-                            fontWeight: 600,
-                          }}
-                        >
-                          Hapus
-                        </button>
-                      )}
+                      <button
+                        onClick={() => settingsH.deletePaymentMethod(m.key)}
+                        style={{
+                          background: COLOR_PALETTE.dangerLight,
+                          color: COLOR_PALETTE.danger,
+                          border: "none",
+                          borderRadius: RADIUS.sm,
+                          padding: "3px 8px",
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                          fontSize: TYPOGRAPHY.label.fontSize,
+                          fontWeight: 600,
+                        }}
+                      >
+                        Hapus
+                      </button>
                     </div>
                   ))
                 ) : (
@@ -413,7 +591,7 @@ export default function SettingsModal({ settingsH }) {
           {tab === "receipt" && (
             <div>
               <div style={{ fontSize: TYPOGRAPHY.label.fontSize, color: MT, fontWeight: 600, marginBottom: 10 }}>
-                Atur field yang muncul di checkout dan resi. Toggle "Wajib" untuk membuat field required.
+                Atur field yang muncul di checkout dan resi. Toggle "Wajib" untuk membuat field required. Semua field dapat dihapus.
               </div>
 
               {/* Receipt Fields */}
@@ -423,10 +601,10 @@ export default function SettingsModal({ settingsH }) {
                     key={field.key}
                     style={{
                       padding: "10px",
-                      background: field.category === "receipt" ? COLOR_PALETTE.infoLight : COLOR_PALETTE.warningLight || "#fff3e0",
+                      background: COLOR_PALETTE.infoLight,
                       borderRadius: RADIUS.md,
                       marginBottom: 8,
-                      border: `1px solid ${field.category === "receipt" ? "#b8ccf0" : "#ffd699"}`,
+                      border: `1px solid #b8ccf0`,
                     }}
                   >
                     <div style={{ ...row, marginBottom: 8 }}>
@@ -435,54 +613,166 @@ export default function SettingsModal({ settingsH }) {
                           {field.label}
                         </span>
                         <div style={{ fontSize: TYPOGRAPHY.label.fontSize, color: MT }}>
-                          {field.category === "receipt" ? "📋 Field Resi" : "💰 Biaya"}
+                          📋 Field Resi
                         </div>
                       </div>
+                      <button
+                        onClick={() => settingsH.deleteReceiptAdditional(field.key)}
+                        style={{
+                          background: COLOR_PALETTE.dangerLight,
+                          color: COLOR_PALETTE.danger,
+                          border: "none",
+                          borderRadius: RADIUS.sm,
+                          padding: "3px 8px",
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                          fontSize: TYPOGRAPHY.label.fontSize,
+                          fontWeight: 600,
+                        }}
+                      >
+                        Hapus
+                      </button>
                     </div>
 
                     {/* For text/number fields: Toggle Required */}
-                    {field.type !== "toggle" && (
-                      <button
-                        onClick={() => settingsH.toggleReceiptAdditionalRequired(field.key)}
-                        style={{
-                          width: "100%",
-                          padding: "6px 10px",
-                          background: field.required ? G : BD,
-                          color: field.required ? W : MT,
-                          border: "none",
-                          borderRadius: RADIUS.sm,
-                          cursor: "pointer",
-                          fontFamily: "inherit",
-                          fontSize: TYPOGRAPHY.label.fontSize,
-                          fontWeight: 600,
-                        }}
-                      >
-                        {field.required ? "✓ Wajib di isi" : "Tidak wajib"}
-                      </button>
-                    )}
-
-                    {/* For toggle fields: Enable/Disable */}
-                    {field.type === "toggle" && (
-                      <button
-                        onClick={() => settingsH.toggleChargeEnabled(field.key)}
-                        style={{
-                          width: "100%",
-                          padding: "6px 10px",
-                          background: field.enabled ? G : "#ddd",
-                          color: field.enabled ? W : MT,
-                          border: "none",
-                          borderRadius: RADIUS.sm,
-                          cursor: "pointer",
-                          fontFamily: "inherit",
-                          fontSize: TYPOGRAPHY.label.fontSize,
-                          fontWeight: 600,
-                        }}
-                      >
-                        {field.enabled ? "✓ Diaktifkan" : "Dinonaktifkan"}
-                      </button>
-                    )}
+                    <button
+                      onClick={() => settingsH.toggleReceiptAdditionalRequired(field.key)}
+                      style={{
+                        width: "100%",
+                        padding: "6px 10px",
+                        background: field.required ? G : BD,
+                        color: field.required ? W : MT,
+                        border: "none",
+                        borderRadius: RADIUS.sm,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                        fontSize: TYPOGRAPHY.label.fontSize,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {field.required ? "✓ Wajib di isi" : "Tidak wajib"}
+                    </button>
                   </div>
                 ))}
+
+              {/* Add new custom field */}
+              <div style={{ marginTop: 16, paddingTop: 12, borderTop: `1px solid ${BD}` }}>
+                <div style={{ fontSize: TYPOGRAPHY.label.fontSize, fontWeight: 600, color: G, marginBottom: 8 }}>
+                  Tambah Field Baru:
+                </div>
+                <div style={{ display: "flex", gap: 7 }}>
+                  <input
+                    type="text"
+                    value={settingsH.newReceiptFieldLabel}
+                    onChange={(e) => settingsH.setNewReceiptFieldLabel(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && settingsH.addReceiptField()}
+                    placeholder="Nama field (e.g., Catatan, Alamat)"
+                    style={{
+                      flex: 1,
+                      padding: "8px 10px",
+                      border: `1px solid ${BD}`,
+                      borderRadius: RADIUS.md,
+                      fontFamily: "inherit",
+                      fontSize: TYPOGRAPHY.small.fontSize,
+                    }}
+                  />
+                  <select
+                    value={settingsH.newReceiptFieldType}
+                    onChange={(e) => settingsH.setNewReceiptFieldType(e.target.value)}
+                    style={{
+                      padding: "8px 10px",
+                      border: `1px solid ${BD}`,
+                      borderRadius: RADIUS.md,
+                      fontFamily: "inherit",
+                      fontSize: TYPOGRAPHY.small.fontSize,
+                    }}
+                  >
+                    <option value="text">Text</option>
+                    <option value="number">Number</option>
+                  </select>
+                  <button
+                    onClick={settingsH.addReceiptField}
+                    style={{
+                      padding: "8px 14px",
+                      background: G,
+                      color: W,
+                      border: "none",
+                      borderRadius: RADIUS.md,
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                      fontSize: TYPOGRAPHY.small.fontSize,
+                      fontWeight: 700,
+                    }}
+                  >
+                    Tambah
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Users Tab */}
+          {tab === "users" && (
+            <div>
+              <div style={{ fontSize: TYPOGRAPHY.label.fontSize, color: MT, fontWeight: 600, marginBottom: 10 }}>
+                Kelola pengguna yang bisa login ke sistem kasir.
+              </div>
+              
+              {/* Users list */}
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: TYPOGRAPHY.label.fontSize, fontWeight: 600, color: G, marginBottom: 8 }}>
+                  Daftar Pengguna ({authH?.users?.length || 0}):
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                  {authH?.users?.map(u => (
+                    <div key={u.username} style={{ ...row, padding: "7px 10px", background: LT, borderRadius: RADIUS.md }}>
+                      <div>
+                        <div style={{ fontSize: TYPOGRAPHY.small.fontSize, fontWeight: 600 }}>{u.nama}{u.username === authH?.currentUser?.username ? " (Anda)" : ""}</div>
+                        <div style={{ fontSize: TYPOGRAPHY.label.fontSize, color: MT }}>@{u.username}</div>
+                      </div>
+                      {!authH?.currentUser || authH?.currentUser?.role !== "admin" ? (
+                        <span style={{ fontSize: TYPOGRAPHY.label.fontSize, color: MT, fontStyle: "italic" }}>Hanya admin</span>
+                      ) : u.username === "admin" ? (
+                        <span style={{ fontSize: TYPOGRAPHY.label.fontSize, color: MT, fontStyle: "italic" }}>Utama (tidak bisa dihapus)</span>
+                      ) : u.username === authH?.currentUser?.username ? (
+                        <span style={{ fontSize: TYPOGRAPHY.label.fontSize, color: MT, fontStyle: "italic" }}>Akun sendiri</span>
+                      ) : (
+                        <button
+                          onClick={() => settingsH.authH.deleteUser(u.username)}
+                          style={{ background: COLOR_PALETTE.dangerLight, color: COLOR_PALETTE.danger, border: "none", borderRadius: RADIUS.sm, padding: "4px 8px", cursor: "pointer", fontFamily: "inherit", fontSize: TYPOGRAPHY.label.fontSize, fontWeight: 600 }}
+                        >Hapus</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Add new user */}
+              <div style={{ paddingTop: 12, borderTop: `1px solid ${BD}` }}>
+                <div style={{ fontSize: TYPOGRAPHY.label.fontSize, fontWeight: 600, color: G, marginBottom: 8 }}>
+                  Tambah Pengguna Baru:
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <input
+                    type="text"
+                    placeholder="Nama Lengkap (e.g., Kasir Budi)"
+                    style={inp}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Username (e.g., kasir1)"
+                    style={inp}
+                  />
+                  <input
+                    type="password"
+                    placeholder="Password (min. 4 karakter)"
+                    style={inp}
+                  />
+                  <button style={{ padding: "8px 14px", background: G, color: W, border: "none", borderRadius: RADIUS.md, cursor: "pointer", fontFamily: "inherit", fontSize: TYPOGRAPHY.small.fontSize, fontWeight: 700 }}>
+                    + Tambah Pengguna
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>

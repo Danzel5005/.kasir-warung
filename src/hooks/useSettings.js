@@ -19,11 +19,19 @@ function useSettings({ toast_ }) {
     printerName: "", 
     paymentMethods: DEFAULT_PAYMENT_METHODS,
     receiptAdditionals: DEFAULT_RECEIPT_ADDITIONALS,
+    warungName: "",
+    warungAddress: "",
+    warungPhone: "",
   });
   const [settingsModal, setSettingsModal] = useState(false);
   const [printerModal, setPrinterModal] = useState(false);
   const [printerList, setPrinterList]   = useState([]);
   const [newPaymentLabel, setNewPaymentLabel] = useState("");
+  const [newReceiptFieldLabel, setNewReceiptFieldLabel] = useState("");
+  const [newReceiptFieldType, setNewReceiptFieldType] = useState("text");
+  const [warungNameInput, setWarungNameInput] = useState("");
+  const [warungAddressInput, setWarungAddressInput] = useState("");
+  const [warungPhoneInput, setWarungPhoneInput] = useState("");
   const logoRef = useRef();
 
   // deps kosong aman: hanya setter, tidak baca state apapun.
@@ -38,6 +46,9 @@ function useSettings({ toast_ }) {
     if (!s.receiptAdditionals || !Array.isArray(s.receiptAdditionals) || s.receiptAdditionals.length === 0) {
       s.receiptAdditionals = DEFAULT_RECEIPT_ADDITIONALS;
     }
+    // Ensure new fields exist
+    if (!s.warungAddress) s.warungAddress = "";
+    if (!s.warungPhone) s.warungPhone = "";
     setSettings(s);
   }, []);
 
@@ -112,12 +123,6 @@ function useSettings({ toast_ }) {
   // PENTING: membaca settings LANGSUNG dari closure.
   // Wajib [settings, toast_] di deps.
   const deletePaymentMethod = useCallback(async (key) => {
-    // Prevent deletion if only one method left
-    if (settings.paymentMethods.length <= 1) {
-      toast_("Minimal harus ada satu metode pembayaran", "err");
-      return;
-    }
-    
     const updated = settings.paymentMethods.filter(p => p.key !== key);
     const s = { ...settings, paymentMethods: updated };
     await api.saveSettings(s);
@@ -167,7 +172,7 @@ function useSettings({ toast_ }) {
   // Toggle "Wajib di isi" (required) for a receipt additional field
   const toggleReceiptAdditionalRequired = useCallback(async (key) => {
     const updated = settings.receiptAdditionals.map(field => {
-      if (field.key === key && field.type !== "toggle") {
+      if (field.key === key) {
         return { ...field, required: !field.required };
       }
       return field;
@@ -177,29 +182,90 @@ function useSettings({ toast_ }) {
     setSettings(s);
   }, [settings, toast_]);
 
-  // Toggle enabled status for charges (tax, service)
-  const toggleChargeEnabled = useCallback(async (key) => {
-    const updated = settings.receiptAdditionals.map(field => {
-      if (field.key === key && field.type === "toggle") {
-        return { ...field, enabled: !field.enabled };
-      }
-      return field;
-    });
+  // Delete a custom receipt additional field
+  const deleteReceiptAdditional = useCallback(async (key) => {
+    // No default fields to protect anymore
+    const defaultKeys = [];
+    if (defaultKeys.includes(key)) {
+      toast_("Field default tidak bisa dihapus", "err");
+      return;
+    }
+    
+    const updated = settings.receiptAdditionals.filter(f => f.key !== key);
     const s = { ...settings, receiptAdditionals: updated };
     await api.saveSettings(s);
     setSettings(s);
-    toast_(`${key === "tax" ? "Pajak" : "Service"} ${updated.find(f => f.key === key)?.enabled ? "diaktifkan" : "dinonaktifkan"}`, "ok");
+    toast_("Field dihapus", "ok");
+  }, [settings, toast_]);
+
+  // Add a new custom receipt additional field
+  const addReceiptField = useCallback(async () => {
+    const label = newReceiptFieldLabel.trim();
+    if (!label) { toast_("Nama field wajib diisi", "err"); return; }
+    
+    // Check if label already exists
+    if (settings.receiptAdditionals.some(f => f.label.toLowerCase() === label.toLowerCase())) {
+      toast_("Field dengan nama sama sudah ada", "err"); 
+      return;
+    }
+    
+    const newField = {
+      key: `custom_${Date.now()}`,
+      label: label,
+      type: newReceiptFieldType,
+      required: false,
+      visible: true,
+      category: "receipt",
+    };
+    
+    const updated = [...settings.receiptAdditionals, newField];
+    const s = { ...settings, receiptAdditionals: updated };
+    await api.saveSettings(s);
+    setSettings(s);
+    setNewReceiptFieldLabel("");
+    setNewReceiptFieldType("text");
+    toast_(`Field "${label}" ditambahkan`, "ok");
+  }, [settings, newReceiptFieldLabel, newReceiptFieldType, toast_]);
+
+  // Toggle warung name
+  const setWarungName = useCallback(async (name) => {
+    const s = { ...settings, warungName: name };
+    await api.saveSettings(s);
+    setSettings(s);
+    toast_("Nama warung disimpan", "ok");
+  }, [settings, toast_]);
+
+  // Toggle warung address
+  const setWarungAddress = useCallback(async (address) => {
+    const s = { ...settings, warungAddress: address };
+    await api.saveSettings(s);
+    setSettings(s);
+    toast_("Alamat warung disimpan", "ok");
+  }, [settings, toast_]);
+
+  // Toggle warung phone
+  const setWarungPhone = useCallback(async (phone) => {
+    const s = { ...settings, warungPhone: phone };
+    await api.saveSettings(s);
+    setSettings(s);
+    toast_("Nomor telepon warung disimpan", "ok");
   }, [settings, toast_]);
 
   return {
     logo, settings, settingsModal, setSettingsModal,
     printerModal, printerList, logoRef,
     newPaymentLabel, setNewPaymentLabel,
+    newReceiptFieldLabel, setNewReceiptFieldLabel,
+    newReceiptFieldType, setNewReceiptFieldType,
+    warungNameInput, setWarungNameInput,
+    warungAddressInput, setWarungAddressInput,
+    warungPhoneInput, setWarungPhoneInput,
     loadInitial, handleLogoUpload, printHTML,
     openPrinterModal, selectPrinter, setPrinterModal,
     addPaymentMethod, deletePaymentMethod,
     handleQrisImageUpload, deleteQrisImage,
-    toggleReceiptAdditionalRequired, toggleChargeEnabled,
+    toggleReceiptAdditionalRequired, deleteReceiptAdditional, addReceiptField,
+    setWarungName, setWarungAddress, setWarungPhone,
   };
 }
 

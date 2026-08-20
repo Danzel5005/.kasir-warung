@@ -11,7 +11,7 @@ function ViewKasir({
   // dari menuH
   allCats, kategori, setKategori, search, setSearch, displayMenu, cats,
   // dari cartH
-  cart, drawerOpen, setDrawerOpen, tableNum, setTableNum, pax, setPax,
+  cart, drawerOpen, setDrawerOpen,
   receiptAdditionalValues, receiptAdditionals, updateReceiptAdditionalValue,
   items, subtotal, service, pajak, total, activeBill,
   addToCart, decCart, delCart, clearCart,
@@ -168,19 +168,6 @@ function ViewKasir({
                 )}
               </div>
             ))}
-          {/* Fallback for backward compatibility - if no receiptAdditionals config */}
-          {!receiptAdditionals && (
-            <>
-              <div style={{marginBottom:7}}>
-                <div style={{fontSize:10,color:MT,fontWeight:600,marginBottom:3}}>NOMOR MEJA <span style={{color:"#e84040"}}>*</span></div>
-                <input type="number" min="1" value={tableNum} onChange={e=>setTableNum(e.target.value)} placeholder="Masukkan nomor meja..." style={{...inp,fontSize:12}}/>
-              </div>
-              <div>
-                <div style={{fontSize:10,color:MT,fontWeight:600,marginBottom:3}}>JUMLAH PAX (orang di meja ini)</div>
-                <input type="number" min="1" value={pax} onChange={e=>setPax(e.target.value)} placeholder="Contoh: 4" style={{...inp,fontSize:12}}/>
-              </div>
-            </>
-          )}
         </div>
 
         {/* Header kolom */}
@@ -224,8 +211,6 @@ function ViewKasir({
         {items.length>0&&(
           <div style={{padding:"10px 13px",borderTop:`1px solid ${BD}`}}>
             <div style={{...row,fontSize:11,color:MT,marginBottom:3}}><span>Subtotal</span><span style={{fontWeight:600,color:TX}}>{fmt(subtotal)}</span></div>
-            <div style={{...row,fontSize:11,color:MT,marginBottom:8}}><span>Service 6%</span><span style={{fontWeight:600,color:TX}}>{fmt(service)}</span></div>
-            <div style={{...row,fontSize:11,color:MT,marginBottom:3}}><span>Pajak 10%</span><span style={{fontWeight:600,color:TX}}>{fmt(pajak)}</span></div>
             <div style={{...row,borderTop:`1px solid ${BD}`,paddingTop:7,marginBottom:9}}>
               <span style={{fontSize:14,fontWeight:700}}>Total</span>
               <span style={{fontSize:15,fontWeight:700,color:OR}}>{fmt(total)}</span>

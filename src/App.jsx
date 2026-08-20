@@ -29,7 +29,6 @@ import SettingsModal   from "./components/modals/SettingsModal.jsx";
 import PrinterModal    from "./components/modals/PrinterModal.jsx";
 import CloseShiftModal from "./components/modals/CloseShiftModal.jsx";
 import ConfirmDelModal from "./components/modals/ConfirmDelModal.jsx";
-import UserModal from "./components/modals/UserModal.jsx";
 
 const HARI  = ["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
 const BULAN = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
@@ -132,9 +131,6 @@ export default function Kasir() {
   // import") — jadi dia tinggal di coordinator level.
   const [confirmDel, setConfirmDel] = useState(null);
 
-  // ── User management modal
-  const [userModal, setUserModal] = useState(false);
-
   // ── Receipt & Pay modal — UI state yang menjembatani cart+history, tetap di App.jsx
   const [payModal, setPayModal] = useState(false);
   const [receipt, setReceipt]   = useState(null);
@@ -198,43 +194,44 @@ export default function Kasir() {
 
   // processPayment butuh potongan dari useHistory, useMenu, useAuth, useBills
   const processPayment = useCallback(() => cartH.processPayment({
-    trxId: historyH.trxId, setTrxId: historyH.setTrxId,
+    generateTrxId: historyH.generateTrxId,
     activeShift: authH.activeShift,
     computeStockDeduction: menuH.computeStockDeduction,
     commitMenu: menuH.setMenu,
-    appendHistory: (trx) => { historyH.appendHistory(trx); setReceipt(trx); setPayModal(false); cartH.setDrawerOpen(false); },
+    appendHistory: (trx) => { historyH.appendHistory(trx); setReceipt(trx); setPayModal(false); cartH.setDrawerOpen(false); cartH.clearCart(); },
     removeBillLocal: billsH.removeBillLocal,
   }), [
-    cartH.processPayment, historyH.trxId, historyH.setTrxId, authH.activeShift,
+    cartH.processPayment, historyH.generateTrxId, authH.activeShift,
     menuH.computeStockDeduction, menuH.setMenu, historyH.appendHistory,
-    cartH.setDrawerOpen, billsH.removeBillLocal,
+    cartH.setDrawerOpen, cartH.clearCart, billsH.removeBillLocal,
   ]);
 
-  // confirmCloseShift butuh clearBills (silent, sesuai perilaku asli) + clearCart
+  // confirmCloseShift butuh clearCart saja — clearBills DIHAPUS
+  // Open bill TIDAK PERNAH dihapus otomatis saat tutup shift
+  // (hanya dihapus jika sudah dibayar via processPayment -> removeBillLocal)
   const confirmCloseShift = useCallback(() => authH.confirmCloseShift({
-    clearBills: billsH.clearBillsSilent,
     clearCart: cartH.clearCart,
-  }), [authH.confirmCloseShift, billsH.clearBillsSilent, cartH.clearCart]);
+  }), [authH.confirmCloseShift, cartH.clearCart]);
 
   // printReceipt(trx) — generic, dari useSettings.printHTML + buildReceiptHTML
   // PENTING: membaca settingsH.logo langsung. Wajib di deps.
   const printReceipt = useCallback(async (trx) => {
-    const html = buildReceiptHTML(trx, settingsH.logo, settingsH.settings.receiptAdditionals);
-    await settingsH.printHTML(html, "Mencetak resi...");
-  }, [settingsH.logo, settingsH.printHTML, settingsH.settings.receiptAdditionals]);
+    const html = buildReceiptHTML(trx, settingsH.logo, settingsH.settings.receiptAdditionals, settingsH.settings.qrisImages, settingsH.settings.warungName, menuH.cats, settingsH.settings.warungAddress, settingsH.settings.warungPhone);
+    await settingsH.printHTML(html, "Selesai Mencetak Resi");
+  }, [settingsH.logo, settingsH.printHTML, settingsH.settings.receiptAdditionals, settingsH.settings.qrisImages, settingsH.settings.warungName, settingsH.settings.warungAddress, settingsH.settings.warungPhone, menuH.cats]);
 
-  // printPreview — depend ke cart (items/tableNum/pax), pakai printHTML generic dari settings
-  // PENTING: membaca cartH.items/tableNum/pax dan settingsH.logo langsung. Semua wajib di deps.
+  // printPreview — depend ke cart (items/receiptAdditionalValues), pakai printHTML generic dari settings
+  // PENTING: membaca cartH.items/receiptAdditionalValues dan settingsH.logo langsung. Semua wajib di deps.
   const printPreview = useCallback(async () => {
-    if (!cartH.items.length || !cartH.tableNum.trim()) { toastH.toast_("Isi meja dan pesanan dulu", "err"); return; }
+    if (!cartH.items.length) { toastH.toast_("Isi pesanan dulu", "err"); return; }
     setPrintingPreview(true);
     try {
-      const html = buildPreviewHTML(cartH.tableNum.trim(), cartH.pax, cartH.items, settingsH.logo, settingsH.settings.receiptAdditionals);
+      const html = buildPreviewHTML(cartH.receiptAdditionalValues, cartH.items, settingsH.logo, settingsH.settings.receiptAdditionals, settingsH.settings.warungName, menuH.cats, settingsH.settings.warungAddress, settingsH.settings.warungPhone);
       await settingsH.printHTML(html, "Mencetak preview tagihan...");
     } finally {
       setPrintingPreview(false);
     }
-  }, [cartH.items, cartH.tableNum, cartH.pax, toastH.toast_, settingsH.logo, settingsH.printHTML, settingsH.settings.receiptAdditionals]);
+  }, [cartH.items, cartH.receiptAdditionalValues, toastH.toast_, settingsH.logo, settingsH.printHTML, settingsH.settings.receiptAdditionals, settingsH.settings.warungName, settingsH.settings.warungAddress, settingsH.settings.warungPhone, menuH.cats]);
 
   // Dipanggil dari tombol "Bayar" di Open Bill view — pola setTimeout
   // DIPERTAHANKAN PERSIS dari kode asli (lihat catatan di useCart.js bagian
@@ -318,7 +315,7 @@ const executeConfirmDel = useCallback(() => {
         <div style={{textAlign:"center",marginBottom:28}}>
           {settingsH.logo?<img src={settingsH.logo} alt="logo" style={{width:64,height:64,borderRadius:12,objectFit:"cover",marginBottom:10}}/>
           :<div style={{width:64,height:64,background:G,borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:700,color:W,margin:"0 auto 10px"}}>YKK</div>}
-          <div style={{fontSize:18,fontWeight:700,color:G}}>Restaurant</div>
+          <div style={{fontSize:18,fontWeight:700,color:G}}>{settingsH.settings.warungName || "Warung"}</div>
           <div style={{fontSize:12,color:MT,marginTop:2}}>Sistem Kasir — Mulai Shift</div>
         </div>
 
@@ -397,7 +394,7 @@ const executeConfirmDel = useCallback(() => {
         <input ref={logoRef} type="file" accept=".jpg,.jpeg,.png" style={{display:"none"}} onChange={settingsH.handleLogoUpload}/>
         <div style={{flexShrink:0}}>
           <div style={{fontSize:13,fontWeight:700,color:G}}>Sistem Kasir</div>
-          <div style={{fontSize:9,color:OR,fontWeight:600}}>Restaurant</div>
+          <div style={{fontSize:9,color:OR,fontWeight:600}}>{settingsH.settings.warungName || "Warung"}</div>
         </div>
 
         {/* Nav */}
@@ -437,8 +434,6 @@ const executeConfirmDel = useCallback(() => {
             allCats={menuH.allCats} kategori={menuH.kategori} setKategori={menuH.setKategori}
             search={menuH.search} setSearch={menuH.setSearch} displayMenu={menuH.displayMenu} cats={menuH.cats}
             cart={cartH.cart} drawerOpen={cartH.drawerOpen} setDrawerOpen={cartH.setDrawerOpen}
-            tableNum={cartH.tableNum} setTableNum={cartH.setTableNum}
-            pax={cartH.pax} setPax={cartH.setPax}
             receiptAdditionalValues={cartH.receiptAdditionalValues} receiptAdditionals={cartH.receiptAdditionals} updateReceiptAdditionalValue={cartH.updateReceiptAdditionalValue}
             items={cartH.items} subtotal={cartH.subtotal} service={cartH.service}
             pajak={cartH.pajak} total={cartH.total} activeBill={cartH.activeBill}
@@ -490,6 +485,7 @@ const executeConfirmDel = useCallback(() => {
             history={historyH.history}
             menu={menuH.menu}
             doCSV={doCSV} at={at}
+            paymentMethods={settingsH.settings.paymentMethods}
           />
         )}
 
@@ -499,14 +495,13 @@ const executeConfirmDel = useCallback(() => {
             menu={menuH.menu} cats={menuH.cats} allCats={menuH.allCats}
             setCatModal={menuH.setCatModal} openAdd={menuH.openAdd} openEdit={menuH.openEdit}
             setConfirmDel={setConfirmDel}
-            setUserModal={setUserModal}
           />
         )}
       </div>
 
       {/* FOOTER */}
       <footer style={{background:W,borderTop:`1px solid ${BD}`,padding:"3px 16px",...row,flexShrink:0}}>
-        <span style={{fontSize:9,color:MT}}>Terima kasih berkunjung ke <span style={{color:OR,fontWeight:600}}>Restaurant</span></span>
+        <span style={{fontSize:9,color:MT}}>Terima kasih berkunjung ke <span style={{color:OR,fontWeight:600}}>{settingsH.settings.warungName || "Warung"}</span></span>
         {dataPath&&<span style={{fontSize:8,color:"#ccc",overflow:"hidden",textOverflow:"ellipsis",maxWidth:300}}>{dataPath}</span>}
         <span style={{fontSize:9,color:MT}}>v3.0.0</span>
       </footer>
@@ -518,7 +513,7 @@ const executeConfirmDel = useCallback(() => {
 
       {/* ══ MODAL: RESI (klik transaksi atau setelah bayar) ════════════════ */}
       {receipt && (
-        <ReceiptModal receipt={receipt} logo={settingsH.logo} printReceipt={printReceipt} setReceipt={setReceipt} receiptAdditionals={settingsH.settings.receiptAdditionals} />
+        <ReceiptModal receipt={receipt} logo={settingsH.logo} printReceipt={printReceipt} setReceipt={setReceipt} receiptAdditionals={settingsH.settings.receiptAdditionals} qrisImages={settingsH.settings.qrisImages} />
       )}
 
       {/* ══ MODAL: TAMBAH/EDIT MENU ════════════════════════════════════════ */}
@@ -533,7 +528,7 @@ const executeConfirmDel = useCallback(() => {
 
       {/* ══ MODAL: SETTINGS (PRINTER & PAYMENT) ════════════════════════════ */}
       {settingsH.settingsModal && (
-        <SettingsModal settingsH={settingsH} />
+        <SettingsModal settingsH={settingsH} authH={authH} />
       )}
 
       {/* ══ MODAL: PRINTER (Legacy, kept for backward compatibility) ════════ */}
@@ -549,11 +544,6 @@ const executeConfirmDel = useCallback(() => {
       {/* ══ MODAL: KONFIRMASI HAPUS ════════════════════════════════════════ */}
       {confirmDel && (
         <ConfirmDelModal confirmDel={confirmDel} setConfirmDel={setConfirmDel} executeConfirmDel={executeConfirmDel} />
-      )}
-
-      {/* ══ MODAL: KELOLA PENGGUNA ════════════════════════════════════════ */}
-      {userModal && (
-        <UserModal authH={authH} setUserModal={setUserModal} />
       )}
 
       {/* ── UNDO BANNER ──────────────────────────────────────────────────── */}

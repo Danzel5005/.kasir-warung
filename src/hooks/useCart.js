@@ -27,8 +27,6 @@ import { api } from "../utilities/utils.js";
 function useCart({ toast_, getNow, receiptAdditionals = [] }) {
   const [cart, setCart]         = useState({});
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [tableNum, setTableNum] = useState("");
-  const [pax, setPax]           = useState("");
   const [receiptAdditionalValues, setReceiptAdditionalValues] = useState({}); // { "nomor_meja": "5", "jumlah_pax": "2" }
   const [metode, setMetode]     = useState("cash");
   const [paid, setPaid]         = useState("");
@@ -49,13 +47,13 @@ function useCart({ toast_, getNow, receiptAdditionals = [] }) {
 
   // Check if all required receipt additionals are filled (moved before canPay to avoid TDZ)
   const checkRequiredAdditionals = useCallback((additionals) => {
-    if (!additionals) return tableNum.trim() !== "";
+    if (!additionals) return true;
     return additionals.every(field => {
       if (!field.required) return true;
       const value = receiptAdditionalValues[field.key];
       return value && String(value).trim() !== "";
     });
-  }, [receiptAdditionalValues, tableNum]);
+  }, [receiptAdditionalValues]);
 
   // Use checkRequiredAdditionals to validate all required receipt additionals (not just tableNum)
   const canPay    = items.length > 0 && checkRequiredAdditionals(receiptAdditionals) && (metode !== "cash" || paidNum >= total);
@@ -99,7 +97,7 @@ function useCart({ toast_, getNow, receiptAdditionals = [] }) {
 
   // deps kosong aman: semua setter dengan nilai konstan, tidak baca state.
   const clearCart = useCallback(() => {
-    setCart({}); setTableNum(""); setPax(""); setPaid(""); setMetode("cash"); setActiveBill(null); setReceiptAdditionalValues({});
+    setCart({}); setPaid(""); setMetode("cash"); setActiveBill(null); setReceiptAdditionalValues({}); setAdditionalsModal({ open: false, item: null }); setDrawerOpen(false);
   }, []);
 
   // Update a single receipt additional field value
@@ -134,7 +132,7 @@ function useCart({ toast_, getNow, receiptAdditionals = [] }) {
       receiptAdditionals
         .filter(f => f.category === "receipt" && f.visible !== false)
         .forEach(field => {
-          receiptAdditionalData[field.key] = receiptAdditionalValues[field.key] || (field.key === "nomor_meja" ? tableNum.trim() : field.key === "jumlah_pax" ? (parseInt(pax) || 0) : "");
+          receiptAdditionalData[field.key] = receiptAdditionalValues[field.key] || "";
         });
     }
     
@@ -142,20 +140,20 @@ function useCart({ toast_, getNow, receiptAdditionals = [] }) {
     if (activeBill) {
       updated = bills.map(b =>
         b.id === activeBill.id
-          ? { ...b, tableNum: tableNum.trim(), items: [...items], pax: parseInt(pax) || b.pax || 0, updatedAt: t.timestamp, ...receiptAdditionalData }
+          ? { ...b, items: [...items], updatedAt: t.timestamp, ...receiptAdditionalData }
           : b
       );
-      toast_('Open Bill Meja diperbarui', "ok");
+      toast_('Open Bill diperbarui', "ok");
     } else {
-      const bill = { id: billId, tableNum: tableNum.trim(), pax: parseInt(pax) || 0, items: [...items], createdAt: t.timestamp, updatedAt: t.timestamp, status: "open", ...receiptAdditionalData };
+      const bill = { id: billId, items: [...items], createdAt: t.timestamp, updatedAt: t.timestamp, status: "open", ...receiptAdditionalData };
       updated = [...bills, bill];
       setBillId(n => n + 1);
-      toast_('Open Bill Meja dibuat', "ok");
+      toast_('Open Bill dibuat', "ok");
     }
     await persistBills(updated);
     clearCart();
     setDrawerOpen(false);
-  }, [items, tableNum, pax, receiptAdditionalValues, receiptAdditionals, activeBill, toast_, getNow, clearCart]);
+  }, [items, receiptAdditionalValues, receiptAdditionals, activeBill, toast_, getNow, clearCart]);
 
   // deps kosong aman: `bill` datang sebagai argumen, tidak baca state luar,
   // hanya setter. Ini fungsi yang dipanggil tombol "Bayar" Open Bill —
@@ -164,27 +162,32 @@ function useCart({ toast_, getNow, receiptAdditionals = [] }) {
     const c = {};
     bill.items.forEach(i => { c[i.id] = { ...i }; });
     setCart(c);
-    setTableNum(bill.tableNum);
-    setPax(String(bill.pax || ""));
     // Load receipt additional values from bill
-    if (bill.nomor_meja !== undefined) setReceiptAdditionalValues(prev => ({ ...prev, nomor_meja: bill.nomor_meja }));
-    if (bill.jumlah_pax !== undefined) setReceiptAdditionalValues(prev => ({ ...prev, jumlah_pax: bill.jumlah_pax }));
+    if (receiptAdditionals) {
+      receiptAdditionals
+        .filter(f => f.category === "receipt" && f.visible !== false)
+        .forEach(field => {
+          if (bill[field.key] !== undefined) {
+            setReceiptAdditionalValues(prev => ({ ...prev, [field.key]: bill[field.key] }));
+          }
+        });
+    }
     setActiveBill(bill);
     setDrawerOpen(true);
   }, []);
 
   // processPayment — paling cross-cutting. Semua dependency lintas-domain
-  // (trxId, activeShift, computeStockDeduction, dst) adalah ARGUMEN
+  // (generateTrxId, activeShift, computeStockDeduction, dst) adalah ARGUMEN
   // PANGGILAN, bukan closure dependency — TIDAK masuk deps array.
   //
-  // PENTING — baca dengan teliti: tableNum, pax, items, subtotal, metode,
+  // PENTING — baca dengan teliti: items, subtotal, metode,
   // paidNum, kembalian, activeBill, cart SEMUA dibaca langsung dari closure.
   // activeBill khususnya — variabel yang diduga terlibat race condition
   // Tahap 2. Dependency array di bawah WAJIB lengkap, atau processPayment
   // akan selalu pakai snapshot dari render pertama (cart kosong, activeBill
   // null selamanya) — bug katastropik, bukan cuma stale.
   const processPayment = useCallback(async ({
-    trxId, setTrxId, activeShift,
+    generateTrxId, activeShift,
     computeStockDeduction, commitMenu,
     appendHistory,
     removeBillLocal,
@@ -201,16 +204,18 @@ function useCart({ toast_, getNow, receiptAdditionals = [] }) {
       receiptAdditionals
         .filter(f => f.category === "receipt" && f.visible !== false)
         .forEach(field => {
-          receiptAdditionalData[field.key] = receiptAdditionalValues[field.key] || (field.key === "nomor_meja" ? tableNum.trim() : field.key === "jumlah_pax" ? (parseInt(pax) || 0) : "");
+          receiptAdditionalData[field.key] = receiptAdditionalValues[field.key] || "";
         });
     }
     
+    const trxId = generateTrxId();
     const trx = {
-      id: trxId, ...t, meja: tableNum.trim(), pax: parseInt(pax) || 0, items: [...items],
+      id: trxId, ...t, items: [...items],
       subtotal, pajak: p, service: s, total: tot, metodeBayar: metode,
       bayar: metode === "cash" ? paidNum : tot,
       kembalian: metode === "cash" ? kembalian : 0,
       shiftId: activeShift?.id || null, shiftNum: activeShift?.shiftNum || null,
+      operator: activeShift?.operator || "Kasir", // [2] nama pengguna yang login
       ...receiptAdditionalData, // Include receipt additional fields
     };
     const updatedMenu = computeStockDeduction(cart);
@@ -234,12 +239,12 @@ function useCart({ toast_, getNow, receiptAdditionals = [] }) {
     clearCart();
     if (onSuccess) onSuccess(trx);
     return trx;
-  }, [tableNum, pax, items, subtotal, metode, paidNum, kembalian, activeBill, cart, toast_, getNow, clearCart]);
+  }, [items, subtotal, metode, paidNum, kembalian, activeBill, cart, toast_, getNow, clearCart]);
 
   return {
-    cart, drawerOpen, tableNum, pax, receiptAdditionalValues, receiptAdditionals, metode, paid, activeBill,
+    cart, drawerOpen, receiptAdditionalValues, receiptAdditionals, metode, paid, activeBill,
     items, subtotal, pajak, service, total, paidNum, kembalian, canPay,
-    setDrawerOpen, setTableNum, setPax, updateReceiptAdditionalValue, setMetode, setPaid,
+    setDrawerOpen, updateReceiptAdditionalValue, setMetode, setPaid,
     addToCart, decCart, delCart, clearCart,
     saveOpenBill, loadBillToCart, processPayment, checkRequiredAdditionals, getCanPay,
   };

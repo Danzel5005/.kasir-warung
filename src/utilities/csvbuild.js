@@ -14,39 +14,37 @@ function csvByDay(trxs, header, rowFn, at) {
   return sections.join("\n");
 }
 
-const TRX_HEADER = "No.Trx,Hari,Tanggal,Jam,Meja,Pax,Metode,Nama Item,Qty,Harga Jual,Modal,Subtotal Jual,Subtotal Modal,Laba Item,Subtotal Trx,Pajak(6%),Service(10%pajak),Total Trx,Bayar,Kembalian,Waktu Unduh";
+const TRX_HEADER = "No.Trx,Hari,Tanggal,Jam,Metode,Nama Item,Qty,Harga Jual,Modal,Subtotal Jual,Subtotal Modal,Laba Item,Subtotal Trx,Total Trx,Bayar,Kembalian,Waktu Unduh";
 function trxRow(t, at) {
-  const {pajak,service,total}=calcPrice(t.subtotal);
+  const {total}=calcPrice(t.subtotal);
   return t.items.map(item=>{
     const subJ=item.harga*item.qty; const subM=(item.modal||0)*item.qty;
-    return [t.id,t.hari,`${t.tgl} ${t.bln} ${t.thn}`,`${t.jam}:${t.mnt}:${t.dtk}`,t.meja,t.pax||0,t.metodeBayar||"cash",`"${item.nama}"`,item.qty,item.harga,item.modal||0,subJ,subM,subJ-subM,t.subtotal,pajak,service,total,t.bayar||0,t.kembalian||0,at].join(",");
+    return [t.id,t.hari,`${t.tgl} ${t.bln} ${t.thn}`,`${t.jam}:${t.mnt}:${t.dtk}`,t.metodeBayar||"cash",`"${item.nama}"`,item.qty,item.harga,item.modal||0,subJ,subM,subJ-subM,t.subtotal,total,t.bayar||0,t.kembalian||0,at].join(",");
   });
 }
 
-const LAP_HEADER = "Hari,Tanggal,Jumlah Trx,Total Pax,Rata-rata per Pax (Rp),Pendapatan Kotor (Rp),Pajak (Rp),Service (Rp),Total Bersih (Rp),Total Modal (Rp),Laba Kotor (Rp),Keterangan,Waktu Unduh";
+const LAP_HEADER = "Hari,Tanggal,Jumlah Trx,Pendapatan Kotor (Rp),Total Bersih (Rp),Total Modal (Rp),Laba Kotor (Rp),Keterangan,Waktu Unduh";
 function lapRow(t) { return [t]; } // placeholder, grouped below
 
 function csvLaporan(trxs, at) {
   const byDay={};
   trxs.forEach(t=>{
     const k=`${t.hari}||${t.tgl} ${t.bln} ${t.thn}`;
-    if(!byDay[k]) byDay[k]={hari:t.hari,tgl:`${t.tgl} ${t.bln} ${t.thn}`,trx:0,pax:0,pendapatan:0,pajak:0,service:0,modal:0};
-    byDay[k].trx++; byDay[k].pax+=(t.pax||0);
-    const p=calcPrice(t.subtotal); byDay[k].pendapatan+=t.subtotal; byDay[k].pajak+=p.pajak; byDay[k].service+=p.service;
+    if(!byDay[k]) byDay[k]={hari:t.hari,tgl:`${t.tgl} ${t.bln} ${t.thn}`,trx:0,pendapatan:0,modal:0};
+    byDay[k].trx++;
+    byDay[k].pendapatan+=t.total; // total includes everything
     t.items.forEach(i=>{byDay[k].modal+=(i.modal||0)*i.qty;});
   });
   const rows=Object.values(byDay).map(d=>{
-    const bersih=d.pendapatan+d.pajak+d.service;
+    const bersih=d.pendapatan;
     const laba=bersih-d.modal;
-    const rpp=d.pax>0?Math.round(bersih/d.pax):0;
     const ket=d.modal===0?"Modal belum diinput":laba>=0?"LABA":"RUGI";
-    return [d.hari,d.tgl,d.trx,d.pax,rpp,d.pendapatan,d.pajak,d.service,bersih,d.modal,laba,ket,at].join(",");
+    return [d.hari,d.tgl,d.trx,d.pendapatan,bersih,d.modal,laba,ket,at].join(",");
   });
-  const tot={trx:0,pax:0,pend:0,pjk:0,srv:0,mod:0};
-  trxs.forEach(t=>{tot.trx++;tot.pax+=(t.pax||0);const p=calcPrice(t.subtotal);tot.pend+=t.subtotal;tot.pjk+=p.pajak;tot.srv+=p.service;t.items.forEach(i=>{tot.mod+=(i.modal||0)*i.qty;});});
-  const totBersih=tot.pend+tot.pjk+tot.srv; const totLaba=totBersih-tot.mod;
-  const totRpp=tot.pax>0?Math.round(totBersih/tot.pax):0;
-  rows.push(["TOTAL","",tot.trx,tot.pax,totRpp,tot.pend,tot.pjk,tot.srv,totBersih,tot.mod,totLaba,tot.mod===0?"Modal belum diinput":totLaba>=0?"LABA":"RUGI",at].join(","));
+  const tot={trx:0,pend:0,mod:0};
+  trxs.forEach(t=>{tot.trx++;tot.pend+=t.total;t.items.forEach(i=>{tot.mod+=(i.modal||0)*i.qty;});});
+  const totBersih=tot.pend; const totLaba=totBersih-tot.mod;
+  rows.push(["TOTAL","",tot.trx,tot.pend,totBersih,tot.mod,totLaba,tot.mod===0?"Modal belum diinput":totLaba>=0?"LABA":"RUGI",at].join(","));
   return [LAP_HEADER,...rows].join("\n");
 }
 
@@ -85,9 +83,14 @@ function csvPerMenu(trxs, menuList, at) {
   return [h,...rows].join("\n");
 }
 
-function csvMetodeBayar(trxs, at) {
-  const METHODS = ["cash","debit-bca","debit-bni","qris-bca","qris-bni"];
-  const LABELS_M = {"cash":"Tunai","debit-bca":"Debit BCA","debit-bni":"Debit BNI","qris-bca":"QRIS BCA","qris-bni":"QRIS BNI","transfer-bca":"Debit BCA","qris":"QRIS BCA"};
+function csvMetodeBayar(trxs, at, paymentMethods = []) {
+  // Use dynamic payment methods from settings, fallback to defaults
+  const METHODS = paymentMethods.length > 0 
+    ? paymentMethods.map(m => m.key)
+    : ["cash","debit-bca","debit-bni","qris-bca","qris-bni"];
+  const LABELS_M = paymentMethods.length > 0
+    ? Object.fromEntries(paymentMethods.map(m => [m.key, m.label]))
+    : {"cash":"Tunai","debit-bca":"Debit BCA","debit-bni":"Debit BNI","qris-bca":"QRIS BCA","qris-bni":"QRIS BNI","transfer-bca":"Debit BCA","qris":"QRIS BCA"};
   const normalize = m => m==="transfer-bca"?"debit-bca":m==="qris"?"qris-bca":m;
 
   // Per hari per metode
@@ -106,7 +109,7 @@ function csvMetodeBayar(trxs, at) {
   Object.values(byDay).forEach(day => {
     METHODS.forEach(m => {
       const d = day.data[m];
-      if(d) rows.push([day.hari, day.tgl, LABELS_M[m], d.trx, d.total, at].join(","));
+      if(d) rows.push([day.hari, day.tgl, LABELS_M[m] || m, d.trx, d.total, at].join(","));
     });
     rows.push("");
   });
@@ -115,7 +118,7 @@ function csvMetodeBayar(trxs, at) {
   const sumRows = METHODS.map(m => {
     const filtered = trxs.filter(t => normalize(t.metodeBayar)===m);
     const tot = filtered.reduce((s,t)=>s+t.total,0);
-    return ["TOTAL","Semua Hari", LABELS_M[m], filtered.length, tot, at].join(",");
+    return ["TOTAL","Semua Hari", LABELS_M[m] || m, filtered.length, tot, at].join(",");
   });
   const grandTotal = trxs.reduce((s,t)=>s+t.total,0);
   sumRows.push(["GRAND TOTAL","","Semua Metode",trxs.length,grandTotal,at].join(","));

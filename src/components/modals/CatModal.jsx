@@ -78,9 +78,21 @@ export default function CatModal({ menuH }) {
                   }}
                   style={{ padding:"10px 12px", background:COLOR_PALETTE.successLight, color:COLOR_PALETTE.success, border:"none", borderRadius:RADIUS.md, cursor:"pointer", fontFamily:"inherit", fontSize:TYPOGRAPHY.small.fontSize, fontWeight:600, textAlign:"left" }}
                 >
-                  🥤 Drinks (Cupsize, Sugar, Ice/Hot)
+                  Drinks (Cupsize, Sugar, Ice/Hot)
                 </button>
               </div>
+              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                <button
+                  onClick={() => {
+                    menuH.addTagToCategory(tagModalCat, "Rokok");
+                    setTagModalCat(null);
+                  }}
+                  style={{ padding:"10px 12px", background:COLOR_PALETTE.successLight, color:COLOR_PALETTE.success, border:"none", borderRadius:RADIUS.md, cursor:"pointer", fontFamily:"inherit", fontSize:TYPOGRAPHY.small.fontSize, fontWeight:600, textAlign:"left" }}
+                >
+                  Rokok
+                </button>
+              </div>
+
             </div>
           </div>
         )}

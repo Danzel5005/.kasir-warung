@@ -13,10 +13,10 @@ export default function PayModal({ cartH, processPayment, setPayModal, paymentMe
 
   // Category labels and colors
   const categoryConfig = {
-    cash: { label: "💵 TUNAI", color: COLOR_PALETTE.secondary, colorLight: COLOR_PALETTE.secondaryLight },
-    debit: { label: "🏦 DEBIT", color: COLOR_PALETTE.info, colorLight: COLOR_PALETTE.infoLight },
-    qris: { label: "📱 QRIS", color: G, colorLight: COLOR_PALETTE.primaryLight },
-    custom: { label: "🏪 LAINNYA", color: COLOR_PALETTE.warning, colorLight: "#fff3e0" },
+    cash: { label: "TUNAI", color: COLOR_PALETTE.secondary, colorLight: COLOR_PALETTE.secondaryLight },
+    debit: { label: "DEBIT", color: COLOR_PALETTE.info, colorLight: COLOR_PALETTE.infoLight },
+    qris: { label: "QRIS", color: G, colorLight: COLOR_PALETTE.primaryLight },
+    custom: { label: "LAINNYA", color: COLOR_PALETTE.warning, colorLight: "#fff3e0" },
   };
 
   const getCategoryColor = (category) => {
@@ -55,9 +55,7 @@ export default function PayModal({ cartH, processPayment, setPayModal, paymentMe
                     ))}
                 </>
               ) : (
-                <>
-                  Meja {cartH.tableNum}{cartH.pax ? ` · ${cartH.pax} pax` : ""}
-                </>
+                <span>—</span>
               )}
               {cartH.activeBill ? ` · Bill #${cartH.activeBill.id}` : ""}
             </span>
@@ -77,8 +75,6 @@ export default function PayModal({ cartH, processPayment, setPayModal, paymentMe
             ))}
             <div style={{ borderTop:`1px solid ${BD}`, marginTop:7, paddingTop:7 }}>
               <div style={{ ...row, fontSize:TYPOGRAPHY.label.fontSize, color:MT }}><span>Subtotal</span><span>{fmt(cartH.subtotal)}</span></div>
-              <div style={{ ...row, fontSize:TYPOGRAPHY.label.fontSize, color:MT }}><span>Service 6%</span><span>{fmt(cartH.service)}</span></div>
-              <div style={{ ...row, fontSize:TYPOGRAPHY.label.fontSize, color:MT }}><span>Pajak 10%</span><span>{fmt(cartH.pajak)}</span></div>
               <div style={{ ...row, fontSize:15, fontWeight:700, marginTop:5 }}>
                 <span>Total</span><span style={{ color:OR }}>{fmt(cartH.total)}</span>
               </div>
@@ -175,11 +171,19 @@ export default function PayModal({ cartH, processPayment, setPayModal, paymentMe
               onClick={() => setPayModal(false)}
               style={{ padding:10, border:`1px solid ${BD}`, borderRadius:RADIUS.md, background:W, cursor:"pointer", fontFamily:"inherit", fontSize:TYPOGRAPHY.small.fontSize, fontWeight:600 }}
             >Batal</button>
-            <button
-              onClick={processPayment}
-              disabled={!cartH.canPay}
-              style={{ padding:10, border:"none", borderRadius:RADIUS.md, background:cartH.canPay ? OR : "#f0c89a", color:W, cursor:cartH.canPay ? "pointer" : "not-allowed", fontFamily:"inherit", fontSize:TYPOGRAPHY.small.fontSize, fontWeight:700 }}
-            >Konfirmasi Bayar</button>
+            {!processPayment.__isAsync ? (
+              <button
+                onClick={processPayment}
+                disabled={!cartH.canPay}
+                style={{ padding:10, border:"none", borderRadius:RADIUS.md, background:cartH.canPay ? OR : "#f0c89a", color:W, cursor:cartH.canPay ? "pointer" : "not-allowed", fontFamily:"inherit", fontSize:TYPOGRAPHY.small.fontSize, fontWeight:700 }}
+              >Konfirmasi Bayar</button>
+            ) : (
+              <button
+                onClick={() => processPayment().then(() => setPayModal(false))}
+                disabled={!cartH.canPay}
+                style={{ padding:10, border:"none", borderRadius:RADIUS.md, background:cartH.canPay ? OR : "#f0c89a", color:W, cursor:cartH.canPay ? "pointer" : "not-allowed", fontFamily:"inherit", fontSize:TYPOGRAPHY.small.fontSize, fontWeight:700 }}
+              >Konfirmasi Bayar</button>
+            )}
           </div>
         </div>
       </div>

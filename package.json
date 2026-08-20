@@ -1,7 +1,7 @@
 {
-  "name": "kasir-kedai-kopi",
+  "name": "kasir-warung",
   "version": "1.0.0",
-  "description": "Aplikasi Kasir Kedai Kopi",
+  "description": "Aplikasi Kasir",
   "main": "electron/main.js",
   "scripts": {
     "dev": "vite",
@@ -26,8 +26,8 @@
     "wait-on": "^8.0.1"
   },
   "build": {
-    "appId": "com.kedai.kasir",
-    "productName": "Kasir Kedai Kopi",
+    "appId": "com.warung.kasir",
+    "productName": "Kasir Warung",
     "directories": {
       "output": "release"
     },
@@ -53,7 +53,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Kasir Kedai Kopi"
+      "shortcutName": "Kasir WRG"
     }
   }
 }

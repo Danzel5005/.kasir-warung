@@ -6,7 +6,6 @@ import { api } from "../utilities/utils.js";
 // Juga mendukung view mode per shift (shiftIdFilter).
 function useHistory({ toast_, addUndo, getNow }) {
   const [history, setHistory] = useState([]);
-  const [trxId, setTrxId]     = useState(1);
   const [fFrom, setFFrom]     = useState("");
   const [fTo, setFTo]         = useState("");
   // hari mana yang di-expand — null = belum diinisialisasi (default: hari
@@ -17,12 +16,28 @@ function useHistory({ toast_, addUndo, getNow }) {
   const [viewMode, setViewMode] = useState("day");
   const [shiftIdFilter, setShiftIdFilter] = useState(null);
 
+  // Generate TRX ID in format: TRX-ddmmyyN where N is sequential for the day (no space, no parentheses)
+  const generateTrxId = useCallback((date = new Date()) => {
+    const d = getNow ? getNow() : {
+      tgl: String(date.getDate()).padStart(2, "0"),
+      blnNum: String(date.getMonth() + 1).padStart(2, "0"),
+      thn: String(date.getFullYear())
+    };
+    const dateStr = `${d.tgl}${d.blnNum}${d.thn.slice(-2)}`;
+    // Count transactions for this date
+    const count = history.filter(t => {
+      const tDate = new Date(t.timestamp);
+      return tDate.getDate() === date.getDate() &&
+             tDate.getMonth() === date.getMonth() &&
+             tDate.getFullYear() === date.getFullYear();
+    }).length + 1;
+    return `TRX-${dateStr}${count}`;
+  }, [history, getNow]);
+
   // deps kosong aman: hanya setter, tidak baca state apapun.
   const loadInitial = useCallback((savedTrx) => {
     const list = savedTrx || [];
     setHistory(list);
-    const maxT = list.reduce((m, t) => Math.max(m, t.id || 0), 0);
-    setTrxId(maxT + 1);
   }, []);
 
   const sortedHistory = useMemo(() => [...history].sort((a, b) => {
@@ -109,10 +124,10 @@ function useHistory({ toast_, addUndo, getNow }) {
   }, [getNow, toast_]);
 
   return {
-    history, trxId, fFrom, fTo, expandedDays,
+    history, fFrom, fTo, expandedDays,
     filteredHistory, histByDay,
     viewMode, shiftIdFilter, histByShift,
-    setTrxId, setFFrom, setFTo, setExpandedDays,
+    generateTrxId, setFFrom, setFTo, setExpandedDays,
     setViewMode, setShiftIdFilter,
     loadInitial, appendHistory, deleteTrx, clearAllTrx, at, doCSV,
   };

@@ -75,8 +75,6 @@ function ViewRiwayat({
       <div style={{ ...row, marginBottom:5 }}>
         <div style={{ display:"flex", gap:5, flexWrap:"wrap", alignItems:"center" }}>
           <Tag label={`TRX #${t.id}`} bg="#e8f5ee" tc={G}/>
-          <Tag label={`Meja ${t.meja}`} bg="#e8eef5" tc="#2a5a8a"/>
-          {t.pax > 0 && <Tag label={`${t.pax} pax`} bg="#f0f0ff" tc="#5a5a9a"/>}
           <Tag label={METODE_LABELS[t.metodeBayar] || t.metodeBayar}
             bg={(METODE_COLORS[t.metodeBayar] || {bg:"#f0f0f0"}).bg}
             tc={(METODE_COLORS[t.metodeBayar] || {tc:MT}).tc}/>
@@ -95,7 +93,6 @@ function ViewRiwayat({
       </div>
       <div style={{ display:"flex", gap:10, fontSize:10, flexWrap:"wrap" }}>
         <span>Sub: <b>{fmt(t.subtotal)}</b></span>
-        <span style={{ color:MT }}>Pajak+Srv: {fmt((t.pajak||0) + (t.service||0))}</span>
         <span style={{ color:G, fontWeight:700 }}>Total: {fmt(t.total)}</span>
         {t.metodeBayar === "cash" && <span style={{ color:"#2a8a2a" }}>Kembalian: {fmt(t.kembalian)}</span>}
       </div>
