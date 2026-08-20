@@ -141,6 +141,8 @@ export default function Kasir() {
   const logoRef   = settingsH.logoRef;
   const photoRef  = useRef();
   const searchRef = useRef();
+  // Store the bill ID being paid so we don't rely on activeBill at confirmation time
+  const billIdToCloseRef = useRef(null);
 
   // ── Cek license dulu sebelum load data
   useEffect(() => { licenseH.checkLicenseOnLoad(); }, []);
@@ -201,13 +203,13 @@ export default function Kasir() {
     commitMenu: menuH.setMenu,
     appendHistory: (trx) => { historyH.appendHistory(trx); setReceipt(trx); setPayModal(false); cartH.setDrawerOpen(false); cartH.clearCart(); },
     removeBillLocal: billsH.removeBillLocal,
-    billIdToClose: cartH.activeBill?.id || null,     // NEW: explicit bill ID from activeBill
+    billIdToClose: billIdToCloseRef.current,     // Use captured bill ID
     paymentMethods: settingsH.settings.paymentMethods || [], // NEW: payment methods for label resolution
   }), [
     cartH.processPayment, historyH.generateTrxId, authH.activeShift,
     menuH.computeStockDeduction, menuH.setMenu, historyH.appendHistory,
     cartH.setDrawerOpen, cartH.clearCart, billsH.removeBillLocal,
-    cartH.activeBill, settingsH.settings.paymentMethods, // NEW deps
+    settingsH.settings.paymentMethods, // NEW deps
   ]);
 
   // confirmCloseShift butuh clearCart saja — clearBills DIHAPUS
@@ -242,6 +244,7 @@ export default function Kasir() {
   // atas perihal bug race condition yang belum di-root-cause).
   const loadBillAndPay = useCallback((bill) => {
     cartH.loadBillToCart(bill);
+    billIdToCloseRef.current = bill.id; // Capture bill ID explicitly
     setView("menu");
     setTimeout(() => setPayModal(true), 300);
   }, [cartH.loadBillToCart, setView]);

@@ -15,7 +15,7 @@ function useBills({ toast_, addUndo }) {
   const loadInitial = useCallback((savedBills) => {
     const list = savedBills || [];
     setBills(list);
-    const maxB = list.reduce((m, b) => Math.max(m, b.id || 0), 0);
+    const maxB = list.reduce((m, b) => Math.max(m, Number(b.id) || 0), 0);
     setBillId(maxB + 1);
   }, []);
 
@@ -23,7 +23,7 @@ function useBills({ toast_, addUndo }) {
   // [bills, addUndo].
   const closeBill = useCallback(async (id) => {
     const snap = [...bills];
-    const updated = bills.filter(b => b.id !== id);
+    const updated = bills.filter(b => String(b.id) !== String(id));
     await api.saveBills(updated); setBills(updated);
     addUndo("Hapus Open Bill", async () => { await api.saveBills(snap); setBills(snap); });
   }, [bills, addUndo]);
@@ -54,9 +54,10 @@ function useBills({ toast_, addUndo }) {
   // bisa konflik dengan atomic write yang sudah jalan di sana.
   // deps kosong aman: pakai functional update setBills(prev=>...), TIDAK
   // baca `bills` langsung dari closure — pattern paling stabil untuk useCallback.
+  // FIX: Use String() comparison to handle potential type mismatches (number vs string)
   const removeBillLocal = useCallback((billIdToRemove) => {
     if (!billIdToRemove) return;
-    setBills(prev => prev.filter(b => b.id !== billIdToRemove));
+    setBills(prev => prev.filter(b => String(b.id) !== String(billIdToRemove)));
   }, []);
 
   return {

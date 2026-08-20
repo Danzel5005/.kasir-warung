@@ -139,7 +139,7 @@ function useCart({ toast_, getNow, receiptAdditionals = [] }) {
     let updated;
     if (activeBill) {
       updated = bills.map(b =>
-        b.id === activeBill.id
+        String(b.id) === String(activeBill.id)
           ? { ...b, items: [...items], updatedAt: t.timestamp, ...receiptAdditionalData }
           : b
       );
@@ -191,8 +191,8 @@ const processPayment = useCallback(async ({
   appendHistory,
   removeBillLocal,
   onSuccess,
-  billIdToClose,        // NEW: explicit bill ID to close (from cartH.activeBill)
-  paymentMethods = [],  // NEW: payment methods array to resolve label
+  billIdToClose,
+  paymentMethods = [],  
 }) => {
   const t = getNow();
   const taxEnabled = receiptAdditionals?.find(f => f.key === "tax")?.enabled !== false;
@@ -233,7 +233,6 @@ const processPayment = useCallback(async ({
 
   commitMenu(updatedMenu);     // setMenu — commit HANYA setelah IPC sukses
   appendHistory(trx);          // setHistory(h=>[trx,...h])
-  setTrxId(n => n + 1);
   // Remove the paid bill from open bills using explicit billIdToClose
   removeBillLocal(billIdToClose);
   clearCart();
