@@ -141,8 +141,7 @@ export default function Kasir() {
   const logoRef   = settingsH.logoRef;
   const photoRef  = useRef();
   const searchRef = useRef();
-  // Store the bill ID being paid so we don't rely on activeBill at confirmation time
-  const billIdToCloseRef = useRef(null);
+  
 
   // ── Cek license dulu sebelum load data
   useEffect(() => { licenseH.checkLicenseOnLoad(); }, []);
@@ -195,7 +194,7 @@ export default function Kasir() {
   }), [cartH.saveOpenBill, billsH.bills, billsH.billId, billsH.persistBills, billsH.setBillId]);
 
   // processPayment butuh potongan dari useHistory, useMenu, useAuth, useBills
-  // FIX: Pass billIdToClose and paymentMethods explicitly to avoid race condition
+  // FIX: Use cartH.activeBill?.id directly to avoid race condition with setTimeout
   const processPayment = useCallback(() => cartH.processPayment({
     generateTrxId: historyH.generateTrxId,
     activeShift: authH.activeShift,
@@ -203,7 +202,7 @@ export default function Kasir() {
     commitMenu: menuH.setMenu,
     appendHistory: (trx) => { historyH.appendHistory(trx); setReceipt(trx); setPayModal(false); cartH.setDrawerOpen(false); cartH.clearCart(); },
     removeBillLocal: billsH.removeBillLocal,
-    billIdToClose: billIdToCloseRef.current,     // Use captured bill ID
+    billIdToClose: cartH.activeBill?.id,     // Use activeBill directly instead of ref
     paymentMethods: settingsH.settings.paymentMethods || [], // NEW: payment methods for label resolution
   }), [
     cartH.processPayment, historyH.generateTrxId, authH.activeShift,
@@ -244,7 +243,6 @@ export default function Kasir() {
   // atas perihal bug race condition yang belum di-root-cause).
   const loadBillAndPay = useCallback((bill) => {
     cartH.loadBillToCart(bill);
-    billIdToCloseRef.current = bill.id; // Capture bill ID explicitly
     setView("menu");
     setTimeout(() => setPayModal(true), 300);
   }, [cartH.loadBillToCart, setView]);

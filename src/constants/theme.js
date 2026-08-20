@@ -52,8 +52,10 @@ export const METODE_COLORS = {
 export const TYPOGRAPHY = {
   h1: { fontSize: 24, lineHeight: 1.2, fontWeight: 700 },
   h2: { fontSize: 18, lineHeight: 1.3, fontWeight: 700 },
+  h3: { fontSize: 16, lineHeight: 1.3, fontWeight: 600 },
   body: { fontSize: 14, lineHeight: 1.4, fontWeight: 400 },
   small: { fontSize: 12, lineHeight: 1.4, fontWeight: 400 },
+  caption: { fontSize: 11, lineHeight: 1.3, fontWeight: 400 },
   label: { fontSize: 11, lineHeight: 1.3, fontWeight: 600 },
   code: { fontSize: 12, fontFamily: "monospace" },
 };
@@ -66,7 +68,21 @@ export const RADIUS = {
   sm: 4,
   md: 8,
   lg: 12,
+  xl: 16,
   full: 9999,
+};
+
+/**
+ * 4-Step Spacing Scale
+ */
+export const SPACING = {
+  none: 0,
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 24,
+  xxl: 32,
 };
 
 /**
@@ -94,6 +110,7 @@ export const row = {
 export const G = COLOR_PALETTE.primary;
 export const OR = COLOR_PALETTE.secondary;
 export const W = COLOR_PALETTE.surface;
+export const BG = COLOR_PALETTE.background;
 export const LT = COLOR_PALETTE.surfaceAlt;
 export const BD = COLOR_PALETTE.border;
 export const TX = COLOR_PALETTE.textPrimary;
