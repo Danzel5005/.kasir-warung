@@ -268,7 +268,7 @@ return (
                   )}
                   {settingsH.settings.warungPhone && (
                     <div style={{ fontSize: TYPOGRAPHY.small.fontSize, color: MT, marginTop: 2 }}>
-                      Telp: {settingsH.settings.warungPhone}
+                    {settingsH.settings.warungPhone}
                     </div>
                   )}
                 </div>

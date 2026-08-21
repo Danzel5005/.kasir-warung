@@ -1,5 +1,34 @@
 import { calcPrice } from "./calculations.js";
 
+// Helper to get category label from key
+const getCategoryLabel = (catKey, categories = []) => {
+  if (!catKey) return "Lainnya";
+  if (categories && categories.length) {
+    const found = categories.find(c => c.key === catKey);
+    if (found) return found.label;
+  }
+  return catKey;
+};
+
+// Helper to get payment method label from key
+const getPaymentMethodLabel = (key, paymentMethods = []) => {
+  if (paymentMethods && paymentMethods.length) {
+    const found = paymentMethods.find(m => m.key === key);
+    if (found) return found.label;
+  }
+  // Fallback to defaults
+  const defaults = {
+    "cash": "Tunai",
+    "debit-bca": "Debit BCA",
+    "debit-bni": "Debit BNI",
+    "qris-bca": "QRIS BCA",
+    "qris-bni": "QRIS BNI",
+    "transfer-bca": "Debit BCA",
+    "qris": "QRIS BCA"
+  };
+  return defaults[key] ?? key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+};
+
 function csvByDay(trxs, header, rowFn, at) {
   const byDay = {};
   [...trxs].sort((a,b)=>new Date(a.timestamp)-new Date(b.timestamp)).forEach(t=>{
@@ -14,12 +43,14 @@ function csvByDay(trxs, header, rowFn, at) {
   return sections.join("\n");
 }
 
-const TRX_HEADER = "No.Trx,Hari,Tanggal,Jam,Metode,Nama Item,Qty,Harga Jual,Modal,Subtotal Jual,Subtotal Modal,Laba Item,Subtotal Trx,Total Trx,Bayar,Kembalian,Waktu Unduh";
-function trxRow(t, at) {
+const TRX_HEADER = "No.Trx,Hari,Tanggal,Jam,Metode,Nama Item,Kategori,Qty,Harga Jual,Modal,Subtotal Jual,Subtotal Modal,Laba Item,Subtotal Trx,Total Trx,Bayar,Kembalian,Waktu Unduh";
+function trxRow(t, at, categories = [], paymentMethods = []) {
   const {total}=calcPrice(t.subtotal);
   return t.items.map(item=>{
     const subJ=item.harga*item.qty; const subM=(item.modal||0)*item.qty;
-    return [t.id,t.hari,`${t.tgl} ${t.bln} ${t.thn}`,`${t.jam}:${t.mnt}:${t.dtk}`,t.metodeBayar||"cash",`"${item.nama}"`,item.qty,item.harga,item.modal||0,subJ,subM,subJ-subM,t.subtotal,total,t.bayar||0,t.kembalian||0,at].join(",");
+    const metodeLabel = getPaymentMethodLabel(t.metodeBayar || "cash", paymentMethods);
+    const catLabel = getCategoryLabel(item.kategori, categories);
+    return [t.id,t.hari,`${t.tgl} ${t.bln} ${t.thn}`,`${t.jam}:${t.mnt}:${t.dtk}`,metodeLabel,`"${item.nama}"`,catLabel,item.qty,item.harga,item.modal||0,subJ,subM,subJ-subM,t.subtotal,total,t.bayar||0,t.kembalian||0,at].join(",");
   });
 }
 
@@ -67,7 +98,7 @@ function csvSalesRate(trxs, menuList, at) {
   ].join("\n");
 }
 
-function csvPerMenu(trxs, menuList, at) {
+function csvPerMenu(trxs, menuList, at, categories = []) {
   const h="Nama Menu,Kategori,Harga Jual,Modal,Total Qty,Pendapatan,Total Modal,Laba,Margin (%),Status,Waktu Unduh";
   const map={};
   trxs.forEach(t=>{t.items.forEach(i=>{
@@ -78,9 +109,22 @@ function csvPerMenu(trxs, menuList, at) {
     const d=map[m.nama]||{qty:0,rev:0,modal:0};
     const laba=d.rev-d.modal; const margin=d.rev>0?((laba/d.rev)*100).toFixed(1):"N/A";
     const status=d.qty===0?"Belum Terjual":"Terjual";
-    return [`"${m.nama}"`,m.kategori,m.harga,m.modal||0,d.qty,d.rev,d.modal,laba,margin,status,at].join(",");
+    const catLabel = getCategoryLabel(m.kategori, categories);
+    return [`"${m.nama}"`,catLabel,m.harga,m.modal||0,d.qty,d.rev,d.modal,laba,margin,status,at].join(",");
   });
   return [h,...rows].join("\n");
+}
+
+// Stock Report CSV - Laporan Stok
+function csvStok(menuList, categories = [], at) {
+  const h = "Nama Menu,Kategori,Harga Jual,Modal,Stok Tersedia,Status,Waktu Unduh";
+  const rows = menuList.map(m => {
+    const catLabel = getCategoryLabel(m.kategori, categories);
+    const stok = m.stok === null ? "Tidak Dibatasi" : String(m.stok || 0);
+    const status = m.stok === null ? "Tidak Dibatasi" : (m.stok <= 0 ? "HABIS" : m.stok <= 5 ? "RENDAH" : "TERSEDIA");
+    return [`"${m.nama}"`, catLabel, m.harga, m.modal || 0, stok, status, at].join(",");
+  });
+  return [h, ...rows].join("\n");
 }
 
 function csvMetodeBayar(trxs, at, paymentMethods = []) {
@@ -126,10 +170,10 @@ function csvMetodeBayar(trxs, at, paymentMethods = []) {
   const grandTotal = trxs.reduce((s,t)=>s+t.total,0);
   sumRows.push(["GRAND TOTAL","","Semua Metode",trxs.length,grandTotal,at].join(","));
 
-  return ["=== DETAIL PER HARI ===", h, ...rows, "=== RINGKASAN TOTAL ===", h, ...sumRows].join("\n");
+return ["=== DETAIL PER HARI ===", h, ...rows, "=== RINGKASAN TOTAL ===", h, ...sumRows].join("\n");
 }
 
 
 
 
-export {csvByDay,TRX_HEADER, LAP_HEADER, csvLaporan, csvSalesRate, csvPerMenu, csvMetodeBayar, trxRow};
+export {csvByDay,TRX_HEADER, LAP_HEADER, csvLaporan, csvSalesRate, csvPerMenu, csvMetodeBayar, csvStok, trxRow};

@@ -62,23 +62,39 @@ function useCart({ toast_, getNow, receiptAdditionals = [] }) {
   // langsung dari closure — pattern paling stabil. Tapi memanggil toast_,
   // jadi tetap perlu [toast_] di deps (toast_ sendiri stabil/[]).
   const addToCart = useCallback((item, additionals = null) => {
-    if (item.stok === 0) { toast_(`Stok "${item.nama}" habis`, "err"); return; }
-    setCart(c => {
-      const cartKey = additionals 
-        ? `${item.id}_${JSON.stringify(additionals)}` 
-        : item.id;
-      return { 
-        ...c, 
-        [cartKey]: { 
-          ...item, 
-          id: item.id, // Keep original id for stock tracking
-          cartKey: cartKey, // Store unique cart key
-          qty: (c[cartKey]?.qty || 0) + 1,
-          additionals: additionals || undefined,
-        } 
-      };
-    });
-  }, [toast_]);
+  // Check if stock is depleted
+  if (item.stok === 0) { toast_(`Stok "${item.nama}" habis`, "err"); return; }
+  
+  const cartKey = additionals 
+    ? `${item.id}_${JSON.stringify(additionals)}` 
+    : item.id;
+
+  // Calculate current total quantity of this item in cart (across all additionals variations)
+  // We need to read current cart state, so we use a functional update with a check
+  setCart(c => {
+    // Sum up all quantities for this item ID across different additionals
+    const currentTotalQty = Object.values(c)
+      .filter(cartItem => cartItem.id === item.id)
+      .reduce((sum, cartItem) => sum + (cartItem.qty || 0), 0);
+    
+    // Check if adding one more would exceed stock
+    if (item.stok !== null && currentTotalQty >= item.stok) {
+      toast_(`Stok "${item.nama}" tidak mencukupi (tersisa ${item.stok - currentTotalQty})`, "err");
+      return c; // Return unchanged cart
+    }
+    
+    return { 
+      ...c, 
+      [cartKey]: { 
+        ...item, 
+        id: item.id, // Keep original id for stock tracking
+        cartKey: cartKey, // Store unique cart key
+        qty: (c[cartKey]?.qty || 0) + 1,
+        additionals: additionals || undefined,
+      } 
+    };
+  });
+}, [toast_]);
 
   // deps kosong aman: functional update penuh, tidak baca state luar sama sekali.
   // Note: id parameter is now cartKey which may include additionals in the format "itemId_{...}"
@@ -122,7 +138,10 @@ function useCart({ toast_, getNow, receiptAdditionals = [] }) {
   // Tanpa activeBill di deps, saveOpenBill akan selalu mengira tidak ada
   // activeBill (selalu masuk cabang "buat baru" bukan "update") — bug baru
   // yang jauh lebih parah dari yang sedang kita selidiki.
-  const saveOpenBill = useCallback(async ({ bills, billId, persistBills, setBillId }) => {
+  const saveOpenBill = useCallback(async ({ 
+    bills, billId, persistBills, setBillId,
+    computeStockDeduction, commitMenu  // NEW: for stock deduction
+  }) => {
     if (!items.length || !checkRequiredAdditionals(receiptAdditionals)) { toast_("Isi field wajib dan pesanan dulu", "err"); return; }
     const t = getNow();
     
@@ -136,9 +155,9 @@ function useCart({ toast_, getNow, receiptAdditionals = [] }) {
         });
     }
     
-    let updated;
+    let updatedBills;
     if (activeBill) {
-      updated = bills.map(b =>
+      updatedBills = bills.map(b =>
         String(b.id) === String(activeBill.id)
           ? { ...b, items: [...items], updatedAt: t.timestamp, ...receiptAdditionalData }
           : b
@@ -146,11 +165,18 @@ function useCart({ toast_, getNow, receiptAdditionals = [] }) {
       toast_('Open Bill diperbarui', "ok");
     } else {
       const bill = { id: billId, items: [...items], createdAt: t.timestamp, updatedAt: t.timestamp, status: "open", ...receiptAdditionalData };
-      updated = [...bills, bill];
+      updatedBills = [...bills, bill];
       setBillId(n => n + 1);
       toast_('Open Bill dibuat', "ok");
     }
-    await persistBills(updated);
+    
+    // Deduct stock when saving open bill
+    if (computeStockDeduction && commitMenu) {
+      const updatedMenu = computeStockDeduction(items);
+      commitMenu(updatedMenu);
+    }
+    
+    await persistBills(updatedBills);
     clearCart();
     setDrawerOpen(false);
   }, [items, receiptAdditionalValues, receiptAdditionals, activeBill, toast_, getNow, clearCart]);

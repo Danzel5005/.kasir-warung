@@ -135,14 +135,21 @@ function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName,
     .map(([catKey, qty]) => `<div class="cat-line"><span>TOTAL (${getCategoryName(catKey, cats)}) :</span><span>${qty}</span></div>`)
     .join("");
 
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+  return `<!DOCTYPE html>
+  <html>
+    <head>
+      <meta charset="utf-8"><style>
     :root{
       --paper:#fdfdf9; --ink:#1c1c1c; --muted:#1c1c1c; --line:#1c1c1c;
       --bg:#eceae2; --header-tag:#c0392b; --body-tag:#1f6f50; --footer-tag:#2f5aa8;
-    }
+        }
     *{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-weight:700;}
     body{font-family:'Courier New', ui-monospace, Menlo, monospace;font-size:12px;width:80mm;padding:3mm;color:var(--ink);background:var(--bg);font-weight:700;}
-    @media print{@page{size:80mm auto;margin:0mm;} body{width:80mm;padding:2mm;}}
+   
+    @media print{
+      @page{size:80mm auto;margin:0mm;} 
+      body{width:80mm;padding:2mm;}
+        }
     .receipt{background:var(--paper);padding:6px 8px 2px;position:relative;}
     .section{position:relative;padding:6px 0;}
     .section + .section{border-top:1px dashed #999;}
@@ -163,7 +170,9 @@ function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName,
     .cat-line{display:flex;justify-content:space-between;font-size:12px;margin:3px 0;font-weight:700;}
     .footer-list{font-size:11px;margin-top:6px;font-weight:700;}
     .footer-list div{margin:2px 0;font-weight:700;}
-  </style></head><body>
+  </style>
+  </head>
+  <body>
     <div class="receipt">
       <!-- HEADER -->
       <div class="section header">
@@ -181,7 +190,6 @@ function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName,
       <!-- BODY -->
       <div class="section body">
         ${rows}
-        <div class="dst">...............................</div>
         <div class="totals">
           <div class="kv"><span class="k">SubTotal</span><span class="v">${fmt(trx.subtotal)}</span></div>
           <div class="kv grand bold"><span class="k">TOTAL</span><span class="v">${fmt(total)}</span></div>
@@ -195,7 +203,7 @@ function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName,
       <div class="section footer">
         ${Object.keys(untaggedCategories).length ? `<div class="footer-list">${renderCatTotals(untaggedCategories)}</div>` : ""}
         ${Object.keys(taggedCategories).length ? `<div class="footer-list"><div class="bold">TAGGED</div>${renderCatTotals(taggedCategories)}</div>` : ""}
-        <div class="footer-note">Terima kasih atas kunjungan Anda!<br/>Selamat menikmati</div>
+        <div class="footer-note">Barang yang sudah dibeli tidak bisa<br/>dikembalikan<br/>Terimakasih</div>
       </div>
     </div>
   </body></html>`;
@@ -235,7 +243,10 @@ function buildPreviewHTML(receiptAdditionalValues, items, logo, receiptAdditiona
     }
     *{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-weight:700;}
     body{font-family:'Courier New', ui-monospace, Menlo, monospace;font-size:12px;width:80mm;padding:3mm;color:var(--ink);background:var(--bg);font-weight:700;}
-    @media print{@page{size:80mm auto;margin:0mm;} body{width:80mm;padding:2mm;}}
+    @media print{
+      @page{size:80mm auto;margin:0mm;} 
+      body{width:80mm;padding:2mm;}
+    }
     .receipt{background:var(--paper);padding:6px 8px 2px;position:relative;}
     .section{position:relative;padding:6px 0;}
     .section + .section{border-top:1px dashed #999;}
@@ -267,7 +278,6 @@ function buildPreviewHTML(receiptAdditionalValues, items, logo, receiptAdditiona
       </div>
       <div class="section body">
         ${rows}
-        <div class="dst">...............................</div>
         <div class="totals">
           <div class="kv"><span class="k">SubTotal</span><span class="v">${fmt(subtotal)}</span></div>
           <div class="kv grand bold"><span class="k">TOTAL</span><span class="v">${fmt(total)}</span></div>

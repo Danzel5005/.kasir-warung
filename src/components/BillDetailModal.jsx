@@ -8,6 +8,7 @@ import { Tag } from "./Tag.jsx";
 // BillDetailModal — detail tagihan dengan aksi lengkap
 export default function BillDetailModal({
   bill,
+  receiptAdditionals = [],
   onClose,
   onAddOrder,
   onPay,
@@ -42,13 +43,21 @@ export default function BillDetailModal({
   const dateStr = created.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" });
 
   const formatReceiptAdditionals = () => {
-    if (!bill) return [];
-    const fields = [];
-    if (bill.tableNum) fields.push({ label: "Nomor Meja", value: bill.tableNum, icon: "🪑" });
-    if (bill.nomor_meja && bill.nomor_meja !== bill.tableNum) fields.push({ label: "Nomor Meja (alt)", value: bill.nomor_meja, icon: "🪑" });
-    if (bill.jumlah_pax) fields.push({ label: "Jumlah Pax", value: bill.jumlah_pax, icon: "👥" });
-    if (bill.catatan) fields.push({ label: "Catatan", value: bill.catatan, icon: "📝" });
-    return fields;
+    if (!bill || !receiptAdditionals?.length) return [];
+    return receiptAdditionals
+      .filter(f => f.category === "receipt" && f.visible !== false)
+      .map(field => {
+        const val = bill[field.key];
+        if (val === undefined || val === null || val === "") return null;
+        // Use field's icon if available, otherwise default
+        let icon = field.icon || "📋";
+        // Fallback icons for common fields
+        if (field.key === "tableNum" || field.key === "nomor_meja") icon = "🪑";
+        else if (field.key === "jumlah_pax") icon = "👥";
+        else if (field.key === "catatan") icon = "📝";
+        return { label: field.label, value: val, icon };
+      })
+      .filter(Boolean);
   };
 
   const receiptFields = formatReceiptAdditionals();
@@ -313,7 +322,7 @@ export default function BillDetailModal({
             <button
               onClick={() => { onAddOrder(); onClose(); }}
               style={{
-                padding: `${SPACING.sm} ${SPACING.md}`,
+                padding: `${SPACING.xxl} ${SPACING.xxl}`,
                 background: COLOR_PALETTE.primaryLight,
                 color: G,
                 border: `1px solid #a8d5b8`,
@@ -333,11 +342,11 @@ export default function BillDetailModal({
             <button
               onClick={() => { onPay(); onClose(); }}
               style={{
-                padding: `${SPACING.sm} ${SPACING.md}`,
+                padding: `${SPACING.lg} ${SPACING.lg} ${SPACING.lg} ${SPACING.lg}`,
                 background: OR,
                 color: W,
                 border: "none",
-                borderRadius: RADIUS.md,
+                borderRadius: RADIUS.lg,
                 cursor: "pointer",
                 fontFamily: "inherit",
                 fontSize: TYPOGRAPHY.small.fontSize,
@@ -345,10 +354,11 @@ export default function BillDetailModal({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: SPACING.xs
+                gap: SPACING.lg
+  
               }}
             >
-              💳 Bayar {fmt(tot)}
+            Bayar {fmt(tot)}
             </button>
           </div>
 
@@ -373,7 +383,7 @@ export default function BillDetailModal({
               gap: SPACING.xs
             }}
           >
-            🗑️ Hapus Tagihan
+          Hapus Tagihan
           </button>
         </div>
 

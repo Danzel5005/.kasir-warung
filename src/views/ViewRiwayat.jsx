@@ -22,6 +22,7 @@ function ViewRiwayat({
   histByShift,                             // historyH
   shifts,                                  // authH
   paymentMethods = [],                     // settingsH - for custom payment method labels
+  menuH = null,                            // menuH - for category labels
 }) {
   const [showAllShifts, setShowAllShifts] = useState(false);
   const [expandedShifts, setExpandedShifts] = useState(null);
@@ -137,7 +138,7 @@ function ViewRiwayat({
           {(fFrom || fTo) &&
             <button onClick={() => { setFFrom(""); setFTo(""); }}
               style={{ fontSize:10, color:"#e84040", background:"none", border:"none", cursor:"pointer" }}>Reset</button>}
-          <button onClick={() => doCSV("Transaksi", csvByDay(filteredHistory, TRX_HEADER, trxRow, at()))}
+          <button onClick={() => doCSV("Transaksi", csvByDay(filteredHistory, TRX_HEADER, (t, at) => trxRow(t, at, menuH?.cats || [], paymentMethods), at()))}
             disabled={!filteredHistory.length}
             style={{ padding:"4px 9px", background:filteredHistory.length ? "#e8f5ee" : LT,
               color:filteredHistory.length ? G : MT, border:`1px solid ${filteredHistory.length ? "#b8ddc8" : BD}`,

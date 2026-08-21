@@ -191,7 +191,9 @@ export default function Kasir() {
   const saveOpenBill = useCallback(() => cartH.saveOpenBill({
     bills: billsH.bills, billId: billsH.billId,
     persistBills: billsH.persistBills, setBillId: billsH.setBillId,
-  }), [cartH.saveOpenBill, billsH.bills, billsH.billId, billsH.persistBills, billsH.setBillId]);
+    computeStockDeduction: menuH.computeStockDeduction,
+    commitMenu: menuH.setMenu,
+  }), [cartH.saveOpenBill, billsH.bills, billsH.billId, billsH.persistBills, billsH.setBillId, menuH.computeStockDeduction, menuH.setMenu]);
 
   // processPayment butuh potongan dari useHistory, useMenu, useAuth, useBills
   // FIX: Use cartH.activeBill?.id directly to avoid race condition with setTimeout
@@ -255,11 +257,17 @@ const executeConfirmDel = useCallback(() => {
     if (confirmDel.type === "all") historyH.clearAllTrx();
     else if (confirmDel.type === "trx") historyH.deleteTrx(confirmDel.id);
     else if (confirmDel.type === "allBills") billsH.clearAllBills();
-    else if (confirmDel.type === "bill") billsH.closeBill(confirmDel.id);
+    else if (confirmDel.type === "bill") {
+      // For open bills, cancel and restore stock
+      billsH.cancelBill(confirmDel.id, {
+        computeStockRestoration: menuH.computeStockRestoration,
+        commitMenu: menuH.setMenu,
+      });
+    }
     else if (confirmDel.type === "allMenu") menuH.clearAllMenu();   // ← new, must be explicit
     else menuH.deleteItem(confirmDel.id);
     setConfirmDel(null);
-  }, [confirmDel, historyH.clearAllTrx, historyH.deleteTrx, billsH.clearAllBills, billsH.closeBill, menuH.clearAllMenu, menuH.deleteItem]);
+  }, [confirmDel, historyH.clearAllTrx, historyH.deleteTrx, billsH.clearAllBills, billsH.cancelBill, menuH.computeStockRestoration, menuH.setMenu, menuH.clearAllMenu, menuH.deleteItem]);
  
   const at = historyH.at;
   const doCSV = historyH.doCSV;
@@ -458,6 +466,7 @@ const executeConfirmDel = useCallback(() => {
             setView={setView}
             loadBillAndPay={loadBillAndPay}
             setConfirmDel={setConfirmDel}
+            settingsH={settingsH}
           />
         )}
 
@@ -480,6 +489,7 @@ const executeConfirmDel = useCallback(() => {
             histByShift={historyH.histByShift}
             shifts={authH.shifts}
             paymentMethods={settingsH.settings.paymentMethods}
+            menuH={menuH}
           />
         )}
 
@@ -490,6 +500,7 @@ const executeConfirmDel = useCallback(() => {
             shifts={authH.shifts} activeShift={authH.activeShift}
             history={historyH.history}
             menu={menuH.menu}
+            menuH={menuH}
             doCSV={doCSV} at={at}
             paymentMethods={settingsH.settings.paymentMethods}
           />

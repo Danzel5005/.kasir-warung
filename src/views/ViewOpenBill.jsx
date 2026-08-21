@@ -13,6 +13,7 @@ function ViewOpenBill({
   setView,
   loadBillAndPay,
   setConfirmDel,
+  settingsH,
 }) {
   const openBills = bills.filter(b => b.status === "open");
   const [selectedBill, setSelectedBill] = useState(null);
@@ -285,6 +286,7 @@ function ViewOpenBill({
       {showDetail && selectedBill && (
         <BillDetailModal
           bill={selectedBill}
+          receiptAdditionals={settingsH.settings.receiptAdditionals || []}
           onClose={handleCloseDetail}
           onAddOrder={() => handleAddOrder(selectedBill)}
           onPay={() => handlePay(selectedBill)}

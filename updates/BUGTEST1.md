@@ -1,5 +1,8 @@
 - [x] Saat konfirmasi bayar "Gagal menyimpan transaksi".Walaupun menggunakan metode QRIS atau tunai yang sudah melebihi harga. 
 - [x] Tidak bisa menambahkan pengguna
-- [ ] Jika pembelian item melebihi jumlah stok, tetap bisa pembelian. Seharusnya tidak boleh
-- [ ] Tambahkan Laporan stok di csvbuild
-- [ ] Rangkuman "item" jangan "menu"
+- [x] Jika pembelian item melebihi jumlah stok, tetap bisa pembelian. Seharusnya jika pembelian melebihi jumlah stok, penambahan item yang akan dibeli costumer akan di blok
+- [x] Tambahkan Laporan stok di csvbuild. Pastikan category costum tidak menunjukan key, tapi menunjukan label
+- [x] Metode pembayaran costum pada CSV Transaksi Semua dan Categori costum pada Transaksi Semua menunjukan key, ubah sehingga menunjukan label
+- [ONGOING] Tambahan pada poin 3, jika item masuk openbill, harus mengurangi item juga, tetapi jika openbill dibatalkan tanpa konfirmasi pembayaran, stok item akan kembali. 
+- [NEW] Pada halaman menu, tambahkan juga search bar.
+- [ONGOING] *BUG* Resi Additional tidak muncul pada openbill, dan datanya ter-reset juga pada openbill. 

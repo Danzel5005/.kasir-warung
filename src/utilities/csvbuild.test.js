@@ -8,7 +8,9 @@ import {
   csvSalesRate,
   csvPerMenu,
   csvMetodeBayar,
+  csvStok,
 } from "./csvbuild.js";
+import { calcPrice } from "./calculations.js";
 
 describe("csvbuild.js - CSV Generator Utilities", () => {
   const timeDownload = "2025-01-15 10:00:00";
@@ -85,7 +87,7 @@ describe("csvbuild.js - CSV Generator Utilities", () => {
 
   describe("trxRow and csvByDay", () => {
     it("should generate CSV rows for transaction items via trxRow", () => {
-      const rows = trxRow(sampleTrx1, timeDownload);
+      const rows = trxRow(sampleTrx1, timeDownload, [], []);
       expect(rows).toHaveLength(2);
       expect(rows[0]).toContain("TRX-001");
       expect(rows[0]).toContain('"Kopi Black"');
@@ -107,14 +109,14 @@ describe("csvbuild.js - CSV Generator Utilities", () => {
         subtotal: 20000,
         items: [{ nama: "Kopi Plain", harga: 20000, qty: 1 }],
       };
-      const rows = trxRow(minimalTrx, timeDownload);
-      expect(rows[0]).toContain("cash"); // fallback metode
+      const rows = trxRow(minimalTrx, timeDownload, [], []);
+      expect(rows[0]).toContain("Tunai"); // fallback metode
       expect(rows[0]).toContain(",0,"); // default pax/modal
     });
 
     it("should group transactions by date and sort chronologically in csvByDay", () => {
       const trxs = [sampleTrxDay2, sampleTrx2, sampleTrx1];
-      const result = csvByDay(trxs, TRX_HEADER, trxRow, timeDownload);
+      const result = csvByDay(trxs, TRX_HEADER, (t, at) => trxRow(t, at, [], []), timeDownload);
 
       expect(result).toContain("===== Rabu, 15 Januari 2025 =====");
       expect(result).toContain("===== Kamis, 16 Januari 2025 =====");
@@ -125,7 +127,7 @@ describe("csvbuild.js - CSV Generator Utilities", () => {
     });
 
     it("should return empty string if transactions array is empty in csvByDay", () => {
-      const result = csvByDay([], TRX_HEADER, trxRow, timeDownload);
+      const result = csvByDay([], TRX_HEADER, (t, at) => trxRow(t, at, [], []), timeDownload);
       expect(result).toBe("");
     });
   });
@@ -151,10 +153,24 @@ describe("csvbuild.js - CSV Generator Utilities", () => {
 
     it("should report 'RUGI' when total cost exceeds total gross income", () => {
       const lossTrx = {
-        ...sampleTrx1,
+        id: "TRX-LOSS",
+        timestamp: "2025-01-15T10:00:00.000Z",
+        hari: "Rabu",
+        tgl: "15",
+        bln: "Januari",
+        thn: "2025",
+        jam: "10",
+        mnt: "00",
+        dtk: "00",
+        meja: "01",
+        pax: 2,
+        metodeBayar: "cash",
         subtotal: 10000,
         items: [{ nama: "Expensive Item", harga: 10000, qty: 1, modal: 50000 }],
       };
+      // Calculate total with service and tax
+      const { total } = calcPrice(lossTrx.subtotal);
+      lossTrx.total = total;
       const csv = csvLaporan([lossTrx], timeDownload);
       expect(csv).toContain("RUGI");
     });
@@ -187,7 +203,7 @@ describe("csvbuild.js - CSV Generator Utilities", () => {
 
   describe("csvPerMenu", () => {
     it("should output per-menu performance report with margin calculations", () => {
-      const csv = csvPerMenu([sampleTrx1], mockMenuList, timeDownload);
+      const csv = csvPerMenu([sampleTrx1], mockMenuList, timeDownload, []);
       expect(csv).toContain("Nama Menu,Kategori,Harga Jual");
       expect(csv).toContain('"Kopi Black",Minuman,20000,8000,1,20000,8000,12000');
       expect(csv).toContain('"Teh Manis",Minuman,10000,3000,0,0,0,0,N/A,Belum Terjual');
@@ -210,6 +226,54 @@ describe("csvbuild.js - CSV Generator Utilities", () => {
       const csv = csvMetodeBayar([], timeDownload);
       expect(csv).toContain("GRAND TOTAL");
       expect(csv).toContain("Semua Metode,0,0");
+    });
+  });
+
+  describe("csvStok", () => {
+    it("should generate stock report CSV with categories and status", () => {
+      const mockCategories = [
+        { key: "Minuman", label: "Minuman" },
+        { key: "Makanan", label: "Makanan" }
+      ];
+      const csv = csvStok(mockMenuList, mockCategories, timeDownload);
+      expect(csv).toContain("Nama Menu,Kategori,Harga Jual,Modal,Stok Tersedia,Status,Waktu Unduh");
+      expect(csv).toContain('"Kopi Black",Minuman');
+      expect(csv).toContain("TERSEDIA");
+    });
+
+    it("should handle items without stock (null) showing 'Tidak Dibatasi'", () => {
+      const menuWithNullStock = [
+        { nama: "Air Mineral", kategori: "Minuman", harga: 5000, modal: 2000, stok: null }
+      ];
+      const csv = csvStok(menuWithNullStock, [], timeDownload);
+      expect(csv).toContain("Tidak Dibatasi");
+    });
+
+    it("should show 'HABIS' status when stock is 0", () => {
+      const menuEmptyStock = [
+        { nama: "Kopi Habis", kategori: "Minuman", harga: 10000, modal: 5000, stok: 0 }
+      ];
+      const csv = csvStok(menuEmptyStock, [], timeDownload);
+      expect(csv).toContain("HABIS");
+    });
+
+    it("should show 'RENDAH' status when stock <= 5", () => {
+      const menuLowStock = [
+        { nama: "Kopi Sedikit", kategori: "Minuman", harga: 10000, modal: 5000, stok: 3 }
+      ];
+      const csv = csvStok(menuLowStock, [], timeDownload);
+      expect(csv).toContain("RENDAH");
+    });
+
+    it("should resolve category label from key using categories array", () => {
+      const menuWithCatKey = [
+        { nama: "Test Item", kategori: "Minuman", harga: 10000, modal: 5000, stok: 10 }
+      ];
+      const categories = [
+        { key: "Minuman", label: "Minuman Premium" }
+      ];
+      const csv = csvStok(menuWithCatKey, categories, timeDownload);
+      expect(csv).toContain("Minuman Premium");
     });
   });
 });

@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { csvByDay, TRX_HEADER, trxRow, csvLaporan, csvSalesRate, csvPerMenu, csvMetodeBayar } from "../utilities/csvbuild.js";
+import { csvByDay, TRX_HEADER, trxRow, csvLaporan, csvSalesRate, csvPerMenu, csvMetodeBayar, csvStok } from "../utilities/csvbuild.js";
 import { fmt, fmtNum } from "../utilities/receipt.js";
 import { METODE_LABELS } from "../constants/payments.js";
 import { G, OR, W, LT, BD, TX, MT, METODE_COLORS } from "../constants/colors.js";
@@ -9,7 +9,8 @@ function ViewLaporan({
   selectedShiftId, setSelectedShiftId,   // authH
   shifts, activeShift,                   // authH
   history,                                // historyH
-  menu,                                   // menuH
+  menu,                                   // menuH.menu (array)
+  menuH,                                  // menuH (hook object with cats)
   doCSV, at,                              // historyH
   paymentMethods,                         // settingsH
 }) {
@@ -92,11 +93,36 @@ function ViewLaporan({
       {/* CSV cards */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:12}}>
         {[
-          {title:"Laporan Keuangan (Untung/Rugi)",desc:"Ringkasan per hari: pendapatan, modal, laba/rugi.",btn:"Unduh CSV Laporan Keuangan",fn:()=>doCSV(`Laporan_Keuangan_${selectedShiftId==="all"?"Semua":`Shift${selShift?.shiftNum||""}` }`,csvLaporan(shiftTrx,at()))},
-          {title:"Sales Rate",desc:"Top 10 terlaku, top 10 paling sedikit, dan semua menu yang belum terjual sama sekali.",btn:"Unduh CSV Sales Rate",fn:()=>doCSV(`Sales_Rate_${selectedShiftId==="all"?"Semua":`Shift${selShift?.shiftNum||""}`}`,csvSalesRate(shiftTrx,menu,at()))},
-          {title:"Rangkuman Per Menu",desc:"Total qty, pendapatan, modal, laba, dan margin % untuk setiap item menu.",btn:"Unduh CSV Per Menu",fn:()=>doCSV(`Rangkuman_Per_Menu_${selectedShiftId==="all"?"Semua":`Shift${selShift?.shiftNum||""}`}`,csvPerMenu(shiftTrx,menu,at()))},
-          {title:"Semua Transaksi Detail",desc:"Detail setiap transaksi, terpisah per hari dalam file CSV. Termasuk metode bayar.",btn:"Unduh CSV Transaksi",fn:()=>doCSV(`Transaksi_${selectedShiftId==="all"?"Semua":`Shift${selShift?.shiftNum||""}`}`,csvByDay(shiftTrx,TRX_HEADER,trxRow,at()))},
-          {title:"Laporan Per Metode Bayar",desc:"Rincian jumlah transaksi dan total pendapatan per metode: Tunai, Debit BCA/BNI, QRIS BCA/BNI — per hari dan total.",btn:"Unduh CSV Metode Bayar",fn:()=>doCSV(`Metode_Bayar_${selectedShiftId==="all"?"Semua":`Shift${selShift?.shiftNum||""}`}`,csvMetodeBayar(shiftTrx,at()))},
+          {title:"Laporan Keuangan",
+            desc:"Ringkasan per hari: pendapatan, modal, laba/rugi.",
+            btn:"Unduh CSV Laporan Keuangan",
+              fn:()=>doCSV(`Laporan_Keuangan_${selectedShiftId==="all"?"Semua":`Shift${selShift?.shiftNum||""}` }`,
+              csvLaporan(shiftTrx,at()))},
+          {title:"Sales Rate",
+            desc:"Top 10 terlaku, top 10 paling sedikit, dan semua menu yang belum terjual sama sekali.",
+            btn:"Unduh CSV Sales Rate",
+              fn:()=>doCSV(`Sales_Rate_${selectedShiftId==="all"?"Semua":`Shift${selShift?.shiftNum||""}`}`,
+                csvSalesRate(shiftTrx,menu,at()))},
+          {title:"Rangkuman Per item",
+            desc:"Total qty, pendapatan, modal, laba, dan margin % untuk setiap item.",
+            btn:"Unduh CSV Per Item",
+            fn:()=>doCSV(`Rangkuman_Per_Menu_${selectedShiftId==="all"?"Semua":`Shift${selShift?.shiftNum||""}`}`,
+              csvPerMenu(shiftTrx,menu,at(), menuH?.cats || []))},
+          {title:"Laporan Stok",
+            desc:"Daftar stok semua menu dengan kategori, harga, dan status ketersediaan.",
+            btn:"Unduh CSV Stok",
+            fn:()=>doCSV(`Laporan_Stok_${selectedShiftId==="all"?"Semua":`Shift${selShift?.shiftNum||""}`}`,
+              csvStok(menu, menuH?.cats || [], at()))},
+          {title:"Semua Transaksi Detail",
+            desc:"Detail setiap transaksi, terpisah per hari dalam file CSV. Termasuk metode bayar.",
+            btn:"Unduh CSV Transaksi",
+              fn:()=>doCSV(`Transaksi_${selectedShiftId==="all"?"Semua":`Shift${selShift?.shiftNum||""}`}`,
+              csvByDay(shiftTrx,TRX_HEADER,(t, at) => trxRow(t, at, menuH?.cats || [], paymentMethods), at()))},
+          {title:"Laporan Per Metode Bayar",
+            desc:"Rincian jumlah transaksi dan total pendapatan per metode pembayaran",
+            btn:"Unduh CSV Metode Bayar",
+              fn:()=>doCSV(`Metode_Bayar_${selectedShiftId==="all"?"Semua":`Shift${selShift?.shiftNum||""}`}`,
+              csvMetodeBayar(shiftTrx,at()))},
         ].map((c,i)=>(
           <div key={i} style={{background:W,border:`1px solid ${BD}`,borderRadius:10,padding:"14px 16px",boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
             <div style={{fontSize:12,fontWeight:700,marginBottom:5}}>{c.title}</div>

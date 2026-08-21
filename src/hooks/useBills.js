@@ -35,6 +35,32 @@ function useBills({ toast_, addUndo }) {
     });
   }, [addUndo]);
 
+  // Close single bill WITHOUT payment (cancel) - restore stock
+  // This is called when user deletes an open bill without paying
+  const cancelBill = useCallback(async (id, { computeStockRestoration, commitMenu }) => {
+    if (!id) return;
+    setBills(prev => {
+      const billToCancel = prev.find(b => String(b.id) === String(id));
+      if (!billToCancel) return prev;
+      
+      const snap = [...prev];
+      const updated = prev.filter(b => String(b.id) !== String(id));
+      api.saveBills(updated);
+      
+      // Restore stock if computeStockRestoration is provided
+      if (computeStockRestoration && commitMenu && billToCancel.items) {
+        const restoredMenu = computeStockRestoration(billToCancel.items);
+        commitMenu(restoredMenu);
+      }
+      
+      addUndo("Batalkan Open Bill", async () => {
+        await api.saveBills(snap);
+        setBills(snap);
+      });
+      return updated;
+    });
+  }, [addUndo]);
+
   // Clear all bills
   const clearAllBills = useCallback(async () => {
     setBills(prev => {
@@ -101,6 +127,7 @@ function useBills({ toast_, addUndo }) {
     openCount,
     loadInitial,
     closeBill,
+    cancelBill,
     clearAllBills,
     persistBills,
     removeBillLocal,

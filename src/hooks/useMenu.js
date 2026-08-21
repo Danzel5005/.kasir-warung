@@ -158,6 +158,15 @@ function useMenu({ toast_, addUndo }) {
     });
   }, [menu]);
 
+  // Restore stock when open bill is cancelled (without payment)
+  const computeStockRestoration = useCallback((billItems) => {
+    return menu.map(m => {
+      const item = billItems.find(i => i.id === m.id);
+      if (!item || m.stok === null) return m;
+      return { ...m, stok: (m.stok || 0) + (item.qty || 0) };
+    });
+  }, [menu]);
+
 // PENTING: membaca menu LANGSUNG dari closure untuk snapshot undo. Wajib [menu, addUndo].
 const clearAllMenu = useCallback(async () => {
   const snap = [...menu];
@@ -171,7 +180,7 @@ const clearAllMenu = useCallback(async () => {
     setKategori, setSearch, setItemModal, setForm, setCatModal, setNewCatLabel,
     setMenu, // diperlukan App.jsx untuk commit stok SETELAH IPC processPayment sukses
     loadInitial, openAdd, openEdit, handlePhoto, saveItem, deleteItem,
-    addCat, deleteCat, addTagToCategory, removeTagFromCategory, computeStockDeduction, clearAllMenu
+    addCat, deleteCat, addTagToCategory, removeTagFromCategory, computeStockDeduction, computeStockRestoration, clearAllMenu
   };
 }
 
