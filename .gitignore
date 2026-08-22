@@ -3,6 +3,7 @@ node_modules/
 jspm_packages/
 .pnp
 .pnp.js
+.github/
 
 # Production / Build outputs
 dist/
@@ -42,4 +43,4 @@ pnpm-debug.log*
 # System files
 .DS_Store
 Thumbs.db
-
+*.exe

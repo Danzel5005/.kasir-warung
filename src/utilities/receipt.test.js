@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fmt, fmtNum, buildReceiptHTML, buildPreviewHTML } from "./receipt.js";
+import { fmt, fmtNum, buildReceiptHTML, buildPreviewHTML, DEFAULT_WARUNG } from "./receipt.js";
 
 describe("receipt.js - Receipt utilities and HTML builders", () => {
   describe("fmt and fmtNum Formatting Helpers", () => {
@@ -37,69 +37,74 @@ describe("receipt.js - Receipt utilities and HTML builders", () => {
       jam: "14",
       mnt: "30",
       dtk: "00",
-      meja: "05",
-      pax: 2,
+      operator: "Kasir 1",
+      warungName: "Warung Test",
       metodeBayar: "cash",
       subtotal: 50000,
       bayar: 100000,
       kembalian: 41700,
       items: [
-        { nama: "Kopi Susu", harga: 25000, qty: 2 }
+        { nama: "Kopi Susu", harga: 25000, qty: 2, kategori: "Minuman" }
       ]
     };
 
     it("should render full HTML string with transaction details and logo", () => {
-      const html = buildReceiptHTML(mockTrxCash, "data:image/png;base64,mocklogo");
+      const html = buildReceiptHTML(mockTrxCash, "data:image/png;base64,mocklogo", [], {});
       expect(html).toContain("<!DOCTYPE html>");
-      expect(html).toContain('<img src="data:image/png;base64,mocklogo" class="logo" />');
-      expect(html).toContain("restaurant");
-      expect(html).toContain("TRX #TRX-101");
-      expect(html).toContain("Meja 05");
-      expect(html).toContain("2 Pax");
-      expect(html).toContain("2x Kopi Susu");
+      expect(html).toContain("Warung Test");
+      expect(html).toContain("TRX-101");
+      expect(html).toContain("KASIR");
+      expect(html).toContain("METODE");
+      expect(html).toContain("2 Minuman Kopi Susu"); // New format: qty Category Name
       expect(html).toContain("Bayar");
       expect(html).toContain("Kembalian");
     });
 
-    it("should render correctly without logo and without pax", () => {
-      const trxNoPax = { ...mockTrxCash, pax: 0 };
-      const html = buildReceiptHTML(trxNoPax, null);
-      expect(html).not.toContain('<img src=');
-      expect(html).not.toContain("Pax");
-      expect(html).toContain("Meja 05 &bull; TRX #TRX-101");
+    it("should use DEFAULT_WARUNG when warungName is not provided", () => {
+      const trxNoName = { ...mockTrxCash, warungName: undefined };
+      const html = buildReceiptHTML(trxNoName, null, [], {});
+      expect(html).toContain(DEFAULT_WARUNG);
     });
 
     it("should hide Bayar and Kembalian for non-cash payment methods", () => {
       const trxQris = { ...mockTrxCash, metodeBayar: "qris-bca" };
-      const html = buildReceiptHTML(trxQris, null);
-      expect(html).not.toContain("<span>Bayar</span>");
-      expect(html).not.toContain("<span>Kembalian</span>");
+      const html = buildReceiptHTML(trxQris, null, [], {});
+      expect(html).not.toContain("<span class=\"k\">Bayar</span>");
+      expect(html).not.toContain("<span class=\"k\">Kembalian</span>");
+      expect(html).toContain("SILAKAN SCAN QRIS");
+    });
+
+    it("should render QRIS image when provided", () => {
+      const trxQris = { ...mockTrxCash, metodeBayar: "qris-bca" };
+      const qrisImages = { "qris-bca": "data:image/png;base64,qrisimage" };
+      const html = buildReceiptHTML(trxQris, null, [], qrisImages);
+      expect(html).toContain("data:image/png;base64,qrisimage");
     });
   });
 
   describe("buildPreviewHTML", () => {
     it("should generate receipt preview HTML with calculated totals", () => {
       const items = [
-        { nama: "Espresso", harga: 20000, qty: 1 },
-        { nama: "Croissant", harga: 25000, qty: 2 }
+        { nama: "Espresso", harga: 20000, qty: 1, kategori: "Minuman" },
+        { nama: "Croissant", harga: 25000, qty: 2, kategori: "Makanan" }
       ];
-      // Subtotal = 20000 + 50000 = 70000
-      const html = buildPreviewHTML("03", 4, items, "logo.png");
+      const receiptAdditionalValues = {};
+      const html = buildPreviewHTML(receiptAdditionalValues, items, "logo.png", [], "Warung Test");
 
       expect(html).toContain("<!DOCTYPE html>");
-      expect(html).toContain("Meja 03");
-      expect(html).toContain("4 Pax");
-      expect(html).toContain("-- PREVIEW TAGIHAN --");
-      expect(html).toContain("1x Espresso");
-      expect(html).toContain("2x Croissant");
-      expect(html).toContain("Belum lunas — mohon menunggu");
+      expect(html).toContain("Warung Test");
+      expect(html).not.toContain("-- PREVIEW TAGIHAN --");
+      expect(html).toContain("1 Minuman Espresso"); // New format: qty Category Name
+      expect(html).toContain("2 Makanan Croissant"); // New format: qty Category Name
+      expect(html).toContain("Belum Lunas");
     });
 
     it("should handle preview with empty items array", () => {
-      const html = buildPreviewHTML("12", 0, [], null);
-      expect(html).toContain("Meja 12");
+      const html = buildPreviewHTML({}, [], null, [], "Warung Test");
+      expect(html).toContain("Warung Test");
       expect(html).not.toContain("Pax");
-      expect(html).toContain("-- PREVIEW TAGIHAN --");
+      expect(html).not.toContain("-- PREVIEW TAGIHAN --");
+      expect(html).toContain("Belum Lunas");
     });
   });
 });

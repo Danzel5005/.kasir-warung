@@ -22,6 +22,9 @@ contextBridge.exposeInMainWorld("kasirAPI", {
   loadQris:    ()      => ipcRenderer.invoke("qris-load"),
   saveQris:    (map)   => ipcRenderer.invoke("qris-save", map),
   deleteQris:  (key)   => ipcRenderer.invoke("qris-delete", key),
+  // Users
+  loadUsers:   ()      => ipcRenderer.invoke("users-load"),
+  saveUsers:   (list)  => ipcRenderer.invoke("users-save", list),
   // Categories
   loadCats:    ()      => ipcRenderer.invoke("cats-load"),
   saveCats:    (list)  => ipcRenderer.invoke("cats-save", list),

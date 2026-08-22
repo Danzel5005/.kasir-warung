@@ -21,6 +21,8 @@ function ViewRiwayat({
   shiftIdFilter, setShiftIdFilter,         // historyH
   histByShift,                             // historyH
   shifts,                                  // authH
+  paymentMethods = [],                     // settingsH - for custom payment method labels
+  menuH = null,                            // menuH - for category labels
 }) {
   const [showAllShifts, setShowAllShifts] = useState(false);
   const [expandedShifts, setExpandedShifts] = useState(null);
@@ -75,9 +77,7 @@ function ViewRiwayat({
       <div style={{ ...row, marginBottom:5 }}>
         <div style={{ display:"flex", gap:5, flexWrap:"wrap", alignItems:"center" }}>
           <Tag label={`TRX #${t.id}`} bg="#e8f5ee" tc={G}/>
-          <Tag label={`Meja ${t.meja}`} bg="#e8eef5" tc="#2a5a8a"/>
-          {t.pax > 0 && <Tag label={`${t.pax} pax`} bg="#f0f0ff" tc="#5a5a9a"/>}
-          <Tag label={METODE_LABELS[t.metodeBayar] || t.metodeBayar}
+          <Tag label={t.metodeBayarLabel ?? paymentMethods.find(m => m.key === t.metodeBayar)?.label ?? METODE_LABELS[t.metodeBayar] ?? t.metodeBayar.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
             bg={(METODE_COLORS[t.metodeBayar] || {bg:"#f0f0f0"}).bg}
             tc={(METODE_COLORS[t.metodeBayar] || {tc:MT}).tc}/>
         </div>
@@ -95,7 +95,6 @@ function ViewRiwayat({
       </div>
       <div style={{ display:"flex", gap:10, fontSize:10, flexWrap:"wrap" }}>
         <span>Sub: <b>{fmt(t.subtotal)}</b></span>
-        <span style={{ color:MT }}>Pajak+Srv: {fmt((t.pajak||0) + (t.service||0))}</span>
         <span style={{ color:G, fontWeight:700 }}>Total: {fmt(t.total)}</span>
         {t.metodeBayar === "cash" && <span style={{ color:"#2a8a2a" }}>Kembalian: {fmt(t.kembalian)}</span>}
       </div>
@@ -139,7 +138,7 @@ function ViewRiwayat({
           {(fFrom || fTo) &&
             <button onClick={() => { setFFrom(""); setFTo(""); }}
               style={{ fontSize:10, color:"#e84040", background:"none", border:"none", cursor:"pointer" }}>Reset</button>}
-          <button onClick={() => doCSV("Transaksi", csvByDay(filteredHistory, TRX_HEADER, trxRow, at()))}
+          <button onClick={() => doCSV("Transaksi", csvByDay(filteredHistory, TRX_HEADER, (t, at) => trxRow(t, at, menuH?.cats || [], paymentMethods), at()))}
             disabled={!filteredHistory.length}
             style={{ padding:"4px 9px", background:filteredHistory.length ? "#e8f5ee" : LT,
               color:filteredHistory.length ? G : MT, border:`1px solid ${filteredHistory.length ? "#b8ddc8" : BD}`,

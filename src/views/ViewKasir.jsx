@@ -11,11 +11,14 @@ function ViewKasir({
   // dari menuH
   allCats, kategori, setKategori, search, setSearch, displayMenu, cats,
   // dari cartH
-  cart, drawerOpen, setDrawerOpen, tableNum, setTableNum, pax, setPax,
+  cart, drawerOpen, setDrawerOpen,
+  receiptAdditionalValues, receiptAdditionals, updateReceiptAdditionalValue,
   items, subtotal, service, pajak, total, activeBill,
   addToCart, decCart, delCart, clearCart,
   // App.jsx wrapper functions (sudah di-useCallback di App.jsx)
   saveOpenBill, printPreview, printingPreview, setPayModal,
+  // validation
+  checkRequiredAdditionals,
   // ref
   searchRef,
 }) {
@@ -139,16 +142,32 @@ function ViewKasir({
           </div>
         )}
 
-        {/* Meja & Pax */}
+        {/* Meja & Pax - Dynamic from receiptAdditionals */}
         <div style={{padding:"8px 12px",borderBottom:`1px solid ${BD}`,background:"#f9faf9"}}>
-          <div style={{marginBottom:7}}>
-            <div style={{fontSize:10,color:MT,fontWeight:600,marginBottom:3}}>NOMOR MEJA <span style={{color:"#e84040"}}>*</span></div>
-            <input type="number" min="1" value={tableNum} onChange={e=>setTableNum(e.target.value)} placeholder="Masukkan nomor meja..." style={{...inp,fontSize:12}}/>
-          </div>
-          <div>
-            <div style={{fontSize:10,color:MT,fontWeight:600,marginBottom:3}}>JUMLAH PAX (orang di meja ini)</div>
-            <input type="number" min="1" value={pax} onChange={e=>setPax(e.target.value)} placeholder="Contoh: 4" style={{...inp,fontSize:12}}/>
-          </div>
+          {receiptAdditionals && receiptAdditionals
+            .filter(f => f.category === "receipt" && f.visible !== false)
+            .map((field) => (
+              <div key={field.key} style={{ marginBottom: 7 }}>
+                <div style={{fontSize:10,color:MT,fontWeight:600,marginBottom:3}}>
+                  {field.label} {field.required && <span style={{color:"#e84040"}}>*</span>}
+                </div>
+                {field.type === "number" ? (
+                  <input type="number" min="1" 
+                    value={receiptAdditionalValues[field.key] || ""} 
+                    onChange={e => updateReceiptAdditionalValue(field.key, e.target.value)}
+                    placeholder={field.placeholder || `Masukkan ${field.label.toLowerCase()}...`}
+                    style={{...inp,fontSize:12}}
+                  />
+                ) : (
+                  <input type="text" 
+                    value={receiptAdditionalValues[field.key] || ""} 
+                    onChange={e => updateReceiptAdditionalValue(field.key, e.target.value)}
+                    placeholder={field.placeholder || `Masukkan ${field.label.toLowerCase()}...`}
+                    style={{...inp,fontSize:12}}
+                  />
+                )}
+              </div>
+            ))}
         </div>
 
         {/* Header kolom */}
@@ -192,56 +211,54 @@ function ViewKasir({
         {items.length>0&&(
           <div style={{padding:"10px 13px",borderTop:`1px solid ${BD}`}}>
             <div style={{...row,fontSize:11,color:MT,marginBottom:3}}><span>Subtotal</span><span style={{fontWeight:600,color:TX}}>{fmt(subtotal)}</span></div>
-            <div style={{...row,fontSize:11,color:MT,marginBottom:8}}><span>Service 6%</span><span style={{fontWeight:600,color:TX}}>{fmt(service)}</span></div>
-            <div style={{...row,fontSize:11,color:MT,marginBottom:3}}><span>Pajak 10%</span><span style={{fontWeight:600,color:TX}}>{fmt(pajak)}</span></div>
             <div style={{...row,borderTop:`1px solid ${BD}`,paddingTop:7,marginBottom:9}}>
               <span style={{fontSize:14,fontWeight:700}}>Total</span>
               <span style={{fontSize:15,fontWeight:700,color:OR}}>{fmt(total)}</span>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>
               <button onClick={saveOpenBill}
-              disabled={!tableNum.trim()}
+              disabled={!checkRequiredAdditionals(receiptAdditionals)}
               style={{padding:"8px 0",
-              border:`2px solid ${tableNum.trim()?"#a8d5b8":BD}`,
+              border:`2px solid ${checkRequiredAdditionals(receiptAdditionals)?"#a8d5b8":BD}`,
               borderRadius:7,
-              background:tableNum.trim()?"#e8f5ee":LT,
-              color:tableNum.trim()?G:MT,
-              cursor:tableNum.trim()?"pointer":"not-allowed",
+              background:checkRequiredAdditionals(receiptAdditionals)?"#e8f5ee":LT,
+              color:checkRequiredAdditionals(receiptAdditionals)?G:MT,
+              cursor:checkRequiredAdditionals(receiptAdditionals)?"pointer":"not-allowed",
               fontFamily:"inherit",fontSize:10,fontWeight:700}}>
                 {activeBill?"Perbarui Open Bill":"Simpan Open Bill"}
               </button>
 
-              <button onClick={printPreview} disabled={!items.length || !tableNum.trim() || printingPreview}
+              <button onClick={printPreview} disabled={!items.length || !checkRequiredAdditionals(receiptAdditionals) || printingPreview}
                 style={{flex:1,
                 padding:10,
                 border:`1px solid ${G}`,
                 borderRadius:7,
-background: items.length && tableNum.trim() && !printingPreview ? "#e8f5ee" : LT,
-color: items.length && tableNum.trim() && !printingPreview ? G : MT,
-cursor: items.length && tableNum.trim() && !printingPreview ? "pointer" : "not-allowed",
+background: items.length && checkRequiredAdditionals(receiptAdditionals) && !printingPreview ? "#e8f5ee" : LT,
+color: items.length && checkRequiredAdditionals(receiptAdditionals) && !printingPreview ? G : MT,
+cursor: items.length && checkRequiredAdditionals(receiptAdditionals) && !printingPreview ? "pointer" : "not-allowed",
 fontFamily:"inherit", fontSize:10, fontWeight:700}}>
 {printingPreview ? "Mencetak..." : "Print Preview"}
 </button>
               <button onClick={
-                ()=>tableNum.trim()&&setPayModal(true)
+                ()=>checkRequiredAdditionals(receiptAdditionals)&&setPayModal(true)
               }
-               disabled={!tableNum.trim()}
+               disabled={!checkRequiredAdditionals(receiptAdditionals)}
                 style={{
                   padding:"8px 0",
                   border:"none",
                   borderRadius:7,
-                  background:tableNum.trim()?OR:"#f0c89a",
+                  background:checkRequiredAdditionals(receiptAdditionals)?OR:"#f0c89a",
                   color:W,
-                  cursor:tableNum.trim()?"pointer":"not-allowed",
+                  cursor:checkRequiredAdditionals(receiptAdditionals)?"pointer":"not-allowed",
                   fontFamily:"inherit",
                   fontSize:10,
                   fontWeight:700}}>
                 Bayar Sekarang
               </button>
             </div>
-            {!tableNum.trim()&&<div style={{fontSize:9,color:"#e84040",
+            {!checkRequiredAdditionals(receiptAdditionals)&&<div style={{fontSize:9,color:"#e84040",
               textAlign:"center",marginTop:4}}>
-                Isi nomor meja terlebih dahulu</div>}
+                Isi field wajib terlebih dahulu</div>}
           </div>
         )}
       </div>

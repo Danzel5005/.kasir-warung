@@ -1,0 +1,1 @@
+const { app, BrowserWindow } = require('electron'); app.whenReady().then(() => { const win = new BrowserWindow({ show: false }); win.webContents.getPrintersAsync().then(printers => { console.log('Printers:', JSON.stringify(printers, null, 2)); app.quit(); }).catch(e => { console.error('Error:', e); app.quit(); }); });

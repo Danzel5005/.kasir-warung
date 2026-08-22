@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { csvByDay, TRX_HEADER, trxRow, csvLaporan, csvSalesRate, csvPerMenu, csvMetodeBayar } from "../utilities/csvbuild.js";
+import { csvByDay, TRX_HEADER, trxRow, csvLaporan, csvSalesRate, csvPerMenu, csvMetodeBayar, csvStok } from "../utilities/csvbuild.js";
 import { fmt, fmtNum } from "../utilities/receipt.js";
 import { METODE_LABELS } from "../constants/payments.js";
 import { G, OR, W, LT, BD, TX, MT, METODE_COLORS } from "../constants/colors.js";
@@ -9,8 +9,10 @@ function ViewLaporan({
   selectedShiftId, setSelectedShiftId,   // authH
   shifts, activeShift,                   // authH
   history,                                // historyH
-  menu,                                   // menuH
+  menu,                                   // menuH.menu (array)
+  menuH,                                  // menuH (hook object with cats)
   doCSV, at,                              // historyH
+  paymentMethods,                         // settingsH
 }) {
   const shiftTrx = selectedShiftId==="all"
     ? history
@@ -25,13 +27,9 @@ function ViewLaporan({
       : "Pilih shift di atas";
 
   const rev=shiftTrx.reduce((s,t)=>s+t.total,0);
-  const pjk=shiftTrx.reduce((s,t)=>s+(t.pajak||0),0);
-  const srv=shiftTrx.reduce((s,t)=>s+(t.service||0),0);
   const mod=shiftTrx.reduce((s,t)=>{t.items.forEach(i=>{s+=(i.modal||0)*i.qty;});return s;},0);
   const sub=shiftTrx.reduce((s,t)=>s+t.subtotal,0);
   const laba=rev-mod;
-  const totalPax=shiftTrx.reduce((s,t)=>s+(t.pax||0),0);
-  const rpp=totalPax>0?Math.round(rev/totalPax):0;
   const hasModal=shiftTrx.some(t=>t.items.some(i=>i.modal>0));
 
   return (
@@ -60,9 +58,6 @@ function ViewLaporan({
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))",gap:10,marginBottom:20}}>
         {[
           {l:"Total Pendapatan",v:fmt(rev),c:G,s:`dari ${shiftTrx.length} trx`},
-          {l:"Pajak (10%)",v:fmt(pjk),c:"#2a5a8a",s:"terkumpul"},
-          {l:"Service (6%)",v:fmt(srv),c:"#5a2a8a",s:"terkumpul"},
-          {l:"Total Pax",v:fmtNum(totalPax),c:"#2a5a8a",s:`${rpp?fmt(rpp)+"/pax":"-"}`},
           {l:"Total Modal",v:hasModal?fmt(mod):"Belum diinput",c:"#b87a00",s:hasModal?`dari sub ${fmt(sub)}`:"-"},
           {l:"Estimasi Laba",v:hasModal?fmt(laba):"Belum diinput",c:laba>=0?G:"#e84040",s:hasModal?`margin ${sub>0?((laba/sub)*100).toFixed(1):0}%`:"-"},
         ].map((s,i)=>(
@@ -74,34 +69,60 @@ function ViewLaporan({
         ))}
       </div>
 
-      {/* Breakdown per metode */}
+      {/* Breakdown per metode - dynamic from settings */}
       <div style={{marginBottom:20}}>
         <div style={{fontSize:11,fontWeight:700,color:TX,marginBottom:8}}>Pendapatan per Metode Bayar</div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(145px,1fr))",gap:8}}>
-          {["cash","debit-bca","debit-bni","qris-bca","qris-bni"].map(m=>{
-            const normalize = x => x==="transfer-bca"?"debit-bca":x==="qris"?"qris-bca":x;
-            const mTrxs = shiftTrx.filter(t=>normalize(t.metodeBayar)===m);
+          {paymentMethods && paymentMethods.length > 0 ? paymentMethods.map((m) => {
+            const mTrxs = shiftTrx.filter(t=>t.metodeBayar===m.key);
             const mTotal = mTrxs.reduce((s,t)=>s+t.total,0);
-            const mc = METODE_COLORS[m]||{bg:LT,tc:MT};
+            const mc = METODE_COLORS[m.key]||{bg:LT,tc:MT};
             return(
-              <div key={m} style={{background:mc.bg,border:`1px solid ${BD}`,borderRadius:9,padding:"11px 13px",boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
-                <div style={{fontSize:10,fontWeight:700,color:mc.tc,marginBottom:4}}>{METODE_LABELS[m]}</div>
+              <div key={m.key} style={{background:mc.bg,border:`1px solid ${BD}`,borderRadius:9,padding:"11px 13px",boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
+                <div style={{fontSize:10,fontWeight:700,color:mc.tc,marginBottom:4}}>{m.label}</div>
                 <div style={{fontSize:14,fontWeight:700,color:TX}}>{fmt(mTotal)}</div>
                 <div style={{fontSize:9,color:MT,marginTop:2}}>{mTrxs.length} transaksi</div>
               </div>
             );
-          })}
+          }) : (
+            <div style={{fontSize:10,color:MT,gridColumn:"1/-1",textAlign:"center"}}>Tidak ada metode bayar di setting</div>
+          )}
         </div>
       </div>
 
       {/* CSV cards */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:12}}>
         {[
-          {title:"Laporan Keuangan (Untung/Rugi)",desc:"Ringkasan per hari: pendapatan, pajak, service, modal, laba/rugi, dan avg per pax.",btn:"Unduh CSV Laporan Keuangan",fn:()=>doCSV(`Laporan_Keuangan_${selectedShiftId==="all"?"Semua":`Shift${selShift?.shiftNum||""}` }`,csvLaporan(shiftTrx,at()))},
-          {title:"Sales Rate",desc:"Top 10 terlaku, top 10 paling sedikit, dan semua menu yang belum terjual sama sekali.",btn:"Unduh CSV Sales Rate",fn:()=>doCSV(`Sales_Rate_${selectedShiftId==="all"?"Semua":`Shift${selShift?.shiftNum||""}`}`,csvSalesRate(shiftTrx,menu,at()))},
-          {title:"Rangkuman Per Menu",desc:"Total qty, pendapatan, modal, laba, dan margin % untuk setiap item menu.",btn:"Unduh CSV Per Menu",fn:()=>doCSV(`Rangkuman_Per_Menu_${selectedShiftId==="all"?"Semua":`Shift${selShift?.shiftNum||""}`}`,csvPerMenu(shiftTrx,menu,at()))},
-          {title:"Semua Transaksi Detail",desc:"Detail setiap transaksi, terpisah per hari dalam file CSV. Termasuk pax dan metode bayar.",btn:"Unduh CSV Transaksi",fn:()=>doCSV(`Transaksi_${selectedShiftId==="all"?"Semua":`Shift${selShift?.shiftNum||""}`}`,csvByDay(shiftTrx,TRX_HEADER,trxRow,at()))},
-          {title:"Laporan Per Metode Bayar",desc:"Rincian jumlah transaksi dan total pendapatan per metode: Tunai, Debit BCA/BNI, QRIS BCA/BNI — per hari dan total.",btn:"Unduh CSV Metode Bayar",fn:()=>doCSV(`Metode_Bayar_${selectedShiftId==="all"?"Semua":`Shift${selShift?.shiftNum||""}`}`,csvMetodeBayar(shiftTrx,at()))},
+          {title:"Laporan Keuangan",
+            desc:"Ringkasan per hari: pendapatan, modal, laba/rugi.",
+            btn:"Unduh CSV Laporan Keuangan",
+              fn:()=>doCSV(`Laporan_Keuangan_${selectedShiftId==="all"?"Semua":`Shift${selShift?.shiftNum||""}` }`,
+              csvLaporan(shiftTrx,at()))},
+          {title:"Sales Rate",
+            desc:"Top 10 terlaku, top 10 paling sedikit, dan semua menu yang belum terjual sama sekali.",
+            btn:"Unduh CSV Sales Rate",
+              fn:()=>doCSV(`Sales_Rate_${selectedShiftId==="all"?"Semua":`Shift${selShift?.shiftNum||""}`}`,
+                csvSalesRate(shiftTrx,menu,at()))},
+          {title:"Rangkuman Per item",
+            desc:"Total qty, pendapatan, modal, laba, dan margin % untuk setiap item.",
+            btn:"Unduh CSV Per Item",
+            fn:()=>doCSV(`Rangkuman_Per_Menu_${selectedShiftId==="all"?"Semua":`Shift${selShift?.shiftNum||""}`}`,
+              csvPerMenu(shiftTrx,menu,at(), menuH?.cats || []))},
+          {title:"Laporan Stok",
+            desc:"Daftar stok semua menu dengan kategori, harga, dan status ketersediaan.",
+            btn:"Unduh CSV Stok",
+            fn:()=>doCSV(`Laporan_Stok_${selectedShiftId==="all"?"Semua":`Shift${selShift?.shiftNum||""}`}`,
+              csvStok(menu, menuH?.cats || [], at()))},
+          {title:"Semua Transaksi Detail",
+            desc:"Detail setiap transaksi, terpisah per hari dalam file CSV. Termasuk metode bayar.",
+            btn:"Unduh CSV Transaksi",
+              fn:()=>doCSV(`Transaksi_${selectedShiftId==="all"?"Semua":`Shift${selShift?.shiftNum||""}`}`,
+              csvByDay(shiftTrx,TRX_HEADER,(t, at) => trxRow(t, at, menuH?.cats || [], paymentMethods), at()))},
+          {title:"Laporan Per Metode Bayar",
+            desc:"Rincian jumlah transaksi dan total pendapatan per metode pembayaran",
+            btn:"Unduh CSV Metode Bayar",
+              fn:()=>doCSV(`Metode_Bayar_${selectedShiftId==="all"?"Semua":`Shift${selShift?.shiftNum||""}`}`,
+              csvMetodeBayar(shiftTrx,at()))},
         ].map((c,i)=>(
           <div key={i} style={{background:W,border:`1px solid ${BD}`,borderRadius:10,padding:"14px 16px",boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
             <div style={{fontSize:12,fontWeight:700,marginBottom:5}}>{c.title}</div>

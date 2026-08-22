@@ -3,7 +3,8 @@ import { G, W, LT, BD, MT } from "../../constants/colors.js";
 import { row, inp, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/theme.js";
 
 export default function UserModal({ authH, setUserModal }) {
-  const { users, addUser, deleteUser } = authH;
+  const { users, addUser, deleteUser, currentUser } = authH;
+  const isAdmin = currentUser && currentUser.role === "admin";
   const [newUser, setNewUser] = useState({ username: "", password: "", nama: "" });
 
   const handleAdd = async () => {
@@ -38,17 +39,20 @@ export default function UserModal({ authH, setUserModal }) {
             {users.map(u => (
               <div key={u.username} style={{ ...row, padding:"7px 10px", background:LT, borderRadius:RADIUS.md }}>
                 <div>
-                  <div style={{ fontSize:TYPOGRAPHY.small.fontSize, fontWeight:600 }}>{u.nama}</div>
+                  <div style={{ fontSize:TYPOGRAPHY.small.fontSize, fontWeight:600 }}>{u.nama}{u.username === currentUser?.username ? " (Anda)" : ""}</div>
                   <div style={{ fontSize:TYPOGRAPHY.label.fontSize, color:MT }}>@{u.username}</div>
                 </div>
-                {u.username !== "admin" && (
+                {!isAdmin ? (
+                  <span style={{ fontSize:TYPOGRAPHY.label.fontSize, color:MT, fontStyle:"italic" }}>Hanya admin</span>
+                ) : u.username === "admin" ? (
+                  <span style={{ fontSize:TYPOGRAPHY.label.fontSize, color:MT, fontStyle:"italic" }}>Utama (tidak bisa dihapus)</span>
+                ) : u.username === currentUser?.username ? (
+                  <span style={{ fontSize:TYPOGRAPHY.label.fontSize, color:MT, fontStyle:"italic" }}>Akun sendiri</span>
+                ) : (
                   <button
                     onClick={() => deleteUser(u.username)}
                     style={{ background:COLOR_PALETTE.dangerLight, color:COLOR_PALETTE.danger, border:"none", borderRadius:RADIUS.sm, padding:"4px 8px", cursor:"pointer", fontFamily:"inherit", fontSize:TYPOGRAPHY.label.fontSize, fontWeight:600 }}
                   >Hapus</button>
-                )}
-                {u.username === "admin" && (
-                  <span style={{ fontSize:TYPOGRAPHY.label.fontSize, color:MT, fontStyle:"italic" }}>Utama (tidak bisa dihapus)</span>
                 )}
               </div>
             ))}
