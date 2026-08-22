@@ -55,7 +55,7 @@ describe("receipt.js - Receipt utilities and HTML builders", () => {
       expect(html).toContain("TRX-101");
       expect(html).toContain("KASIR");
       expect(html).toContain("METODE");
-      expect(html).toContain("2x Kopi Susu");
+      expect(html).toContain("2 Minuman Kopi Susu"); // New format: qty Category Name
       expect(html).toContain("Bayar");
       expect(html).toContain("Kembalian");
     });
@@ -94,8 +94,8 @@ describe("receipt.js - Receipt utilities and HTML builders", () => {
       expect(html).toContain("<!DOCTYPE html>");
       expect(html).toContain("Warung Test");
       expect(html).not.toContain("-- PREVIEW TAGIHAN --");
-      expect(html).toContain("1x Espresso");
-      expect(html).toContain("2x Croissant");
+      expect(html).toContain("1 Minuman Espresso"); // New format: qty Category Name
+      expect(html).toContain("2 Makanan Croissant"); // New format: qty Category Name
       expect(html).toContain("Belum Lunas");
     });
 

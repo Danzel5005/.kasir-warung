@@ -10,3 +10,4 @@
 - [x] *BUG* Resi Additional tidak muncul pada openbill, dan datanya ter-reset juga pada openbill. 
 - [x] Pajak & Service Fee removed
 - [x] *BUG* Memperbarui openbill yang sudah berisi item, menyebabkan jumlah stok item berubah secara tidak sesuai (langsung 0).
+- [ ] Revisi bentuk resi pada bagian item.

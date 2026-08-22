@@ -121,11 +121,13 @@ function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName,
 
   const rows = trx.items.map(i=>{
     const addStr = formatAdditionals(i.additionals);
-    const cat = i.kategori ? `<span class="item-tag">${getCategoryName(i.kategori, cats)}</span>` : "";
+    const catLabel = i.kategori ? getCategoryName(i.kategori, cats) : "";
     const itemTotal = fmt(i.harga * i.qty);
+    const unitPrice = fmt(i.harga);
+    const qtyCatName = catLabel ? `${i.qty} ${catLabel} ${i.nama}` : `${i.qty}x ${i.nama}`;
     return `<div class="item">
-      <div class="item-row1"><span>${i.qty}x ${i.nama}</span><span>${itemTotal}</span></div>
-      <div class="item-row2">${cat}<span>@ ${fmt(i.harga)}</span></div>
+      <div class="item-row1"><span>${qtyCatName}</span><span>${itemTotal}</span></div>
+      <div class="item-row2"><span style="color: white;">_______</span><span>${unitPrice}</span></div>
       ${addStr?`<div class="item-row2"><span>${addStr}</span></div>`:""}
     </div>`
   }).join("");
@@ -158,7 +160,7 @@ function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName,
     .kv .k{font-weight:700;white-space:nowrap;} .kv .v{text-align:right;font-weight:700;}
     .item{margin:6px 0;font-size:12.5px;font-weight:700;}
     .item-row1{display:flex;justify-content:space-between;gap:6px;font-weight:700;}
-    .item-row2{display:flex;justify-content:space-between;font-size:11.5px;margin-top:1px;font-weight:700;}
+    .item-row2{display:flex;justify-content:flex-start;font-size:11.5px;margin-top:1px;font-weight:700;}
     .item-tag{font-size:10px;border:1px solid #bbb;border-radius:3px;padding:0 4px;font-weight:700;}
     .dst{text-align:center;font-size:12px;margin:6px 0;font-weight:700;}
     .totals{margin-top:6px;border-top:1px dashed #999;padding-top:6px;font-weight:700;}
@@ -220,11 +222,13 @@ function buildPreviewHTML(receiptAdditionalValues, items, logo, receiptAdditiona
 
   const rows = items.map(i => {
     const addStr = formatAdditionals(i.additionals);
-    const cat = i.kategori ? `<span class="item-tag">${getCategoryName(i.kategori, cats)}</span>` : "";
+    const catLabel = i.kategori ? getCategoryName(i.kategori, cats) : "";
     const itemTotal = fmt(i.harga * i.qty);
+    const unitPrice = fmt(i.harga);
+    const qtyCatName = catLabel ? `${i.qty} ${catLabel} ${i.nama}` : `${i.qty}x ${i.nama}`;
     return `<div class="item">
-      <div class="item-row1"><span>${i.qty}x ${i.nama}</span><span>${itemTotal}</span></div>
-      <div class="item-row2">${cat}<span>@ ${fmt(i.harga)}</span></div>
+      <div class="item-row1"><span>${qtyCatName}</span><span>${itemTotal}</span></div>
+      <div class="item-row2"><span>${unitPrice}</span></div>
       ${addStr?`<div class="item-row2"><span>${addStr}</span></div>`:""}
     </div>`
   }).join("");
@@ -253,7 +257,7 @@ function buildPreviewHTML(receiptAdditionalValues, items, logo, receiptAdditiona
     .kv .k{font-weight:700;white-space:nowrap;} .kv .v{text-align:right;font-weight:700;}
     .item{margin:6px 0;font-size:12.5px;font-weight:700;}
     .item-row1{display:flex;justify-content:space-between;gap:6px;font-weight:700;}
-    .item-row2{display:flex;justify-content:space-between;font-size:11.5px;margin-top:1px;font-weight:700;}
+    .item-row2{display:flex;justify-content:flex-start;font-size:11.5px;margin-top:1px;font-weight:700;}
     .item-tag{font-size:10px;border:1px solid #bbb;border-radius:3px;padding:0 4px;font-weight:700;}
     .dst{text-align:center;font-size:12px;margin:6px 0;font-weight:700;}
     .totals{margin-top:6px;border-top:1px dashed #999;padding-top:6px;font-weight:700;}
