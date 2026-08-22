@@ -24,7 +24,7 @@ import { api } from "../utilities/utils.js";
 // terlibat dalam race condition Tahap 2. Dependency array di bawah
 // diverifikasi dengan sangat hati-hati: salah satu deps hilang di sini
 // bisa MENCIPTAKAN stale closure baru, bukan cuma gagal mencegah yang lama.
-function useCart({ toast_, getNow, receiptAdditionals = [] }) {
+function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals = [] }) {
   const [cart, setCart]         = useState({});
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [receiptAdditionalValues, setReceiptAdditionalValues] = useState({}); // { "nomor_meja": "5", "jumlah_pax": "2" }
@@ -33,15 +33,12 @@ function useCart({ toast_, getNow, receiptAdditionals = [] }) {
   const [activeBill, setActiveBill] = useState(null);
   const [additionalsModal, setAdditionalsModal] = useState({ open: false, item: null });
   const [pendingItem, setPendingItem] = useState(null);
+  // Reactive state for receiptAdditionals - initialized from props, can be updated via setter
+  const [receiptAdditionals, setReceiptAdditionals] = useState(initialReceiptAdditionals);
 
   const items    = Object.values(cart);
   const subtotal = items.reduce((s, i) => s + i.harga * i.qty, 0);
-  // Get tax/service toggles from receipt additionals (passed via settings in App.jsx)
-  // Default to enabled if not configured
-  const taxEnabled = receiptAdditionals?.find(f => f.key === "tax")?.enabled !== false;
-  const serviceEnabled = receiptAdditionals?.find(f => f.key === "service")?.enabled !== false;
-  
-  const { pajak, service, total } = calcPrice(subtotal, { taxEnabled, serviceEnabled });
+  const { pajak, service, total } = calcPrice(subtotal);
   const paidNum   = parseInt(paid.replace(/\D/g, "")) || 0;
   const kembalian = paidNum - total;
 
@@ -172,7 +169,13 @@ function useCart({ toast_, getNow, receiptAdditionals = [] }) {
     
     // Deduct stock when saving open bill
     if (computeStockDeduction && commitMenu) {
-      const updatedMenu = computeStockDeduction(items);
+      // Convert items array to object keyed by item.id (summing quantities across additionals)
+      const cartItemsById = items.reduce((acc, item) => {
+        const existing = acc[item.id] || { qty: 0 };
+        acc[item.id] = { ...existing, qty: existing.qty + (item.qty || 0) };
+        return acc;
+      }, {});
+      const updatedMenu = computeStockDeduction(cartItemsById);
       commitMenu(updatedMenu);
     }
     
@@ -181,9 +184,7 @@ function useCart({ toast_, getNow, receiptAdditionals = [] }) {
     setDrawerOpen(false);
   }, [items, receiptAdditionalValues, receiptAdditionals, activeBill, toast_, getNow, clearCart]);
 
-  // deps kosong aman: `bill` datang sebagai argumen, tidak baca state luar,
-  // hanya setter. Ini fungsi yang dipanggil tombol "Bayar" Open Bill —
-  // dipertahankan persis, lihat catatan bug di atas file ini.
+  // deps: needs receiptAdditionals to read current receipt additionals config
   const loadBillToCart = useCallback((bill) => {
     const c = {};
     bill.items.forEach(i => { c[i.id] = { ...i }; });
@@ -200,7 +201,7 @@ function useCart({ toast_, getNow, receiptAdditionals = [] }) {
     }
     setActiveBill(bill);
     setDrawerOpen(true);
-  }, []);
+  }, [receiptAdditionals]);
 
   // processPayment — paling cross-cutting. Semua dependency lintas-domain
   // (generateTrxId, activeShift, computeStockDeduction, dst) adalah ARGUMEN
@@ -218,12 +219,11 @@ const processPayment = useCallback(async ({
   removeBillLocal,
   onSuccess,
   billIdToClose,
-  paymentMethods = [],  
+  paymentMethods = [],
+  menu, // Pass current menu for open bill payment (no stock deduction)
 }) => {
   const t = getNow();
-  const taxEnabled = receiptAdditionals?.find(f => f.key === "tax")?.enabled !== false;
-  const serviceEnabled = receiptAdditionals?.find(f => f.key === "service")?.enabled !== false;
-  const { pajak: p, service: s, total: tot } = calcPrice(subtotal, { taxEnabled, serviceEnabled });
+  const { pajak: p, service: s, total: tot } = calcPrice(subtotal);
   
   // Build receipt additional values for the transaction
   const receiptAdditionalData = {};
@@ -252,7 +252,23 @@ const processPayment = useCallback(async ({
     operator: activeShift?.operator || "Kasir", // [2] nama pengguna yang login
     ...receiptAdditionalData, // Include receipt additional fields
   };
-  const updatedMenu = computeStockDeduction(cart);
+  // Check if we're paying an existing open bill (stock was already deducted when bill was created)
+  const isPayingOpenBill = !!billIdToClose;
+  
+  let updatedMenu;
+  if (isPayingOpenBill) {
+    // For open bills, stock was already deducted when bill was created
+    // Just use current menu as-is (no additional deduction)
+    updatedMenu = menu;
+  } else {
+    // For new payments (not from open bill), deduct stock
+    const cartItemsById = Object.values(cart).reduce((acc, item) => {
+      const existing = acc[item.id] || { qty: 0 };
+      acc[item.id] = { ...existing, qty: existing.qty + (item.qty || 0) };
+      return acc;
+    }, {});
+    updatedMenu = computeStockDeduction(cartItemsById);
+  }
   const result = await api.processPayment({ trx, updatedMenu, activeBillId: billIdToClose });
 
   if (!result.ok) { toast_("Gagal menyimpan transaksi", "err"); return null; }
@@ -272,6 +288,7 @@ const processPayment = useCallback(async ({
     setDrawerOpen, updateReceiptAdditionalValue, setMetode, setPaid,
     addToCart, decCart, delCart, clearCart,
     saveOpenBill, loadBillToCart, processPayment, checkRequiredAdditionals, getCanPay,
+    setReceiptAdditionals,
   };
 }
 

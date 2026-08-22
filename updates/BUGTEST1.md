@@ -3,6 +3,9 @@
 - [x] Jika pembelian item melebihi jumlah stok, tetap bisa pembelian. Seharusnya jika pembelian melebihi jumlah stok, penambahan item yang akan dibeli costumer akan di blok
 - [x] Tambahkan Laporan stok di csvbuild. Pastikan category costum tidak menunjukan key, tapi menunjukan label
 - [x] Metode pembayaran costum pada CSV Transaksi Semua dan Categori costum pada Transaksi Semua menunjukan key, ubah sehingga menunjukan label
-- [ONGOING] Tambahan pada poin 3, jika item masuk openbill, harus mengurangi item juga, tetapi jika openbill dibatalkan tanpa konfirmasi pembayaran, stok item akan kembali. 
+- [x] *BUG* Jika item di order oleh openbill, item tersebut harus berkurang juga jumlah stoknya, tetapi jika openbill dibatalkan tanpa konfirmasi pembayaran (tanpa konfirmasi bayar), stok item akan kembali.
+- [x] *BUG* Saat undo penghapusan openbill yang dihapus tanpa konfirmasi bayar, stok item tidak berkurang lagi
+- [x] *BUG* Saat openbill melakukan konfirmasi bayar, jumlah item tereduksi kembali. Contoh kasus: stok item 4, 1 item masuk open bill, item berkurang satu (sisa 3), saat membayar openbill melalui konfirmasi bayar, item berkurang lagi (sisa 2), seharusnya item tetap sisa 3.
 - [NEW] Pada halaman menu, tambahkan juga search bar.
-- [ONGOING] *BUG* Resi Additional tidak muncul pada openbill, dan datanya ter-reset juga pada openbill. 
+- [ ] *BUG* Resi Additional tidak muncul pada openbill, dan datanya ter-reset juga pada openbill. 
+- [ ] Pajak & Service Fee removed

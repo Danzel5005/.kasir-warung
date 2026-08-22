@@ -113,13 +113,19 @@ export default function Kasir() {
   // ── Hooks: panggil semua di sini, App.jsx jadi satu-satunya tempat yang
   // tahu seluruh data flow antar domain. Tidak ada hook yang import hook lain.
   const toastH    = useToast();
-  const settingsH = useSettings({ toast_: toastH.toast_ });
   const licenseH  = useLicense();
   const authH     = useAuth({ getNow, toast_: toastH.toast_ });
   const menuH     = useMenu({ toast_: toastH.toast_, addUndo: toastH.addUndo });
   const billsH    = useBills({ toast_: toastH.toast_, addUndo: toastH.addUndo });
-  const cartH     = useCart({ toast_: toastH.toast_, getNow, receiptAdditionals: settingsH.settings.receiptAdditionals || [] });
+  const cartH     = useCart({ toast_: toastH.toast_, getNow, receiptAdditionals: [] });
   const historyH  = useHistory({ toast_: toastH.toast_, addUndo: toastH.addUndo, getNow });
+  // settingsH needs cartH to be defined first for onChange callback
+  const settingsH = useSettings({ 
+    toast_: toastH.toast_, 
+    onChange: (newSettings) => {
+      cartH.setReceiptAdditionals(newSettings.receiptAdditionals || []);
+    }
+  });
 
   // ── Navigasi (UI-level, tidak dimiliki domain manapun)
   const [view, setView] = useState("menu");
@@ -206,11 +212,13 @@ export default function Kasir() {
     removeBillLocal: billsH.removeBillLocal,
     billIdToClose: cartH.activeBill?.id,     // Use activeBill directly instead of ref
     paymentMethods: settingsH.settings.paymentMethods || [], // NEW: payment methods for label resolution
+    menu: menuH.menu, // Pass current menu for open bill payment (no stock deduction)
   }), [
     cartH.processPayment, historyH.generateTrxId, authH.activeShift,
     menuH.computeStockDeduction, menuH.setMenu, historyH.appendHistory,
     cartH.setDrawerOpen, cartH.clearCart, billsH.removeBillLocal,
     settingsH.settings.paymentMethods, // NEW deps
+    menuH.menu, // Add menu to deps
   ]);
 
   // confirmCloseShift butuh clearCart saja — clearBills DIHAPUS
@@ -261,13 +269,14 @@ const executeConfirmDel = useCallback(() => {
       // For open bills, cancel and restore stock
       billsH.cancelBill(confirmDel.id, {
         computeStockRestoration: menuH.computeStockRestoration,
+        computeStockDeduction: menuH.computeStockDeduction,
         commitMenu: menuH.setMenu,
       });
     }
     else if (confirmDel.type === "allMenu") menuH.clearAllMenu();   // ← new, must be explicit
     else menuH.deleteItem(confirmDel.id);
     setConfirmDel(null);
-  }, [confirmDel, historyH.clearAllTrx, historyH.deleteTrx, billsH.clearAllBills, billsH.cancelBill, menuH.computeStockRestoration, menuH.setMenu, menuH.clearAllMenu, menuH.deleteItem]);
+  }, [confirmDel, historyH.clearAllTrx, historyH.deleteTrx, billsH.clearAllBills, billsH.cancelBill, menuH.computeStockRestoration, menuH.computeStockDeduction, menuH.setMenu, menuH.clearAllMenu, menuH.deleteItem]);
  
   const at = historyH.at;
   const doCSV = historyH.doCSV;

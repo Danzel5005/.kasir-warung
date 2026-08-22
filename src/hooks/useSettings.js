@@ -13,7 +13,8 @@ const DEFAULT_PAYMENT_METHODS = [
 // Tidak depend ke hook lain. Expose `printHTML(html)` generik supaya
 // useCart/useHistory bisa cetak tanpa import hook ini langsung — mereka
 // menerima `printHTML` sebagai parameter dari App.jsx.
-function useSettings({ toast_ }) {
+// Optional onChange callback to notify when settings change (e.g., receiptAdditionals)
+function useSettings({ toast_, onChange }) {
   const [logo, setLogo]               = useState(null);
   const [settings, setSettings]       = useState({ 
     printerName: "", 
@@ -65,7 +66,8 @@ function useSettings({ toast_ }) {
     if (!s.warungAddress) s.warungAddress = "";
     if (!s.warungPhone) s.warungPhone = "";
     setSettings(s);
-  }, []);
+    onChange?.(s);
+  }, [onChange]);
 
   // deps kosong aman: hanya setter, tidak baca state apapun.
   const handleLogoUpload = useCallback((e) => {
@@ -198,7 +200,8 @@ function useSettings({ toast_ }) {
     const s = { ...settings, receiptAdditionals: updated };
     await api.saveSettings(s);
     setSettings(s);
-  }, [settings, toast_]);
+    onChange?.(s);
+  }, [settings, toast_, onChange]);
 
   // Delete a custom receipt additional field
   const deleteReceiptAdditional = useCallback(async (key) => {
@@ -213,8 +216,9 @@ function useSettings({ toast_ }) {
     const s = { ...settings, receiptAdditionals: updated };
     await api.saveSettings(s);
     setSettings(s);
+    onChange?.(s);
     toast_("Field dihapus", "ok");
-  }, [settings, toast_]);
+  }, [settings, toast_, onChange]);
 
   // Add a new custom receipt additional field
   const addReceiptField = useCallback(async () => {
@@ -240,10 +244,11 @@ function useSettings({ toast_ }) {
     const s = { ...settings, receiptAdditionals: updated };
     await api.saveSettings(s);
     setSettings(s);
+    onChange?.(s);
     setNewReceiptFieldLabel("");
     setNewReceiptFieldType("text");
     toast_(`Field "${label}" ditambahkan`, "ok");
-  }, [settings, newReceiptFieldLabel, newReceiptFieldType, toast_]);
+  }, [settings, newReceiptFieldLabel, newReceiptFieldType, toast_, onChange]);
 
   // Toggle warung name
   const setWarungName = useCallback(async (name) => {

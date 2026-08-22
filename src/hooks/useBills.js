@@ -37,7 +37,7 @@ function useBills({ toast_, addUndo }) {
 
   // Close single bill WITHOUT payment (cancel) - restore stock
   // This is called when user deletes an open bill without paying
-  const cancelBill = useCallback(async (id, { computeStockRestoration, commitMenu }) => {
+  const cancelBill = useCallback(async (id, { computeStockRestoration, computeStockDeduction, commitMenu }) => {
     if (!id) return;
     setBills(prev => {
       const billToCancel = prev.find(b => String(b.id) === String(id));
@@ -48,14 +48,26 @@ function useBills({ toast_, addUndo }) {
       api.saveBills(updated);
       
       // Restore stock if computeStockRestoration is provided
+      let restoredMenu = null;
       if (computeStockRestoration && commitMenu && billToCancel.items) {
-        const restoredMenu = computeStockRestoration(billToCancel.items);
+        restoredMenu = computeStockRestoration(billToCancel.items);
         commitMenu(restoredMenu);
       }
       
       addUndo("Batalkan Open Bill", async () => {
         await api.saveBills(snap);
         setBills(snap);
+        // Re-deduct stock when undoing the cancellation
+        if (restoredMenu && computeStockDeduction && commitMenu && billToCancel.items) {
+          // Convert bill items to object keyed by item.id
+          const billItemsById = billToCancel.items.reduce((acc, item) => {
+            const existing = acc[item.id] || { qty: 0 };
+            acc[item.id] = { ...existing, qty: existing.qty + (item.qty || 0) };
+            return acc;
+          }, {});
+          const reDeductedMenu = computeStockDeduction(billItemsById);
+          commitMenu(reDeductedMenu);
+        }
       });
       return updated;
     });

@@ -102,11 +102,10 @@ const buildCategoryTotals = (items, cats = []) => {
 };
 
 function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName, cats = [], warungAddress = "", warungPhone = "", paymentMethods = []) {
-  const taxEnabled = receiptAdditionals?.find(f => f.key === "tax")?.enabled !== false;
-  const serviceEnabled = receiptAdditionals?.find(f => f.key === "service")?.enabled !== false;
-  const { pajak, service, total } = calcPrice(trx.subtotal, {
-    taxEnabled, serviceEnabled
-  });
+  // Use stored tax/service from transaction (no recalculation)
+  const pajak = trx.pajak || 0;
+  const service = trx.service || 0;
+  const total = trx.total || trx.subtotal;
   // Use stored label from transaction, fallback to lookup, NEVER show raw key
   const metodeLabel = trx.metodeBayarLabel 
     ?? paymentMethods.find(m => m.key === trx.metodeBayar)?.label 
@@ -211,9 +210,7 @@ function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName,
 
 function buildPreviewHTML(receiptAdditionalValues, items, logo, receiptAdditionals, warungName, cats = [], warungAddress = "", warungPhone = "") {
   const subtotal = items.reduce((s, i) => s + i.harga * i.qty, 0);
-  const taxEnabled = receiptAdditionals?.find(f => f.key === "tax")?.enabled !== false;
-  const serviceEnabled = receiptAdditionals?.find(f => f.key === "service")?.enabled !== false;
-  const { pajak, service, total } = calcPrice(subtotal, { taxEnabled, serviceEnabled });
+  const { pajak, service, total } = calcPrice(subtotal);
   const t = getNow();
   const addFields = buildAdditionalFields(receiptAdditionalValues, receiptAdditionals);
   const storeName = warungName || DEFAULT_WARUNG;
