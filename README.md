@@ -1,13 +1,13 @@
-# Kasir Warung Nusantara ☕
+# Kasir Warung Nusantara 
 
 Aplikasi kasir (POS) desktop untuk warung/kedai kopi, dibangun dengan **React + Electron**. Mendukung manajemen menu, open bill, shift kerja, banyak metode pembayaran, cetak struk thermal, dan laporan penjualan — didesain agar mudah dijalankan sebagai aplikasi Windows (.exe) mandiri.
 
 ## Fitur
 
-- **Kasir & Keranjang** — pencarian menu, kategori, tambahan (additionals), dan alur pembayaran cepat
-- **Open Bill** — simpan pesanan yang belum dibayar dan lanjutkan transaksi nanti
+- **Kasir & Keranjang** — pencarian menu, kategori, tambahan pada resi, dan alur pembayaran cepat
+- **Open Bill** — simpan pesanan yang belum dibayar dan lanjutkan transaksi nanti (ngutang lah)
 - **Manajemen Shift** — mulai/tutup shift dengan ringkasan penjualan per shift
-- **Manajemen Pengguna & Akses** — login, tambah/hapus user (admin)
+- **Manajemen Pengguna & Akses** — login, tambah/hapus user (hanya admin)
 - **Kelola Menu** — CRUD kategori dan item menu, harga, stok
 - **Riwayat Transaksi** — filter per hari atau per shift, dengan tampilan yang bisa dilipat (collapse)
 - **Laporan** — ekspor data penjualan ke CSV
