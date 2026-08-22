@@ -7,5 +7,5 @@
 - [x] *BUG* Saat undo penghapusan openbill yang dihapus tanpa konfirmasi bayar, stok item tidak berkurang lagi
 - [x] *BUG* Saat openbill melakukan konfirmasi bayar, jumlah item tereduksi kembali. Contoh kasus: stok item 4, 1 item masuk open bill, item berkurang satu (sisa 3), saat membayar openbill melalui konfirmasi bayar, item berkurang lagi (sisa 2), seharusnya item tetap sisa 3.
 - [NEW] Pada halaman menu, tambahkan juga search bar.
-- [ ] *BUG* Resi Additional tidak muncul pada openbill, dan datanya ter-reset juga pada openbill. 
-- [ ] Pajak & Service Fee removed
+- [x] *BUG* Resi Additional tidak muncul pada openbill, dan datanya ter-reset juga pada openbill. 
+- [x] Pajak & Service Fee removed
