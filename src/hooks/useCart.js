@@ -153,7 +153,32 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
     }
     
     let updatedBills;
+    let stockDelta = null;
     if (activeBill) {
+      // Calculate stock delta: new items - old items
+      const oldItemsById = (activeBill.items || []).reduce((acc, item) => {
+        const existing = acc[item.id] || { qty: 0 };
+        acc[item.id] = { ...existing, qty: existing.qty + (item.qty || 0) };
+        return acc;
+      }, {});
+      const newItemsById = items.reduce((acc, item) => {
+        const existing = acc[item.id] || { qty: 0 };
+        acc[item.id] = { ...existing, qty: existing.qty + (item.qty || 0) };
+        return acc;
+      }, {});
+      
+      // Compute delta (new - old)
+      const allItemIds = new Set([...Object.keys(oldItemsById), ...Object.keys(newItemsById)]);
+      stockDelta = {};
+      for (const id of allItemIds) {
+        const oldQty = oldItemsById[id]?.qty || 0;
+        const newQty = newItemsById[id]?.qty || 0;
+        const diff = newQty - oldQty;
+        if (diff !== 0) {
+          stockDelta[id] = { qty: diff };
+        }
+      }
+      
       updatedBills = bills.map(b =>
         String(b.id) === String(activeBill.id)
           ? { ...b, items: [...items], updatedAt: t.timestamp, ...receiptAdditionalData }
@@ -161,21 +186,22 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
       );
       toast_('Open Bill diperbarui', "ok");
     } else {
+      // New bill - all items are new stock deduction
+      stockDelta = items.reduce((acc, item) => {
+        const existing = acc[item.id] || { qty: 0 };
+        acc[item.id] = { ...existing, qty: existing.qty + (item.qty || 0) };
+        return acc;
+      }, {});
+      
       const bill = { id: billId, items: [...items], createdAt: t.timestamp, updatedAt: t.timestamp, status: "open", ...receiptAdditionalData };
       updatedBills = [...bills, bill];
       setBillId(n => n + 1);
       toast_('Open Bill dibuat', "ok");
     }
     
-    // Deduct stock when saving open bill
-    if (computeStockDeduction && commitMenu) {
-      // Convert items array to object keyed by item.id (summing quantities across additionals)
-      const cartItemsById = items.reduce((acc, item) => {
-        const existing = acc[item.id] || { qty: 0 };
-        acc[item.id] = { ...existing, qty: existing.qty + (item.qty || 0) };
-        return acc;
-      }, {});
-      const updatedMenu = computeStockDeduction(cartItemsById);
+    // Deduct stock when saving open bill (only delta for updates)
+    if (computeStockDeduction && commitMenu && stockDelta && Object.keys(stockDelta).length > 0) {
+      const updatedMenu = computeStockDeduction(stockDelta);
       commitMenu(updatedMenu);
     }
     

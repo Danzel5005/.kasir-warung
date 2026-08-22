@@ -521,6 +521,7 @@ const executeConfirmDel = useCallback(() => {
             menu={menuH.menu} cats={menuH.cats} allCats={menuH.allCats}
             setCatModal={menuH.setCatModal} openAdd={menuH.openAdd} openEdit={menuH.openEdit}
             setConfirmDel={setConfirmDel}
+            search={menuH.search} setSearch={menuH.setSearch}
           />
         )}
       </div>

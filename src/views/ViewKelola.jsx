@@ -9,18 +9,23 @@ function ViewKelola({
   menu, cats, allCats,                  // menuH
   setCatModal, openAdd, openEdit,       // menuH
   setConfirmDel,                        // App.jsx local
+  search, setSearch,                    // search from menuH
 }) {
   // Group items by their actual category (kategori field), not just categories in cats array
   // This ensures ALL items show even if their category is missing from cats
   const groupedItems = useMemo(() => {
     const groups = {};
+    const searchLower = search.toLowerCase();
     menu.forEach(item => {
+      // Filter by search term
+      if (!item.nama.toLowerCase().includes(searchLower)) return;
+      
       const catKey = item.kategori || "unknown";
       if (!groups[catKey]) groups[catKey] = [];
       groups[catKey].push(item);
     });
     return groups;
-  }, [menu]);
+  }, [menu, search]);
 
   // Get category labels from cats array, fallback to key if not found
   const getCatLabel = (key) => {
@@ -49,7 +54,18 @@ function ViewKelola({
           <div style={{fontSize:TYPOGRAPHY.body.fontSize,fontWeight:700,color:G}}>Kelola Menu & Kategori</div>
           <div style={{fontSize:TYPOGRAPHY.label.fontSize,color:MT}}>{menu.length} item · {cats.length} kategori</div>
         </div>
-        <div style={{display:"flex",gap:8}}>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          {/* Search bar */}
+          <div style={{display:"flex",alignItems:"center",gap:8,background:COLOR_PALETTE.grayLight,border:`1px solid ${BD}`,borderRadius:RADIUS.md,padding:"6px 10px",minWidth:200}}>
+            <span style={{color:MT,fontSize:13}}>&#128269;</span>
+            <input 
+              value={search} 
+              onChange={e=>setSearch(e.target.value)} 
+              placeholder="Cari menu..." 
+              style={{border:"none",background:"transparent",outline:"none",fontSize:12,fontFamily:"inherit",width:"100%"}}
+            />
+            {search&&<button onClick={()=>setSearch("")} style={{border:"none",background:"none",cursor:"pointer",color:MT,fontSize:12}}>&#10005;</button>}
+          </div>
           <button onClick={()=>setCatModal(true)} style={{background:COLOR_PALETTE.infoLight,color:COLOR_PALETTE.info,border:"none",borderRadius:RADIUS.md,padding:"6px 12px",cursor:"pointer",fontFamily:"inherit",fontSize:TYPOGRAPHY.small.fontSize,fontWeight:700}}>Kelola Kategori</button>
           <button onClick={openAdd} style={{background:G,color:W,border:"none",borderRadius:RADIUS.md,padding:"6px 12px",cursor:"pointer",fontFamily:"inherit",fontSize:TYPOGRAPHY.small.fontSize,fontWeight:700}}>+ Tambah Menu</button>
         {menu.length>0 && (
