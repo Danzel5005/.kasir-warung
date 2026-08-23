@@ -145,7 +145,6 @@ export default function Kasir() {
   const [dataPath, setDataPath] = useState("");
 
   const logoRef   = settingsH.logoRef;
-  const photoRef  = useRef();
   const searchRef = useRef();
   
 
@@ -485,11 +484,10 @@ const executeConfirmDel = useCallback(() => {
           <ViewRiwayat
             fFrom={historyH.fFrom} setFFrom={historyH.setFFrom}
             fTo={historyH.fTo} setFTo={historyH.setFTo}
-            filteredHistory={historyH.filteredHistory}
             history={historyH.history}
             histByDay={historyH.histByDay}
             expandedDays={historyH.expandedDays} setExpandedDays={historyH.setExpandedDays}
-            doCSV={doCSV} at={at}
+            doCSV={historyH.doCSV} at={historyH.at}
             setConfirmDel={setConfirmDel}
             setReceipt={setReceipt}
             // New: shift-based view
@@ -499,6 +497,11 @@ const executeConfirmDel = useCallback(() => {
             shifts={authH.shifts}
             paymentMethods={settingsH.settings.paymentMethods}
             menuH={menuH}
+            // Pagination
+            totalCount={historyH.totalCount} currentPage={historyH.currentPage} pageSize={historyH.pageSize}
+            isLoading={historyH.isLoading} hasMore={historyH.hasMore} loadMore={historyH.loadMore}
+            refresh={historyH.refresh} loadAllForExport={historyH.loadAllForExport}
+            sortOrder={historyH.sortOrder} toggleSort={historyH.toggleSort}
           />
         )}
 
@@ -545,7 +548,7 @@ const executeConfirmDel = useCallback(() => {
 
       {/* ══ MODAL: TAMBAH/EDIT MENU ════════════════════════════════════════ */}
       {menuH.itemModal && (
-        <ItemModal menuH={menuH} photoRef={photoRef} />
+        <ItemModal menuH={menuH} />
       )}
 
       {/* ══ MODAL: KELOLA KATEGORI ════════════════════════════════════════ */}

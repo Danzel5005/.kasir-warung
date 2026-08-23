@@ -24,29 +24,6 @@ export default function ItemModal({ menuH, photoRef, fmt: fmtProp }) {
           >&#10005;</button>
         </div>
 
-        {/* Upload foto */}
-        <div style={{ marginBottom:10 }}>
-          <div
-            onClick={() => photoRef.current.click()}
-            style={{ width:"100%", height:95, border:`2px dashed ${BD}`, borderRadius:RADIUS.md, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", overflow:"hidden", background:LT }}
-          >
-            {menuH.form.foto
-              ? <img src={menuH.form.foto} alt="preview" style={{ width:"100%", height:"100%", objectFit:"cover" }}/>
-              : <div style={{ textAlign:"center", color:MT }}>
-                  <div style={{ fontSize:20, marginBottom:2 }}>&#128247;</div>
-                  <div style={{ fontSize:TYPOGRAPHY.label.fontSize }}>Upload foto (opsional)</div>
-                </div>
-            }
-          </div>
-          <input ref={photoRef} type="file" accept=".jpg,.jpeg,.png" style={{ display:"none" }} onChange={menuH.handlePhoto}/>
-          {menuH.form.foto && (
-            <button
-              onClick={() => menuH.setForm(f => ({ ...f, foto:null }))}
-              style={{ fontSize:TYPOGRAPHY.label.fontSize, color:COLOR_PALETTE.danger, background:"none", border:"none", cursor:"pointer", marginTop:2 }}
-            >Hapus foto</button>
-          )}
-        </div>
-
         {/* Field teks */}
         {[
           { l:"Nama Menu *",        k:"nama",  p:"Contoh: Kopi Susu Gula Aren" },

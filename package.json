@@ -6,7 +6,7 @@
     "name": "Danzel Tampilang",
     "email": "danzeltampilang@gmail.com",
     "url": "https://wa.me/6289502417252"
-    },
+  },
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -48,7 +48,7 @@
     "nodeGypRebuild": false,
     "npmRebuild": false,
     "win": {
-      "icon":"src/assets/icon.ico",
+      "icon": "src/assets/icon.ico",
       "target": [
         {
           "target": "nsis",
@@ -65,5 +65,10 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Kasir WRG"
     }
+  },
+  "allowScripts": {
+    "electron@31.7.7": true,
+    "better-sqlite3@11.8.1": true,
+    "esbuild@0.21.5": true
   }
 }

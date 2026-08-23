@@ -106,6 +106,8 @@ function initDB() {
       
       CREATE INDEX IF NOT EXISTS idx_trx_created ON transactions(created_at);
       CREATE INDEX IF NOT EXISTS idx_shifts_created ON shifts(created_at);
+      -- New indexes for filtering performance
+      CREATE INDEX IF NOT EXISTS idx_trx_created_date ON transactions(date(created_at));
     `);
     console.log('[Main] Tables created');
     
@@ -316,6 +318,123 @@ ipcMain.handle("trx-load", () => {
     return rows.map(row => JSON.parse(row.data));
   } catch (err) {
     console.error("[trx-load] Error:", err.message);
+    return [];
+  }
+});
+
+// ── New: Filtered & Paginated Transactions (SQL-level filtering for scalability)
+// Supports: date range (fFrom, fTo), shiftId filter, pagination (page, pageSize), sort
+ipcMain.handle("trx-load-filtered", (_e, { fFrom, fTo, shiftId, page = 0, pageSize = 100, sort = "desc" }) => {
+  if (!db) return { transactions: [], total: 0, page, pageSize };
+  
+  try {
+    // Build WHERE clause dynamically
+    const whereConditions = [];
+    const params = [];
+    
+    if (fFrom) {
+      whereConditions.push("date(created_at) >= date(?)");
+      params.push(fFrom);
+    }
+    if (fTo) {
+      whereConditions.push("date(created_at) <= date(?)");
+      params.push(fTo);
+    }
+    if (shiftId) {
+      // JSON_EXTRACT to filter by shiftId inside the JSON blob
+      whereConditions.push("json_extract(data, '$.shiftId') = ?");
+      params.push(shiftId);
+    }
+    
+    const whereClause = whereConditions.length > 0 
+      ? "WHERE " + whereConditions.join(" AND ") 
+      : "";
+    
+    // Count total matching records
+    const countStmt = db.prepare(`SELECT COUNT(*) as total FROM transactions ${whereClause}`);
+    const { total } = countStmt.get(...params);
+    
+    // Fetch paginated results
+    const orderBy = sort === "asc" ? "ASC" : "DESC";
+    const dataStmt = db.prepare(`
+      SELECT id, data, created_at 
+      FROM transactions 
+      ${whereClause}
+      ORDER BY created_at ${orderBy}
+      LIMIT ? OFFSET ?
+    `);
+    
+    const dataParams = [...params, pageSize, page * pageSize];
+    const rows = dataStmt.all(...dataParams);
+    const transactions = rows.map(row => JSON.parse(row.data));
+    
+    return { transactions, total, page, pageSize };
+  } catch (err) {
+    console.error("[trx-load-filtered] Error:", err.message);
+    return { transactions: [], total: 0, page, pageSize };
+  }
+});
+
+// ── New: Aggregated statistics via SQL (daily totals, etc.)
+ipcMain.handle("trx-get-daily-stats", (_e, { fFrom, fTo, shiftId }) => {
+  if (!db) return [];
+  
+  try {
+    const whereConditions = [];
+    const params = [];
+    
+    if (fFrom) {
+      whereConditions.push("date(created_at) >= date(?)");
+      params.push(fFrom);
+    }
+    if (fTo) {
+      whereConditions.push("date(created_at) <= date(?)");
+      params.push(fTo);
+    }
+    if (shiftId) {
+      whereConditions.push("json_extract(data, '$.shiftId') = ?");
+      params.push(shiftId);
+    }
+    
+    const whereClause = whereConditions.length > 0 
+      ? "WHERE " + whereConditions.join(" AND ") 
+      : "";
+    
+    // Group by date and aggregate
+    const stmt = db.prepare(`
+      SELECT 
+        date(created_at) as date,
+        COUNT(*) as count,
+        SUM(json_extract(data, '$.total')) as total,
+        SUM(json_extract(data, '$.pax')) as pax,
+        SUM(json_extract(data, '$.subtotal')) as subtotal
+      FROM transactions
+      ${whereClause}
+      GROUP BY date(created_at)
+      ORDER BY date(created_at) DESC
+    `);
+    
+    return stmt.all(...params);
+  } catch (err) {
+    console.error("[trx-get-daily-stats] Error:", err.message);
+    return [];
+  }
+});
+
+// ── New: Get distinct shift IDs for filter dropdown
+ipcMain.handle("trx-get-shift-ids", () => {
+  if (!db) return [];
+  
+  try {
+    const stmt = db.prepare(`
+      SELECT DISTINCT json_extract(data, '$.shiftId') as shiftId
+      FROM transactions
+      WHERE json_extract(data, '$.shiftId') IS NOT NULL
+      ORDER BY shiftId DESC
+    `);
+    return stmt.all().map(r => r.shiftId).filter(Boolean);
+  } catch (err) {
+    console.error("[trx-get-shift-ids] Error:", err.message);
     return [];
   }
 });

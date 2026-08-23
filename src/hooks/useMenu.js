@@ -15,7 +15,7 @@ function useMenu({ toast_, addUndo }) {
   // modal tambah/edit item — murni milik domain menu
   const [itemModal, setItemModal]   = useState(false);
   const [editTarget, setEditTarget] = useState(null);
-  const [form, setForm] = useState({ nama: "", harga: "", modal: "", kategori: "kopi", desc: "", foto: null, stok: "" });
+  const [form, setForm] = useState({ nama: "", harga: "", modal: "", kategori: "kopi", desc: "", stok: "" });
 
   // modal kelola kategori
   const [catModal, setCatModal]       = useState(false);
@@ -46,22 +46,10 @@ function useMenu({ toast_, addUndo }) {
 
   // deps kosong aman: `item` datang sebagai argumen panggilan, tidak baca state luar.
   const openEdit = useCallback((item) => {
-    setForm({ nama: item.nama, harga: String(item.harga), modal: String(item.modal || 0), kategori: item.kategori, desc: item.desc || "", foto: item.foto || null, stok: item.stok === null ? "" : String(item.stok) });
+    setForm({ nama: item.nama, harga: String(item.harga), modal: String(item.modal || 0), kategori: item.kategori, desc: item.desc || "", stok: item.stok === null ? "" : String(item.stok) });
     setEditTarget(item);
     setItemModal(true);
   }, []);
-
-  // PENTING: memanggil toast_ — meski toast_ sendiri stabil (useCallback []
-  // di useToast), tetap disertakan untuk kejelasan & exhaustive-deps.
-  const handlePhoto = useCallback((e) => {
-    const f = e.target.files[0];
-    if (!f) return;
-    if (!["image/jpeg", "image/png"].includes(f.type)) { toast_("Hanya JPEG/PNG", "err"); return; }
-    if (f.size > 3 * 1024 * 1024) { toast_("Maks 3MB", "err"); return; }
-    const r = new FileReader();
-    r.onload = (ev) => setForm(x => ({ ...x, foto: ev.target.result }));
-    r.readAsDataURL(f);
-  }, [toast_]);
 
   // PENTING: membaca form, editTarget, menu LANGSUNG dari closure. Wajib
   // [form, editTarget, menu, toast_] — tanpa form/editTarget, saveItem akan
@@ -74,8 +62,8 @@ function useMenu({ toast_, addUndo }) {
     if (harga <= 0) { toast_("Harga tidak valid", "err"); return; }
     const stok = form.stok === "" ? null : parseInt(form.stok) || 0;
     const next = editTarget
-      ? menu.map(m => m.id === editTarget.id ? { ...m, nama, harga, modal, kategori: form.kategori, desc: form.desc.trim(), foto: form.foto, stok } : m)
-      : [...menu, { id: `c_${Date.now()}`, nama, harga, modal, kategori: form.kategori, desc: form.desc.trim(), foto: form.foto, stok }];
+      ? menu.map(m => m.id === editTarget.id ? { ...m, nama, harga, modal, kategori: form.kategori, desc: form.desc.trim(), stok } : m)
+      : [...menu, { id: `c_${Date.now()}`, nama, harga, modal, kategori: form.kategori, desc: form.desc.trim(), stok }];
     await api.saveMenu(next); setMenu(next); setItemModal(false);
     toast_(`"${nama}" ${editTarget ? "diperbarui" : "ditambahkan"}`, "ok");
   }, [form, editTarget, menu, toast_]);
@@ -179,7 +167,7 @@ const clearAllMenu = useCallback(async () => {
     itemModal, editTarget, form, catModal, newCatLabel,
     setKategori, setSearch, setItemModal, setForm, setCatModal, setNewCatLabel,
     setMenu, // diperlukan App.jsx untuk commit stok SETELAH IPC processPayment sukses
-    loadInitial, openAdd, openEdit, handlePhoto, saveItem, deleteItem,
+    loadInitial, openAdd, openEdit, saveItem, deleteItem,
     addCat, deleteCat, addTagToCategory, removeTagFromCategory, computeStockDeduction, computeStockRestoration, clearAllMenu
   };
 }

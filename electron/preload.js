@@ -7,6 +7,10 @@ contextBridge.exposeInMainWorld("kasirAPI", {
   deleteTrx:   (id)    => ipcRenderer.invoke("trx-delete", id),
   restoreTrx:  (list)  => ipcRenderer.invoke("trx-restore", list),
   clearTrx:    ()      => ipcRenderer.invoke("trx-clear"),
+  // New: Filtered & paginated transactions
+  loadTrxFiltered: (filters) => ipcRenderer.invoke("trx-load-filtered", filters),
+  getTrxDailyStats: (filters) => ipcRenderer.invoke("trx-get-daily-stats", filters),
+  getTrxShiftIds: () => ipcRenderer.invoke("trx-get-shift-ids"),
   // Open Bills
   loadBills:    ()      => ipcRenderer.invoke("bills-load"),
   saveBills:    (list)  => ipcRenderer.invoke("bills-save", list),
@@ -46,5 +50,4 @@ contextBridge.exposeInMainWorld("kasirAPI", {
   // Info
   getDataPath:  ()      => ipcRenderer.invoke("get-data-path"),
   processPayment: (data) => ipcRenderer.invoke("process-payment", data),
-
 });
