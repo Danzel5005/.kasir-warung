@@ -60,10 +60,7 @@ export default function ReceiptModal({ receipt, logo, printReceipt, setReceipt, 
 
         {/* Header */}
         <div style={{ padding:"20px 17px", flex:"0 0 auto", textAlign:"center" }}>
-          {logo
-            ? <img src={logo} alt="logo" style={{ width:42, height:42, objectFit:"cover", borderRadius:RADIUS.md, marginBottom:5 }}/> 
-            : <div style={{ width:42, height:42, background:G, borderRadius:RADIUS.md, display:"flex", alignItems:"center", justifyContent:"center", fontSize:TYPOGRAPHY.small.fontSize, fontWeight:700, color:W, margin:"0 auto 5px" }}>YKK</div> 
-          }
+          {logo && <img src={logo} alt="logo" style={{ width:42, height:42, objectFit:"cover", borderRadius:RADIUS.md, marginBottom:5 }}/>}
           <div style={{ fontWeight:700, fontSize:TYPOGRAPHY.body.fontSize, color:G }}>
             {receipt.warungName || "Warung"}
           </div>

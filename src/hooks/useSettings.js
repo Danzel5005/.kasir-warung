@@ -81,6 +81,12 @@ function useSettings({ toast_, onChange }) {
     r.readAsDataURL(f);
   }, []);
 
+  // deps kosong aman: hanya setter, tidak baca state apapun.
+  const handleLogoRemove = useCallback(async () => {
+    setLogo(null);
+    await api.saveLogo(null);
+  }, []);
+
   // PENTING: membaca settings.printerName LANGSUNG dari closure, bukan lewat
   // functional setState. Wajib [settings, toast_] di deps, atau printHTML akan
   // selalu cetak ke printer dari state pertama kali hook mount (stale).
@@ -283,7 +289,7 @@ function useSettings({ toast_, onChange }) {
     warungNameInput, setWarungNameInput,
     warungAddressInput, setWarungAddressInput,
     warungPhoneInput, setWarungPhoneInput,
-    loadInitial, handleLogoUpload, printHTML,
+    loadInitial, handleLogoUpload, handleLogoRemove, printHTML,
     openPrinterModal, selectPrinter, setPrinterModal,
     addPaymentMethod, deletePaymentMethod,
     handleQrisImageUpload, deleteQrisImage,
