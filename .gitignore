@@ -12,7 +12,7 @@ build/
 out/
 .docusaurus/
 release/
-
+license-key-generator-android/
 
 # Environment variables and secrets (NEVER commit these)
 .env
