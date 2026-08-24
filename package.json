@@ -42,6 +42,7 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
+      "!electron/license-secret.cjs",
       "node_modules/**/*",
       "package.json"
     ],

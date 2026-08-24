@@ -22,6 +22,7 @@ release/
 .env.production.local
 *.pem
 generator*
+electron/license-secret.cjs
 
 # Logs
 logs

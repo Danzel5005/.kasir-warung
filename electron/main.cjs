@@ -1,8 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("path");
 const fs = require("fs");
-const crypto = require("crypto");
-const LICENSE_SECRET = "Q8x-7NqP-Z3mK-4VtR-8H2c-9wL6pX5sJ1";
+const { LICENSE_SECRET, generateKey } = require("./license-secret.cjs");
 
 // ─── LICENSE ──────────────────────────────────────────────────────────────────
 function getHardwareId() {
@@ -11,14 +10,6 @@ function getHardwareId() {
     const raw = machineIdSync(true).replace(/-/g, "").toUpperCase().slice(0, 16);
     return `${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 12)}-${raw.slice(12, 16)}`;
   } catch { return null; }
-}
-
-function generateKey(hardwareId) {
-  const hash = crypto.createHmac("sha256", LICENSE_SECRET)
-    .update(hardwareId.replace(/-/g, "").toUpperCase())
-    .digest("hex").toUpperCase();
-  const s = hash.slice(0, 20);
-  return `YKK-${s.slice(0, 5)}-${s.slice(5, 10)}-${s.slice(10, 15)}-${s.slice(15, 20)}`;
 }
 
 function getLicensePath() {
