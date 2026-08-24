@@ -136,6 +136,9 @@ function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName,
     .map(([catKey, qty]) => `<div class="cat-line"><span>TOTAL (${getCategoryName(catKey, cats)}) :</span><span>${qty}</span></div>`)
     .join("");
 
+  // Calculate total quantity of all items for subtotal
+  const totalQty = trx.items.reduce((sum, item) => sum + (item.qty || 0), 0);
+
   return `<!DOCTYPE html>
   <html>
     <head>
@@ -196,12 +199,13 @@ function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName,
           <div class="kv grand bold"><span class="k">TOTAL</span><span class="v">${fmt(total)}</span></div>
           ${trx.metodeBayar==="cash"?`<div class="kv"><span class="k">Bayar</span><span class="v">${fmt(trx.bayar)}</span></div><div class="kv"><span class="k">Kembalian</span><span class="v">${fmt(trx.kembalian)}</span></div>`:""}
         </div>
-        <div class="payment-note">${trx.metodeBayar==="cash"?"LUNAS":"SILAKAN SCAN QRIS DI BAWAH"}</div>
+        <div class="payment-note">${trx.metodeBayar==="cash"?"LUNAS":"____"}</div>
         ${qrisImage?`<img src="${qrisImage}" class="qris-img" alt="QRIS" />`:""}
       </div>
 
       <!-- FOOTER -->
       <div class="section footer">
+        <div class="cat-line"><span>SUBTOTAL ITEMS :</span><span>${totalQty}</span></div>
         ${Object.keys(untaggedCategories).length ? `<div class="footer-list">${renderCatTotals(untaggedCategories)}</div>` : ""}
         ${Object.keys(taggedCategories).length ? `<div class="footer-list"><div class="bold">TAGGED</div>${renderCatTotals(taggedCategories)}</div>` : ""}
         <div class="footer-note">Barang yang sudah dibeli tidak bisa<br/>dikembalikan<br/>Terimakasih</div>
@@ -236,6 +240,9 @@ function buildPreviewHTML(receiptAdditionalValues, items, logo, receiptAdditiona
   const renderCatTotals = (catMap) => Object.entries(catMap)
     .map(([catKey, qty]) => `<div class="cat-line"><span>TOTAL (${getCategoryName(catKey, cats)}) :</span><span>${qty}</span></div>`)
     .join("");
+
+  // Calculate total quantity of all items for subtotal
+  const totalQty = items.reduce((sum, item) => sum + (item.qty || 0), 0);
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     :root{
@@ -285,6 +292,7 @@ function buildPreviewHTML(receiptAdditionalValues, items, logo, receiptAdditiona
         </div>
       </div>
       <div class="section footer">
+        <div class="cat-line"><span>SUBTOTAL ITEMS :</span><span>${totalQty}</span></div>
         ${Object.keys(untaggedCategories).length ? `<div class="footer-list">${renderCatTotals(untaggedCategories)}</div>` : ""}
         ${Object.keys(taggedCategories).length ? `<div class="footer-list"><div class="bold">TAGGED</div>${renderCatTotals(taggedCategories)}</div>` : ""}
         <div class="footer-note">Belum Lunas</div>

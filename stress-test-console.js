@@ -95,7 +95,7 @@ function genTrx(index) {
   
   for (let i = 0; i < itemCount; i++) {
     const m = randomItem(MENU_ITEMS);
-    const qty = randomInt(1, 3);
+    const qty = randomInt(25, 60);
     const lineTotal = m.harga * qty;
     subtotal += lineTotal;
     items.push({ id: m.id, nama: m.nama, harga: m.harga, qty, subtotal: lineTotal, kategori: m.kategori, catatan: '' });
@@ -127,7 +127,7 @@ function genTrx(index) {
   if (!window.kasirAPI) { console.error('❌ Run in Electron DevTools Console'); return; }
   
   const TOTAL = 100000;
-  const BATCH = 500;
+  const BATCH = 100;
   let ok = 0, err = 0;
   const t0 = Date.now();
   
