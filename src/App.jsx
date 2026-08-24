@@ -5,6 +5,7 @@ import { buildReceiptHTML, buildPreviewHTML, fmt } from "./utilities/receipt.js"
 import { api } from "./utilities/utils.js";
 import { row } from "./constants/styles.js";
 import { ClockBadge } from "./components/ClockBadge.jsx";
+import { SnakeLoader } from "./components/SnakeLoader.jsx";
 
 import { useToast } from "./hooks/useToast.js";
 import { useSettings } from "./hooks/useSettings.js";
@@ -136,6 +137,12 @@ export default function Kasir() {
   // harus tahu tentang domain lain (melanggar constraint "no cross-hook
   // import") — jadi dia tinggal di coordinator level.
   const [confirmDel, setConfirmDel] = useState(null);
+
+  // ── Snake loader state for button actions
+  const [showSnakeLoader, setShowSnakeLoader] = useState(false);
+  const [snakeLoaderTrigger, setSnakeLoaderTrigger] = useState(null); // "login" | "license"
+  const [loginTransitioning, setLoginTransitioning] = useState(false); // keeps login screen visible during loader
+  const [licenseTransitioning, setLicenseTransitioning] = useState(false); // keeps license screen visible during loader
 
   // ── Receipt & Pay modal — UI state yang menjembatani cart+history, tetap di App.jsx
   const [payModal, setPayModal] = useState(false);
@@ -284,7 +291,9 @@ const executeConfirmDel = useCallback(() => {
   if(licenseH.licenseStatus===null) return <AppSkeleton />;
 
   // ─── AKTIVASI LICENSE ─────────────────────────────────────────────────────────
-  if(!licenseH.licenseStatus.valid){
+  // Show license screen during transition even if license becomes valid
+  const showLicenseScreen = !licenseH.licenseStatus.valid || licenseTransitioning;
+  if(showLicenseScreen){
     return(
       <div style={{minHeight:"100vh",background:`linear-gradient(135deg,${G} 0%,#0f3d24 100%)`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Segoe UI',sans-serif"}}>
         <div style={{background:W,borderRadius:18,padding:"36px 32px",width:400,maxWidth:"95vw",boxShadow:"0 24px 80px rgba(0,0,0,0.4)"}}>
@@ -316,10 +325,23 @@ const executeConfirmDel = useCallback(() => {
             />
             {licenseH.licErr&&<div style={{color:"#e84040",fontSize:11,fontWeight:600,marginTop:5}}>❌ {licenseH.licErr}</div>}
           </div>
-          <button onClick={licenseH.doActivate} disabled={!licenseH.licKey.trim()||licenseH.licLoad}
-            style={{width:"100%",padding:13,background:licenseH.licKey.trim()&&!licenseH.licLoad?G:"#aaa",color:W,border:"none",borderRadius:9,cursor:licenseH.licKey.trim()&&!licenseH.licLoad?"pointer":"not-allowed",fontFamily:"inherit",fontSize:13,fontWeight:700}}>
-            {licenseH.licLoad?"Memvalidasi...":"Aktifkan Software"}
+          <div style={{ position: "relative", width: "100%" }}>
+          <button
+            onClick={async () => { 
+              setSnakeLoaderTrigger("license"); 
+              setShowSnakeLoader(true); 
+              setLicenseTransitioning(true);
+              await licenseH.doActivate();
+              // Wait minimum duration before hiding loader
+              await new Promise(r => setTimeout(r, 1200));
+              setShowSnakeLoader(false);
+              setLicenseTransitioning(false);
+            }}
+            disabled={!licenseH.licKey.trim()||licenseH.licLoad||showSnakeLoader}
+            style={{width:"100%",padding:13,background:licenseH.licKey.trim()&&!licenseH.licLoad&&!showSnakeLoader?G:"#aaa",color:W,border:"none",borderRadius:9,cursor:licenseH.licKey.trim()&&!licenseH.licLoad&&!showSnakeLoader?"pointer":"not-allowed",fontFamily:"inherit",fontSize:13,fontWeight:700}}>
+            {showSnakeLoader && snakeLoaderTrigger === "license" ? <SnakeLoader visible={true} minDuration={1200} size={24} color="#fff" /> : (licenseH.licLoad?"Memvalidasi...":"Aktifkan Software")}
           </button>
+        </div>
           <div style={{textAlign:"center",marginTop:16,fontSize:10,color:MT,lineHeight:1.7}}>
             License terikat ke perangkat ini.<br/>Pindah PC? Hubungi penjual untuk reset aktivasi.
           </div>
@@ -329,7 +351,9 @@ const executeConfirmDel = useCallback(() => {
   }
 
   // ─── LOGIN / START SHIFT SCREEN ─────────────────────────────────────────────
-  if(!authH.activeShift) return (
+  // Show login screen during transition even if shift becomes active
+  const showLoginScreen = !authH.activeShift || loginTransitioning;
+  if(showLoginScreen) return (
     <div style={{minHeight:"100vh",background:`linear-gradient(135deg,${G} 0%,#0f3d24 100%)`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Segoe UI',sans-serif"}}>
       <div style={{background:W,borderRadius:18,padding:"36px 32px",width:360,maxWidth:"95vw",boxShadow:"0 24px 80px rgba(0,0,0,0.4)"}}>
         {/* Logo & Judul */}
@@ -369,11 +393,24 @@ const executeConfirmDel = useCallback(() => {
           />
         </div>
         {authH.loginForm.error&&<div style={{color:"#e84040",fontSize:11,fontWeight:600,marginBottom:10,textAlign:"center"}}>{authH.loginForm.error}</div>}
-        <button
-          onClick={authH.doLogin}
-          disabled={!authH.loginForm.username||!authH.loginForm.password}
-          style={{width:"100%",padding:"12px",background:authH.loginForm.username&&authH.loginForm.password?G:"#aaa",color:W,border:"none",borderRadius:9,cursor:authH.loginForm.username&&authH.loginForm.password?"pointer":"not-allowed",fontFamily:"inherit",fontSize:13,fontWeight:700,transition:"background 0.2s"}}
-        >Mulai Shift</button>
+        <div style={{ position: "relative", width: "100%" }}>
+          <button
+            onClick={async () => { 
+              setSnakeLoaderTrigger("login"); 
+              setShowSnakeLoader(true); 
+              setLoginTransitioning(true);
+              await authH.doLogin();
+              // Wait minimum duration before hiding loader
+              await new Promise(r => setTimeout(r, 1200));
+              setShowSnakeLoader(false);
+              setLoginTransitioning(false);
+            }}
+            disabled={!authH.loginForm.username||!authH.loginForm.password||showSnakeLoader}
+            style={{width:"100%",padding:"12px",background:authH.loginForm.username&&authH.loginForm.password&&!showSnakeLoader?G:"#aaa",color:W,border:"none",borderRadius:9,cursor:authH.loginForm.username&&authH.loginForm.password&&!showSnakeLoader?"pointer":"not-allowed",fontFamily:"inherit",fontSize:13,fontWeight:700,transition:"background 0.2s"}}
+          >
+            {showSnakeLoader && snakeLoaderTrigger === "login" ? <SnakeLoader visible={true} minDuration={1200} size={24} color="#fff" /> : "Mulai Shift"}
+          </button>
+        </div>
 
         {/* Riwayat shift */}
         {authH.shifts.length>0&&(
