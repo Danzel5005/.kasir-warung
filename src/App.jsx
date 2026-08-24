@@ -338,7 +338,7 @@ const executeConfirmDel = useCallback(() => {
               setLicenseTransitioning(false);
             }}
             disabled={!licenseH.licKey.trim()||licenseH.licLoad||showSnakeLoader}
-            style={{width:"100%",padding:13,background:licenseH.licKey.trim()&&!licenseH.licLoad&&!showSnakeLoader?G:"#aaa",color:W,border:"none",borderRadius:9,cursor:licenseH.licKey.trim()&&!licenseH.licLoad&&!showSnakeLoader?"pointer":"not-allowed",fontFamily:"inherit",fontSize:13,fontWeight:700}}>
+            style={{width:"100%",padding:13,background:licenseH.licKey.trim()&&!licenseH.licLoad&&!showSnakeLoader?G:"#aaa",color:W,border:"none",borderRadius:9,cursor:licenseH.licKey.trim()&&!licenseH.licLoad&&!showSnakeLoader?"pointer":"not-allowed",fontFamily:"inherit",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>
             {showSnakeLoader && snakeLoaderTrigger === "license" ? <SnakeLoader visible={true} minDuration={1200} size={24} color="#fff" /> : (licenseH.licLoad?"Memvalidasi...":"Aktifkan Software")}
           </button>
         </div>
@@ -406,7 +406,7 @@ const executeConfirmDel = useCallback(() => {
               setLoginTransitioning(false);
             }}
             disabled={!authH.loginForm.username||!authH.loginForm.password||showSnakeLoader}
-            style={{width:"100%",padding:"12px",background:authH.loginForm.username&&authH.loginForm.password&&!showSnakeLoader?G:"#aaa",color:W,border:"none",borderRadius:9,cursor:authH.loginForm.username&&authH.loginForm.password&&!showSnakeLoader?"pointer":"not-allowed",fontFamily:"inherit",fontSize:13,fontWeight:700,transition:"background 0.2s"}}
+            style={{width:"100%",padding:"12px",background:authH.loginForm.username&&authH.loginForm.password&&!showSnakeLoader?G:"#aaa",color:W,border:"none",borderRadius:9,cursor:authH.loginForm.username&&authH.loginForm.password&&!showSnakeLoader?"pointer":"not-allowed",fontFamily:"inherit",fontSize:13,fontWeight:700,transition:"background 0.2s",display:"flex",alignItems:"center",justifyContent:"center"}}
           >
             {showSnakeLoader && snakeLoaderTrigger === "login" ? <SnakeLoader visible={true} minDuration={1200} size={24} color="#fff" /> : "Mulai Shift"}
           </button>
