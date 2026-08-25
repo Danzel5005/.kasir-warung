@@ -20,6 +20,26 @@ const fmt   = (n) => `Rp ${Number(n||0).toLocaleString("id-ID")}`;
 const fmtNum = (n) => Number(n||0).toLocaleString("id-ID");
 const DEFAULT_WARUNG = "Warung";
 
+// Paper width (mm) for @page size — configurable from Printer settings.
+// Clamped to a sane thermal-printer range; invalid values fall back to 80mm.
+const DEFAULT_PAPER_WIDTH_MM = 80;
+const MIN_PAPER_WIDTH_MM = 30;
+const MAX_PAPER_WIDTH_MM = 210;
+const normalizePaperWidth = (w) => {
+  const n = Math.round(Number(w));
+  if (!Number.isFinite(n)) return DEFAULT_PAPER_WIDTH_MM;
+  return Math.min(MAX_PAPER_WIDTH_MM, Math.max(MIN_PAPER_WIDTH_MM, n));
+};
+
+// Shared print CSS so @page size always matches the configured paper width
+const buildPrintCSS = (paperWidthMm) => {
+  const w = normalizePaperWidth(paperWidthMm);
+  return `
+    @page{size:${w}mm auto;margin:0mm;}
+    body{width:${w}mm;padding:2mm;}
+  `;
+};
+
 // Helper function to format drink additionals (cupsize/sugar/temperature)
 const formatAdditionals = (additionals) => {
   if (!additionals) return "";
@@ -101,7 +121,7 @@ const buildCategoryTotals = (items, cats = []) => {
   return { taggedCategories, untaggedCategories };
 };
 
-function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName, cats = [], warungAddress = "", warungPhone = "", paymentMethods = []) {
+function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName, cats = [], warungAddress = "", warungPhone = "", paymentMethods = [], paperWidthMm = DEFAULT_PAPER_WIDTH_MM) {
   // Use stored tax/service from transaction (no recalculation)
   const pajak = trx.pajak || 0;
   const service = trx.service || 0;
@@ -148,11 +168,10 @@ function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName,
       --bg:#eceae2; --header-tag:#c0392b; --body-tag:#1f6f50; --footer-tag:#2f5aa8;
         }
     *{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-weight:700;}
-    body{font-family:'Courier New', ui-monospace, Menlo, monospace;font-size:12px;width:80mm;padding:3mm;color:var(--ink);background:var(--bg);font-weight:700;}
-   
+    body{font-family:'Courier New', ui-monospace, Menlo, monospace;font-size:12px;width:${paperWidthMm}mm;padding:3mm;color:var(--ink);background:var(--bg);font-weight:700;}
+
     @media print{
-      @page{size:80mm auto;margin:0mm;} 
-      body{width:80mm;padding:2mm;}
+${buildPrintCSS(paperWidthMm)}
         }
     .receipt{background:var(--paper);padding:6px 8px 2px;position:relative;}
     .section{position:relative;padding:6px 0;}
@@ -214,7 +233,7 @@ function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName,
   </body></html>`;
 }
 
-function buildPreviewHTML(receiptAdditionalValues, items, logo, receiptAdditionals, warungName, cats = [], warungAddress = "", warungPhone = "") {
+function buildPreviewHTML(receiptAdditionalValues, items, logo, receiptAdditionals, warungName, cats = [], warungAddress = "", warungPhone = "", paperWidthMm = DEFAULT_PAPER_WIDTH_MM) {
   const subtotal = items.reduce((s, i) => s + i.harga * i.qty, 0);
   const { pajak, service, total } = calcPrice(subtotal);
   const t = getNow();
@@ -250,10 +269,9 @@ function buildPreviewHTML(receiptAdditionalValues, items, logo, receiptAdditiona
       --bg:#eceae2; --header-tag:#c0392b; --body-tag:#1f6f50; --footer-tag:#2f5aa8;
     }
     *{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-weight:700;}
-    body{font-family:'Courier New', ui-monospace, Menlo, monospace;font-size:12px;width:80mm;padding:3mm;color:var(--ink);background:var(--bg);font-weight:700;}
+    body{font-family:'Courier New', ui-monospace, Menlo, monospace;font-size:12px;width:${paperWidthMm}mm;padding:3mm;color:var(--ink);background:var(--bg);font-weight:700;}
     @media print{
-      @page{size:80mm auto;margin:0mm;} 
-      body{width:80mm;padding:2mm;}
+${buildPrintCSS(paperWidthMm)}
     }
     .receipt{background:var(--paper);padding:6px 8px 2px;position:relative;}
     .section{position:relative;padding:6px 0;}
@@ -301,4 +319,4 @@ function buildPreviewHTML(receiptAdditionalValues, items, logo, receiptAdditiona
   </body></html>`;
 }
 
-export {buildReceiptHTML, buildPreviewHTML, fmt, fmtNum, DEFAULT_WARUNG};
+export {buildReceiptHTML, buildPreviewHTML, fmt, fmtNum, DEFAULT_WARUNG, DEFAULT_PAPER_WIDTH_MM};

@@ -1,6 +1,6 @@
 {
   "name": "kasir-warung",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Aplikasi Kasir",
   "author": {
     "name": "Danzel Tampilang",
@@ -42,7 +42,7 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
-      "!electron/license-secret.cjs",
+      "electron/license-secret.cjs",
       "node_modules/**/*",
       "package.json"
     ],

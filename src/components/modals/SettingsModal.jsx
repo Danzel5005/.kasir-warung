@@ -7,6 +7,11 @@ export default function SettingsModal({ settingsH, authH }) {
   const [loadingPrinters, setLoadingPrinters] = useState(false);
   const qrisImageRef = useRef({});
   const [newUser, setNewUser] = useState({ username: "", password: "", nama: "" });
+  // Local draft for receipt paper width; committed via Simpan button
+  const [paperWidthDraft, setPaperWidthDraft] = useState(settingsH.settings.receiptPaperWidthMm || 80);
+  useEffect(() => {
+    setPaperWidthDraft(settingsH.settings.receiptPaperWidthMm || 80);
+  }, [settingsH.settings.receiptPaperWidthMm]);
 
   const handleAddUser = async () => {
     const u = newUser.username.trim();
@@ -243,6 +248,72 @@ return (
                   </button>
                 ))
               )}
+
+              {/* Receipt paper width (@page size) */}
+              <div style={{ paddingTop: 12, borderTop: `1px solid ${BD}`, marginTop: 10 }}>
+                <div style={{ fontSize: TYPOGRAPHY.label.fontSize, fontWeight: 600, color: G, marginBottom: 8 }}>
+                  Lebar Kertas Resi (mm):
+                </div>
+                <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
+                  <input
+                    type="number"
+                    min="30"
+                    max="210"
+                    value={paperWidthDraft}
+                    onChange={(e) => setPaperWidthDraft(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && settingsH.setReceiptPaperWidth(paperWidthDraft)}
+                    placeholder="80"
+                    style={{
+                      width: 90,
+                      padding: "8px 10px",
+                      border: `1px solid ${BD}`,
+                      borderRadius: RADIUS.md,
+                      fontFamily: "inherit",
+                      fontSize: TYPOGRAPHY.small.fontSize,
+                    }}
+                  />
+                  <button
+                    onClick={() => settingsH.setReceiptPaperWidth(paperWidthDraft)}
+                    style={{
+                      padding: "8px 14px",
+                      background: G,
+                      color: W,
+                      border: "none",
+                      borderRadius: RADIUS.md,
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                      fontSize: TYPOGRAPHY.small.fontSize,
+                      fontWeight: 700,
+                    }}
+                  >
+                    Simpan
+                  </button>
+                  {[58, 80].map((w) => (
+                    <button
+                      key={w}
+                      onClick={() => {
+                        setPaperWidthDraft(w);
+                        settingsH.setReceiptPaperWidth(w);
+                      }}
+                      style={{
+                        padding: "6px 10px",
+                        background: Number(settingsH.settings.receiptPaperWidthMm) === w ? COLOR_PALETTE.primaryLight : W,
+                        border: `1px solid ${Number(settingsH.settings.receiptPaperWidthMm) === w ? G : BD}`,
+                        borderRadius: RADIUS.sm,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                        fontSize: TYPOGRAPHY.label.fontSize,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {w}mm
+                    </button>
+                  ))}
+                </div>
+                <div style={{ fontSize: TYPOGRAPHY.label.fontSize, color: MT, marginTop: 8 }}>
+                  Default 80mm. Gunakan 58mm untuk printer thermal mini. Rentang 30-210mm.
+                </div>
+              </div>
             </div>
           )}
 

@@ -641,13 +641,25 @@ ipcMain.handle("get-printers", async () => {
 const PAGE_WIDTH_MM = 210;
 const PAGE_HEIGHT_MM = 297;
 const RECEIPT_WIDTH_MM = 67;
+const DEFAULT_PAPER_WIDTH_MM = 80;
+const MIN_PAPER_WIDTH_MM = 30;
+const MAX_PAPER_WIDTH_MM = 210;
 
-function injectReceiptPrintCSS(rawHtml = "") {
+function normalizePaperWidthMm(w) {
+  const n = Math.round(Number(w));
+  if (!Number.isFinite(n)) return DEFAULT_PAPER_WIDTH_MM;
+  return Math.min(MAX_PAPER_WIDTH_MM, Math.max(MIN_PAPER_WIDTH_MM, n));
+}
+
+// Injected CSS must match the @page size the receipt HTML was built with,
+// otherwise Chromium re-lays-out onto a different page width at print time.
+function injectReceiptPrintCSS(rawHtml = "", paperWidthMm = DEFAULT_PAPER_WIDTH_MM) {
+  const w = normalizePaperWidthMm(paperWidthMm);
   const css = `<style id="receipt-override">
-    @page { size: A4 portrait; margin: 0; }
+    @page { size: ${w}mm auto; margin: 0; }
     html, body {
-      width: ${RECEIPT_WIDTH_MM}mm !important;
-      max-width: ${RECEIPT_WIDTH_MM}mm !important;
+      width: ${w}mm !important;
+      max-width: ${w}mm !important;
       margin: 0 !important;
       padding: 0 !important;
       overflow: hidden !important;
@@ -668,9 +680,13 @@ function injectReceiptPrintCSS(rawHtml = "") {
   return rawHtml + css;
 }
 
-ipcMain.handle("print-receipt", (_e, { html, printerName }) => {
+ipcMain.handle("print-receipt", (_e, { html, printerName, paperWidthMm }) => {
   return new Promise((resolve) => {
     ensureDir();
+
+    // Honor the user-configured paper width for both layout and printer page size
+    const paperW = normalizePaperWidthMm(paperWidthMm);
+    const paperH = Math.max(paperW * 2, 100);
 
     const win = new BrowserWindow({
       width: Math.ceil((PAGE_WIDTH_MM / 25.4) * 96),
@@ -680,7 +696,7 @@ ipcMain.handle("print-receipt", (_e, { html, printerName }) => {
     });
 
     const printFile = path.join(DATA_DIR, "receipt-print.html");
-    fs.writeFileSync(printFile, injectReceiptPrintCSS(html), "utf-8");
+    fs.writeFileSync(printFile, injectReceiptPrintCSS(html, paperW), "utf-8");
     win.loadFile(printFile);
 
     win.webContents.once("did-finish-load", () => {
@@ -691,7 +707,7 @@ ipcMain.handle("print-receipt", (_e, { html, printerName }) => {
             printBackground: true,
             deviceName: printerName || "",
             margins: { marginType: "none" },
-            pageSize: { width: PAGE_WIDTH_MM * 1000, height: PAGE_HEIGHT_MM * 1000 },
+            pageSize: { width: paperW * 1000, height: paperH * 1000 },
             scaleFactor: 100,
           },
           (success, errType) => {

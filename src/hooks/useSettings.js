@@ -23,6 +23,7 @@ function useSettings({ toast_, onChange }) {
     warungName: "",
     warungAddress: "",
     warungPhone: "",
+    receiptPaperWidthMm: 80,
   });
   const [settingsModal, setSettingsModal] = useState(false);
   const [printerModal, setPrinterModal] = useState(false);
@@ -65,6 +66,10 @@ function useSettings({ toast_, onChange }) {
     // Ensure new fields exist
     if (!s.warungAddress) s.warungAddress = "";
     if (!s.warungPhone) s.warungPhone = "";
+    // Receipt paper width — migrate older settings; invalid values fall back to 80mm
+    const pw = Math.round(Number(s.receiptPaperWidthMm));
+    if (!Number.isFinite(pw) || pw < 30 || pw > 210) s.receiptPaperWidthMm = 80;
+    else s.receiptPaperWidthMm = pw;
     setSettings(s);
     onChange?.(s);
   }, [onChange]);
@@ -91,7 +96,7 @@ function useSettings({ toast_, onChange }) {
   // functional setState. Wajib [settings, toast_] di deps, atau printHTML akan
   // selalu cetak ke printer dari state pertama kali hook mount (stale).
   const printHTML = useCallback(async (html, successMsg = "Mencetak...") => {
-    const res = await api.printReceipt({ html, printerName: settings.printerName || "" });
+    const res = await api.printReceipt({ html, printerName: settings.printerName || "", paperWidthMm: settings.receiptPaperWidthMm });
     if (res?.ok) toast_(successMsg, "ok");
     else toast_(res?.error || "Gagal cetak", "err");
     return res;
@@ -280,6 +285,19 @@ function useSettings({ toast_, onChange }) {
     toast_("Nomor telepon warung disimpan", "ok");
   }, [settings, toast_]);
 
+  // Receipt paper width (@page size) — clamped to 30–210mm, falls back to 80mm
+  const setReceiptPaperWidth = useCallback(async (mm) => {
+    const n = Math.round(Number(mm));
+    if (!Number.isFinite(n) || n < 30 || n > 210) {
+      toast_("Lebar kertas harus antara 30-210 mm", "err");
+      return;
+    }
+    const s = { ...settings, receiptPaperWidthMm: n };
+    await api.saveSettings(s);
+    setSettings(s);
+    toast_("Lebar kertas resi disimpan", "ok");
+  }, [settings, toast_]);
+
   return {
     logo, settings, settingsModal, setSettingsModal,
     printerModal, printerList, logoRef,
@@ -295,6 +313,7 @@ function useSettings({ toast_, onChange }) {
     handleQrisImageUpload, deleteQrisImage,
     toggleReceiptAdditionalRequired, deleteReceiptAdditional, addReceiptField,
     setWarungName, setWarungAddress, setWarungPhone,
+    setReceiptPaperWidth,
   };
 }
 
