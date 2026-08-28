@@ -653,10 +653,12 @@ function normalizePaperWidthMm(w) {
 
 // Injected CSS must match the @page size the receipt HTML was built with,
 // otherwise Chromium re-lays-out onto a different page width at print time.
-function injectReceiptPrintCSS(rawHtml = "", paperWidthMm = DEFAULT_PAPER_WIDTH_MM) {
+function injectReceiptPrintCSS(rawHtml = "", paperWidthMm = DEFAULT_PAPER_WIDTH_MM, forceA4 = false) {
   const w = normalizePaperWidthMm(paperWidthMm);
+  const pageSize = forceA4 ? `${PAGE_WIDTH_MM}mm ${PAGE_HEIGHT_MM}mm` : `${w}mm auto`;
+
   const css = `<style id="receipt-override">
-    @page { size: ${w}mm auto; margin: 0; }
+    @page { size: ${pageSize}; margin: 0; }
     html, body {
       width: ${w}mm !important;
       max-width: ${w}mm !important;
@@ -687,6 +689,7 @@ ipcMain.handle("print-receipt", (_e, { html, printerName, paperWidthMm }) => {
     // Honor the user-configured paper width for both layout and printer page size
     const paperW = normalizePaperWidthMm(paperWidthMm);
     const paperH = Math.max(paperW * 2, 100);
+    const forceA4 = isPdfPrinter(printerName);
 
     const win = new BrowserWindow({
       width: Math.ceil((PAGE_WIDTH_MM / 25.4) * 96),
@@ -696,25 +699,39 @@ ipcMain.handle("print-receipt", (_e, { html, printerName, paperWidthMm }) => {
     });
 
     const printFile = path.join(DATA_DIR, "receipt-print.html");
-    fs.writeFileSync(printFile, injectReceiptPrintCSS(html, paperW), "utf-8");
+    fs.writeFileSync(printFile, injectReceiptPrintCSS(html, paperW, forceA4), "utf-8");
     win.loadFile(printFile);
 
     win.webContents.once("did-finish-load", () => {
       setTimeout(() => {
-        win.webContents.print(
-          {
-            silent: true,
-            printBackground: true,
-            deviceName: printerName || "",
-            margins: { marginType: "none" },
-            pageSize: { width: paperW * 1000, height: paperH * 1000 },
-            scaleFactor: 100,
-          },
-          (success, errType) => {
-            setTimeout(() => win.close(), 500);
-            resolve({ ok: success, error: errType || null });
-          }
-        );
+        const printOptions = forceA4
+          ? {
+              silent: true,
+              printBackground: true,
+              deviceName: printerName || "",
+              pageSize: { width: PAGE_WIDTH_MM * 1000, height: PAGE_HEIGHT_MM * 1000 }, // A4, in microns
+              margins: {
+                marginType: "custom",
+                top: 0,
+                bottom: 0,
+                left: 0,
+                right: (PAGE_WIDTH_MM - paperW) * 1000, // e.g. 210-80=130mm, in microns
+              },
+              scaleFactor: 100,
+            }
+          : {
+              silent: true,
+              printBackground: true,
+              deviceName: printerName || "",
+              margins: { marginType: "none" },
+              pageSize: { width: paperW * 1000, height: paperH * 1000 },
+              scaleFactor: 100,
+            };
+
+        win.webContents.print(printOptions, (success, errType) => {
+          setTimeout(() => win.close(), 500);
+          resolve({ ok: success, error: errType || null });
+        });
       }, 250);
     });
 
