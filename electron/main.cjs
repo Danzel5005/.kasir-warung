@@ -651,6 +651,15 @@ function normalizePaperWidthMm(w) {
   return Math.min(MAX_PAPER_WIDTH_MM, Math.max(MIN_PAPER_WIDTH_MM, n));
 }
 
+// Detect "print to PDF"-style virtual printers. These are routed through
+// printToPDF() below instead of the OS print spooler, because drivers like
+// "Microsoft Print to PDF" silently ignore Electron's custom pageSize/margins
+// when going through webContents.print() and fall back to Letter/A4 centered
+// on their own — there is no reliable way to fix that from the caller side.
+function isPdfPrinter(name = "") {
+  return /pdf/i.test(name);
+}
+
 // Injected CSS must match the @page size the receipt HTML was built with,
 // otherwise Chromium re-lays-out onto a different page width at print time.
 function injectReceiptPrintCSS(rawHtml = "", paperWidthMm = DEFAULT_PAPER_WIDTH_MM, forceA4 = false) {
@@ -686,7 +695,6 @@ ipcMain.handle("print-receipt", (_e, { html, printerName, paperWidthMm }) => {
   return new Promise((resolve) => {
     ensureDir();
 
-    // Honor the user-configured paper width for both layout and printer page size
     const paperW = normalizePaperWidthMm(paperWidthMm);
     const paperH = Math.max(paperW * 2, 100);
     const forceA4 = isPdfPrinter(printerName);
@@ -703,35 +711,54 @@ ipcMain.handle("print-receipt", (_e, { html, printerName, paperWidthMm }) => {
     win.loadFile(printFile);
 
     win.webContents.once("did-finish-load", () => {
-      setTimeout(() => {
-        const printOptions = forceA4
-          ? {
-              silent: true,
+      setTimeout(async () => {
+        if (forceA4) {
+          try {
+            // Chromium's own PDF engine — fully honors our @page CSS,
+            // unlike webContents.print() through a system driver.
+            const pdfBuffer = await win.webContents.printToPDF({
               printBackground: true,
-              deviceName: printerName || "",
-              pageSize: { width: PAGE_WIDTH_MM * 1000, height: PAGE_HEIGHT_MM * 1000 }, // A4, in microns
-              margins: {
-                marginType: "custom",
-                top: 0,
-                bottom: 0,
-                left: 0,
-                right: (PAGE_WIDTH_MM - paperW) * 1000, // e.g. 210-80=130mm, in microns
-              },
-              scaleFactor: 100,
-            }
-          : {
-              silent: true,
-              printBackground: true,
-              deviceName: printerName || "",
+              preferCSSPageSize: true, // use @page{size:210mm 297mm} verbatim, no scale-to-fit
+              scale: 1,
               margins: { marginType: "none" },
-              pageSize: { width: paperW * 1000, height: paperH * 1000 },
-              scaleFactor: 100,
-            };
+            });
 
-        win.webContents.print(printOptions, (success, errType) => {
-          setTimeout(() => win.close(), 500);
-          resolve({ ok: success, error: errType || null });
-        });
+            const { filePath, canceled } = await dialog.showSaveDialog(win, {
+              title: "Simpan Struk sebagai PDF",
+              defaultPath: path.join(app.getPath("desktop"), "receipt.pdf"),
+              filters: [{ name: "PDF Files", extensions: ["pdf"] }],
+            });
+
+            win.close();
+
+            if (canceled || !filePath) {
+              resolve({ ok: false, error: "Dibatalkan" });
+              return;
+            }
+            fs.writeFileSync(filePath, pdfBuffer);
+            resolve({ ok: true, filePath });
+          } catch (err) {
+            win.close();
+            resolve({ ok: false, error: err.message });
+          }
+          return;
+        }
+
+        // Real thermal printers keep using the original driver-based path.
+        win.webContents.print(
+          {
+            silent: true,
+            printBackground: true,
+            deviceName: printerName || "",
+            margins: { marginType: "none" },
+            pageSize: { width: paperW * 1000, height: paperH * 1000 },
+            scaleFactor: 100,
+          },
+          (success, errType) => {
+            setTimeout(() => win.close(), 500);
+            resolve({ ok: success, error: errType || null });
+          }
+        );
       }, 250);
     });
 
