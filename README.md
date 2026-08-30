@@ -4,7 +4,7 @@ Aplikasi kasir (POS) desktop untuk warung/kedai kopi, dibangun dengan **React 18
 
 ## Fitur Utama
 
-### 🛒 Kasir & Keranjang
+### Kasir & Keranjang
 - Pencarian menu real-time, filter kategori, grid menu responsif
 - **Customisasi Minuman (Drinks Tag System)** — item kategori "Drinks" otomatis menampilkan modal pilihan: Cupsize (Small/Medium/Large), Sugar (Less/Normal/More), Temperature (Ice dengan level Less/Normal/More, Hot)
 - Tambahan pada resi (receipt additionals) dinamis — bisa dikonfigurasi di Settings: Nomor Meja, Jumlah Pax, Catatan, dll.
@@ -12,13 +12,13 @@ Aplikasi kasir (POS) desktop untuk warung/kedai kopi, dibangun dengan **React 18
 - Perhitungan otomatis: Subtotal, Pajak (10%), Service (5%), Total
 - Print Preview sebelum cetak struk
 
-### 📋 Open Bill
+### Open Bill
 - Simpan pesanan yang belum dibayar (status "open") dan lanjutkan transaksi nanti
 - Update item pada open bill yang sudah ada (tambah/kurangi/hapus) dengan deduksi stok delta
 - Hapus open bill (batalkan) dengan restore stok otomatis
 - Bayar open bill langsung dari daftar (stock sudah dipotong saat buat bill, tidak double deduct)
 
-### 👤 Manajemen Shift & Pengguna
+### Manajemen Shift & Pengguna
 - Login multi-user dengan role Admin/Kasir
 - Mulai shift baru otomatis menentukan nomor urut shift harian
 - Tutup shift dengan ringkasan: jam buka/tutup, operator, total transaksi, omset
@@ -26,14 +26,14 @@ Aplikasi kasir (POS) desktop untuk warung/kedai kopi, dibangun dengan **React 18
 - Kelola pengguna (Admin only): tambah/hapus user, password, nama tampilan
 - Riwayat shift dengan status (Aktif/Tertutup) dan ringkasan per shift
 
-### 🍽️ Kelola Menu & Kategori
+### Kelola Menu & Kategori
 - CRUD item menu: nama, harga, harga modal (untuk laporan laba/rugi), kategori, deskripsi, foto, stok (null = unlimited)
 - CRUD kategori: label, key, **tags** (mis. "drinks", "rokok") untuk fitur khusus
 - Tag "Drinks" → otomatis munculkan customisasi minuman di kasir
 - Tag "Rokok" → ditampilkan terpisah di footer struk (Total ROKOK)
 - Pencarian & filter kategori di halaman Kelola
 
-### 📊 Riwayat Transaksi
+### Riwayat Transaksi
 - Filter per rentang tanggal (Dari - Sampai)
 - **Dua mode tampilan**: Per Hari (default, collapse/expand per hari) atau Per Shift
 - Grup per shift menampilkan: nomor shift, operator, jam, total transaksi, total pax
@@ -41,7 +41,7 @@ Aplikasi kasir (POS) desktop untuk warung/kedai kopi, dibangun dengan **React 18
 - Hapus transaksi individu atau hapus semua (dengan undo 9 detik)
 - Unduh CSV transaksi (detail per hari dalam 1 file)
 
-### 📈 Laporan & Ekspor CSV
+### Laporan & Ekspor CSV
 Pilih shift (Semua / Shift tertentu / Shift aktif) untuk memfilter laporan:
 - **Laporan Keuangan** — ringkasan per hari: pendapatan, modal, laba/rugi, margin %
 - **Sales Rate** — Top 10 terlaris, Bottom 10, menu tidak terjual sama sekali
@@ -50,27 +50,27 @@ Pilih shift (Semua / Shift tertentu / Shift aktif) untuk memfilter laporan:
 - **Semua Transaksi Detail** — detail setiap transaksi terpisah per hari
 - **Laporan Per Metode Bayar** — rincian jumlah transaksi & total per metode pembayaran
 
-### 🖨️ Cetak Struk Thermal
-- Dukungan printer thermal 80mm (Bixolon SRP-350, Epson, dll.) via Electron `webContents.print()`
+### Cetak Struk Thermal
+- Dukungan printer thermal 80mm dan 58mm (Ukuran customizable sesuai kebutuhan) via Electron `webContents.print()`
 - Pilih printer langsung dari aplikasi (modal Printer)
-- Format struk 80mm dengan: logo, nama warung, alamat, telepon, no transaksi, waktu, kasir, metode bayar, item (dengan tag kategori & additionals), total, kembalian, QRIS image (jika QRIS), footer kategori (tagged/untagged), catatan "Barang yang sudah dibeli tidak bisa dikembalikan"
+- Format struk memiliki: logo, nama warung, alamat, telepon, no transaksi, waktu, kasir, metode bayar, item, total, kembalian, QRIS image (jika QRIS), footer kategori, catatan "Barang yang sudah dibeli tidak bisa dikembalikan"
 - Cetak preview (Print Preview) sebelum cetak aktual
 
-### 🔐 Lisensi & Hardware Binding
+### Lisensi & Hardware Binding
 - Aktivasi lisensi terikat ke perangkat menggunakan `node-machine-id` (hardware fingerprint)
 - Format License Key: `YKK-XXXXX-XXXXX-XXXXX-XXXXX` (20 karakter hex dari HMAC-SHA256)
 - Hardware ID ditampilkan saat aktivasi (format: `XXXX-XXXX-XXXX-XXXX`)
 - Lisensi disimpan terenkripsi (Base64) di `app.getPath("userData")/.ykk_lic`
 - Pindah PC? Hubungi penjual untuk reset aktivasi
 
-### ⚙️ Settings & Customization
+### Settings & Customization
 - **Nama Warung, Alamat, Nomor Telepon** — tampil di header struk
 - **Metode Pembayaran** — CRUD custom methods (label, kategori: cash/qris/custom), auto-detect QRIS dari nama
 - **QRIS Image Upload** — upload gambar QRIS per metode pembayaran (maks 2MB)
 - **Receipt Additionals** — CRUD field tambahan di resi (text/number, required/optional, visible/hidden, kategori receipt/bill)
 - **Printer** — pilih printer thermal default
 
-### 🎨 Design System & i18n
+### Design System & i18n
 - Design System terpusat di `src/constants/theme.js`: 8-step color palette, 6-step typographic scale, 5 radius tokens, 4-step spacing
 - Multi-bahasa (i18n) ringan di `src/utilities/i18n.js` — Bahasa Indonesia & English
 
@@ -247,4 +247,4 @@ Proyek internal/pribadi — **MIT License**.
 
 **Author**: Danzel Tampilang  
 **Contact**: danzeltampilang@gmail.com / [WhatsApp](https://wa.me/6289502417252)  
-**Version**: 1.0.0 (v3.0.0 internal)
+**Version**: 1.1.0
