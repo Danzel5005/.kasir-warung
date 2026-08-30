@@ -143,6 +143,19 @@ export default function Kasir() {
   const [snakeLoaderTrigger, setSnakeLoaderTrigger] = useState(null); // "login" | "license"
   const [loginTransitioning, setLoginTransitioning] = useState(false); // keeps login screen visible during loader
   const [licenseTransitioning, setLicenseTransitioning] = useState(false); // keeps license screen visible during loader
+  const [showPw, setShowPw] = useState(false); // hold-to-show password
+
+  // ── Shared login handler (button click + Enter key)
+  const handleLogin = useCallback(async () => {
+    if (!authH.loginForm.username || !authH.loginForm.password || showSnakeLoader) return;
+    setSnakeLoaderTrigger("login");
+    setShowSnakeLoader(true);
+    setLoginTransitioning(true);
+    await authH.doLogin();
+    await new Promise(r => setTimeout(r, 1200));
+    setShowSnakeLoader(false);
+    setLoginTransitioning(false);
+  }, [authH, showSnakeLoader])
 
   // ── Receipt & Pay modal — UI state yang menjembatani cart+history, tetap di App.jsx
   const [payModal, setPayModal] = useState(false);
@@ -381,28 +394,39 @@ const executeConfirmDel = useCallback(() => {
             style={{width:"100%",padding:"10px 12px",boxSizing:"border-box",border:`1.5px solid ${authH.loginForm.error?"#e84040":BD}`,borderRadius:8,fontSize:13,fontFamily:"inherit",outline:"none",marginBottom:10}}
           />
           <label style={{fontSize:10,color:MT,fontWeight:600,display:"block",marginBottom:4}}>PASSWORD</label>
-          <input
-            id="pw-input"
-            type="password" value={authH.loginForm.password}
-            onChange={e=>authH.setLoginForm(f=>({...f,password:e.target.value,error:""}))}
-            onKeyDown={e=>e.key==="Enter"&&authH.doLogin()}
-            placeholder="Masukkan password..."
-            style={{width:"100%",padding:"10px 12px",boxSizing:"border-box",border:`1.5px solid ${authH.loginForm.error?"#e84040":BD}`,borderRadius:8,fontSize:13,fontFamily:"inherit",outline:"none"}}
-          />
+          <div style={{position:"relative",width:"100%"}}>
+            <input
+              id="pw-input"
+              type={showPw ? "text" : "password"}
+              value={authH.loginForm.password}
+              onChange={e=>authH.setLoginForm(f=>({...f,password:e.target.value,error:""}))}
+              onKeyDown={e=>e.key==="Enter"&&handleLogin()}
+              placeholder="Masukkan password..."
+              style={{width:"100%",padding:"10px 44px 10px 12px",boxSizing:"border-box",border:`1.5px solid ${authH.loginForm.error?"#e84040":BD}`,borderRadius:8,fontSize:13,fontFamily:"inherit",outline:"none"}}
+            />
+            <button
+              type="button"
+              onMouseDown={() => setShowPw(true)}
+              onMouseUp={() => setShowPw(false)}
+              onMouseLeave={() => setShowPw(false)}
+              onTouchStart={(e) => { e.preventDefault(); setShowPw(true); }}
+              onTouchEnd={() => setShowPw(false)}
+              onTouchCancel={() => setShowPw(false)}
+              style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"transparent",border:"none",cursor:"pointer",padding:4,display:"flex",alignItems:"center",justifyContent:"center",color:MT}}
+              aria-label={showPw ? "Sembunyikan password" : "Tampilkan password"}
+            >
+              {showPw ? (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              )}
+            </button>
+          </div>
         </div>
         {authH.loginForm.error&&<div style={{color:"#e84040",fontSize:11,fontWeight:600,marginBottom:10,textAlign:"center"}}>{authH.loginForm.error}</div>}
         <div style={{ position: "relative", width: "100%" }}>
           <button
-            onClick={async () => { 
-              setSnakeLoaderTrigger("login"); 
-              setShowSnakeLoader(true); 
-              setLoginTransitioning(true);
-              await authH.doLogin();
-              // Wait minimum duration before hiding loader
-              await new Promise(r => setTimeout(r, 1200));
-              setShowSnakeLoader(false);
-              setLoginTransitioning(false);
-            }}
+            onClick={handleLogin}
             disabled={!authH.loginForm.username||!authH.loginForm.password||showSnakeLoader}
             style={{width:"100%",padding:"12px",background:authH.loginForm.username&&authH.loginForm.password&&!showSnakeLoader?G:"#aaa",color:W,border:"none",borderRadius:9,cursor:authH.loginForm.username&&authH.loginForm.password&&!showSnakeLoader?"pointer":"not-allowed",fontFamily:"inherit",fontSize:13,fontWeight:700,transition:"background 0.2s",display:"flex",alignItems:"center",justifyContent:"center"}}
           >
