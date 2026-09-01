@@ -1,4 +1,4 @@
-# Kasir Warung Nusantara 
+# Kasir Warung DEN POS
 
 Aplikasi kasir (POS) desktop untuk warung/kedai kopi, dibangun dengan **React 18 + Electron 31 + Vite 5**. Mendukung manajemen menu, open bill, shift kerja, banyak metode pembayaran (Tunai, Debit, QRIS), cetak struk thermal, laporan penjualan lengkap, dan sistem lisensi berbasis hardware ID — didesain agar mudah dijalankan sebagai aplikasi Windows (.exe) mandiri.
 
