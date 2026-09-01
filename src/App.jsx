@@ -4,6 +4,7 @@ import { G, OR, W, LT, BD, TX, MT } from "./constants/colors.js";
 import { buildReceiptHTML, buildPreviewHTML, fmt } from "./utilities/receipt.js";
 import { normalizeBarcodeInput, findMenuByMenuId } from "./utilities/barcode.js";
 import { api } from "./utilities/utils.js";
+import { resolveShiftTarget } from "./utilities/shiftState.js";
 import { row } from "./constants/styles.js";
 import { ClockBadge } from "./components/ClockBadge.jsx";
 import { SnakeLoader } from "./components/SnakeLoader.jsx";
@@ -165,12 +166,31 @@ function KasirWorkspace() {
   }, [authH, showSnakeLoader])
 
   const handleSaveOpeningCash = useCallback(async () => {
-    if (!authH.activeShift) return;
-    const value = Number(String(openingCashInput).replace(/[^\d]/g, "")) || 0;
-    await authH.updateShift(authH.activeShift.id, { openingCash: value });
-    setOpeningCashInput("");
-    setOpeningCashModal(false);
-    toastH.toast_("Uang kas berhasil disimpan", "ok");
+    try {
+      const savedShifts = await api.loadShifts();
+      const targetShift = resolveShiftTarget({
+        shifts: savedShifts || authH.shifts || [],
+        activeShift: authH.activeShift,
+        selectedShiftId: authH.selectedShiftId,
+      });
+      const targetShiftId = targetShift?.id || authH.selectedShiftId;
+      if (!targetShiftId) return;
+
+      const value = Number(String(openingCashInput).replace(/[^\d]/g, "")) || 0;
+      authH.setSelectedShiftId(targetShiftId);
+      const updated = await authH.updateShift(targetShiftId, { openingCash: value }, savedShifts || authH.shifts || []);
+      if (!updated) {
+        toastH.toast_("Shift aktif tidak ditemukan", "err");
+        return;
+      }
+
+      setOpeningCashInput("");
+      setOpeningCashModal(false);
+      toastH.toast_("Uang kas berhasil disimpan", "ok");
+    } catch (err) {
+      console.error("[App] save opening cash failed:", err);
+      toastH.toast_("Gagal menyimpan uang kas awal", "err");
+    }
   }, [authH, openingCashInput, toastH]);
 
   const handleSkipOpeningCash = useCallback(() => {
@@ -752,8 +772,8 @@ const executeConfirmDel = useCallback(() => {
               style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: 10, border: `1.5px solid ${BD}`, fontSize: 18, fontWeight: 700, fontFamily: "inherit", marginBottom: 18 }}
             />
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <button onClick={handleSkipOpeningCash} style={{ background: LT, color: TX, border: `1px solid ${BD}`, borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontFamily: "inherit", fontWeight: 700 }}>Lewati</button>
-              <button onClick={handleSaveOpeningCash} style={{ background: G, color: W, border: "none", borderRadius: 8, padding: "10px 18px", cursor: "pointer", fontFamily: "inherit", fontWeight: 700 }}>Simpan</button>
+              <button type="button" onClick={handleSkipOpeningCash} style={{ background: LT, color: TX, border: `1px solid ${BD}`, borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontFamily: "inherit", fontWeight: 700 }}>Lewati</button>
+              <button type="button" onClick={handleSaveOpeningCash} style={{ background: G, color: W, border: "none", borderRadius: 8, padding: "10px 18px", cursor: "pointer", fontFamily: "inherit", fontWeight: 700 }}>Simpan</button>
             </div>
           </div>
         </div>

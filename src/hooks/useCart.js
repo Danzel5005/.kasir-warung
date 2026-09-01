@@ -262,8 +262,19 @@ const processPayment = useCallback(async ({
   }
   
   // Resolve payment method label for the transaction (never show key)
-  const metodeLabel = paymentMethods.find(m => m.key === metode)?.label 
-    ?? globalThis.METODE_LABELS?.[metode] 
+  const savedSettingsLabel = (() => {
+    try {
+      const savedSettings = JSON.parse(localStorage.getItem("ykk_settings") || "{}");
+      const storedMethod = (savedSettings?.paymentMethods || []).find(m => String(m.key || "").trim() === String(metode || "").trim());
+      return storedMethod?.label || "";
+    } catch (_) {
+      return "";
+    }
+  })();
+
+  const metodeLabel = paymentMethods.find(m => String(m.key || "").trim() === String(metode || "").trim())?.label
+    ?? savedSettingsLabel
+    ?? globalThis.METODE_LABELS?.[metode]
     ?? metode.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   
   const trxId = generateTrxId();

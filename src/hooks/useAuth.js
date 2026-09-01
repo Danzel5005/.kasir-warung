@@ -23,7 +23,10 @@ function useAuth({ getNow, toast_ }) {
     const allShifts = savedShifts || [];
     setShifts(allShifts);
     const openShift = allShifts.find(s => s.status === "open");
-    if (openShift) setActiveShift(openShift);
+    if (openShift) {
+      setActiveShift(openShift);
+      setSelectedShiftId(openShift.id);
+    }
     // Load users: jika storage kosong, pakai default
     const userList = savedUsers && savedUsers.length ? savedUsers : DEFAULT_USERS;
     setUsers(userList);
@@ -65,15 +68,21 @@ function useAuth({ getNow, toast_ }) {
     return true;
   }, [loginForm, users, shifts, getNow]);
 
-  const updateShift = useCallback(async (shiftId, patch) => {
+  const updateShift = useCallback(async (shiftId, patch, sourceShifts = shifts) => {
     if (!shiftId) return false;
-    const next = shifts.map(s => s.id === shiftId ? { ...s, ...patch } : s);
-    await api.saveShifts(next);
+
+    const source = Array.isArray(sourceShifts) ? sourceShifts : [];
+    const next = source.map(s => s.id === shiftId ? { ...s, ...patch } : s);
+    const updatedShift = next.find(s => s.id === shiftId) || (activeShift && activeShift.id === shiftId ? { ...activeShift, ...patch } : null);
+    if (!updatedShift) return false;
+
+    const result = await api.saveShifts(next);
+    if (result?.ok === false) return false;
     setShifts(next);
-    setActiveShift(current => current && current.id === shiftId ? { ...current, ...patch } : current);
-    setSelectedShiftId(current => current === shiftId ? shiftId : current);
+    setActiveShift(updatedShift);
+    setSelectedShiftId(shiftId);
     return true;
-  }, [shifts]);
+  }, [activeShift, shifts]);
 
   // onShiftClosed: {clearCart} — dipass dari App.jsx SAAT DIPANGGIL
   // (argumen panggilan, bukan closure dependency), jadi TIDAK masuk deps array.

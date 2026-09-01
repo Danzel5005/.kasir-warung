@@ -46,7 +46,8 @@ function ViewLaporan({
   const reportOpeningCash = selectedShiftList.reduce((sum, shift) => sum + Number(shift?.openingCash || 0), 0) || Number(openingCash || 0);
   const reportTotalExpenses = selectedShiftList.reduce((sum, shift) => sum + Number((shift?.expenses || []).reduce((inner, item) => inner + Number(item.jumlah || 0), 0)), 0) || Number(totalExpenses || 0);
   const netProfit = laba - reportTotalExpenses;
-  const cashBalance = reportOpeningCash + netProfit;
+  // Saldo kas shift mencakup kas awal, pendapatan, dan pengeluaran shift.
+  const cashBalance = reportOpeningCash + rev - reportTotalExpenses;
   const [detailType, setDetailType] = useState(null);
   const [selectedExpenseCategory, setSelectedExpenseCategory] = useState(null);
   const [selectedIncomeMethod, setSelectedIncomeMethod] = useState(null);
@@ -57,13 +58,53 @@ function ViewLaporan({
     return found?.label || normalizedKey;
   };
 
-  const incomeBreakdown = paymentMethods.length
-    ? paymentMethods.map((m) => {
-        const mTrxs = shiftTrx.filter((t) => t.metodeBayar === m.key);
-        const total = mTrxs.reduce((sum, t) => sum + Number(t.total || 0), 0);
-        return { label: m.label, total, count: mTrxs.length, items: mTrxs };
-      }).filter((item) => item.total > 0)
-    : [{ label: "Tidak ada metode bayar", total: rev, count: shiftTrx.length, items: shiftTrx }];
+  const resolvePaymentMethodLabel = (trx) => {
+    const key = String(trx?.metodeBayar || "cash").trim();
+    const transactionLabel = String(trx?.metodeBayarLabel || "").trim();
+    if (transactionLabel) return transactionLabel;
+
+    const methodFromSettings = paymentMethods.find((m) => String(m.key || "").trim() === key);
+    if (methodFromSettings?.label) return methodFromSettings.label;
+
+    try {
+      const savedSettings = JSON.parse(localStorage.getItem("ykk_settings") || "{}");
+      const savedMethod = (savedSettings?.paymentMethods || []).find((m) => String(m.key || "").trim() === key);
+      if (savedMethod?.label) return savedMethod.label;
+    } catch (_) {
+      // ignore missing localStorage in non-browser/test contexts
+    }
+
+    const defaults = {
+      cash: "Tunai",
+      "debit-bca": "Debit BCA",
+      "debit-bni": "Debit BNI",
+      "qris-bca": "QRIS BCA",
+      "qris-bni": "QRIS BNI",
+      "transfer-bca": "Debit BCA",
+      qris: "QRIS BCA",
+    };
+
+    return defaults[key] || key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  };
+
+  const incomeBreakdown = shiftTrx.length
+    ? shiftTrx.reduce((acc, trx) => {
+        const key = String(trx?.metodeBayar || "cash").trim();
+        const label = resolvePaymentMethodLabel(trx);
+        const existing = acc.find((entry) => entry.key === key || entry.label === label);
+        const total = Number(trx.total || 0);
+
+        if (existing) {
+          existing.total += total;
+          existing.count += 1;
+          existing.items.push(trx);
+          return acc;
+        }
+
+        acc.push({ key, label, total, count: 1, items: [trx] });
+        return acc;
+      }, []).filter((item) => item.total > 0)
+    : [{ key: "none", label: "Tidak ada metode bayar", total: rev, count: shiftTrx.length, items: shiftTrx }];
 
   const expenseEntries = selectedShiftList.flatMap((shift) => (shift?.expenses || []).map((item) => {
     const categoryKey = String(item?.kategori || item?.category || "lainnya");
@@ -99,7 +140,7 @@ function ViewLaporan({
         </div>
         <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",justifyContent:"flex-end"}}>
           <button onClick={onOpenCashModal} style={{padding:"8px 12px",background:"#e8f5ee",color:G,border:`1px solid #a8d5b8`,borderRadius:8,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700}}>
-            Total Kas: {fmt(cashBalance)}
+            Total Kas Shift ini: {fmt(cashBalance)}
           </button>
           <button onClick={onOpenExpenseModal} style={{padding:"8px 12px",background:W,color:G,border:`1px solid ${BD}`,borderRadius:8,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700}}>
             Masukan Pengeluaran
@@ -232,7 +273,7 @@ function ViewLaporan({
               {(incomeBreakdown.find((item) => item.label === selectedIncomeMethod)?.items || []).map((trx, idx) => (
                 <div key={`${trx.id || idx}-${trx.createdAt || idx}`} style={{background:"#eef8f0", border:`1px solid #cfead6`, borderRadius:8, padding:"10px 12px"}}>
                   <div style={{fontSize:9,color:MT,marginBottom:4}}>{trx.hari || "-"} · {trx.tgl || "-"} {trx.bln || "-"} {trx.thn || ""}</div>
-                  <div style={{fontSize:12,fontWeight:700,color:TX}}>{trx.metodeBayar || selectedIncomeMethod}</div>
+                  <div style={{fontSize:12,fontWeight:700,color:TX}}>{resolvePaymentMethodLabel(trx)}</div>
                   <div style={{fontSize:11,color:G, fontWeight:700, marginTop:4}}>{fmt(Number(trx.total || 0))}</div>
                 </div>
               ))}

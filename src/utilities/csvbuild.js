@@ -11,11 +11,23 @@ const getCategoryLabel = (catKey, categories = []) => {
 };
 
 // Helper to get payment method label from key
-const getPaymentMethodLabel = (key, paymentMethods = []) => {
+const getPaymentMethodLabel = (key, paymentMethods = [], fallbackLabel = "") => {
+  const normalizedKey = key || "cash";
   if (paymentMethods && paymentMethods.length) {
-    const found = paymentMethods.find(m => m.key === key);
-    if (found) return found.label;
+    const found = paymentMethods.find(m => String(m.key || "").trim() === String(normalizedKey).trim());
+    if (found?.label) return found.label;
   }
+  if (fallbackLabel && String(fallbackLabel).trim()) return String(fallbackLabel).trim();
+
+  try {
+    const savedSettings = JSON.parse(localStorage.getItem("ykk_settings") || "{}");
+    const savedMethods = Array.isArray(savedSettings?.paymentMethods) ? savedSettings.paymentMethods : [];
+    const foundSaved = savedMethods.find(m => String(m.key || "").trim() === String(normalizedKey).trim());
+    if (foundSaved?.label) return foundSaved.label;
+  } catch (_) {
+    // ignore localStorage access errors in non-browser/test contexts
+  }
+
   // Fallback to defaults
   const defaults = {
     "cash": "Tunai",
@@ -26,7 +38,7 @@ const getPaymentMethodLabel = (key, paymentMethods = []) => {
     "transfer-bca": "Debit BCA",
     "qris": "QRIS BCA"
   };
-  return defaults[key] ?? key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  return defaults[normalizedKey] ?? String(normalizedKey).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 };
 
 function csvByDay(trxs, header, rowFn, at) {
@@ -48,7 +60,7 @@ function trxRow(t, at, categories = [], paymentMethods = []) {
   const {total}=calcPrice(t.subtotal);
   return t.items.map(item=>{
     const subJ=item.harga*item.qty; const subM=(item.modal||0)*item.qty;
-    const metodeLabel = getPaymentMethodLabel(t.metodeBayar || "cash", paymentMethods);
+    const metodeLabel = getPaymentMethodLabel(t.metodeBayar || "cash", paymentMethods, t.metodeBayarLabel);
     const catLabel = getCategoryLabel(item.kategori, categories);
     return [t.id,t.hari,`${t.tgl} ${t.bln} ${t.thn}`,`${t.jam}:${t.mnt}:${t.dtk}`,metodeLabel,`"${item.nama}"`,catLabel,item.qty,item.harga,item.modal||0,subJ,subM,subJ-subM,t.subtotal,total,t.bayar||0,t.kembalian||0,at].join(",");
   });
@@ -137,17 +149,35 @@ function csvStok(menuList, categories = [], at) {
 }
 
 function csvMetodeBayar(trxs, at, paymentMethods = []) {
-  // Use dynamic payment methods from settings, fallback to defaults
-  const METHODS = paymentMethods.length > 0 
-    ? paymentMethods.map(m => m.key)
-    : ["cash","debit-bca","debit-bni","qris-bca","qris-bni"];
-  const LABELS_M = paymentMethods.length > 0
-    ? Object.fromEntries(paymentMethods.map(m => [m.key, m.label]))
-    : {"cash":"Tunai","debit-bca":"Debit BCA","debit-bni":"Debit BNI","qris-bca":"QRIS BCA","qris-bni":"QRIS BNI","transfer-bca":"Debit BCA","qris":"QRIS BCA"};
-  const normalize = m => m==="transfer-bca"?"debit-bca":m==="qris"?"qris-bca":m;
+  const normalize = m => {
+    if (!m || typeof m !== "string") return "cash";
+    return m === "transfer-bca" ? "debit-bca" : m === "qris" ? "qris-bca" : m;
+  };
 
-  // Helper to get label, never show raw key
-  const getLabel = (key) => LABELS_M[key] ?? key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  const seenMethods = new Set();
+  trxs.forEach(t => {
+    const key = normalize(t.metodeBayar);
+    seenMethods.add(key);
+  });
+
+  const METHODS = [
+    ...new Set([
+      ...paymentMethods.map(m => normalize(m.key)),
+      ...Array.from(seenMethods),
+      "cash",
+      "debit-bca",
+      "debit-bni",
+      "qris-bca",
+      "qris-bni",
+    ])
+  ];
+
+  const LABELS_M = Object.fromEntries([
+    ...paymentMethods.map(m => [normalize(m.key), m.label]),
+    ...trxs.map(t => [normalize(t.metodeBayar), getPaymentMethodLabel(t.metodeBayar, paymentMethods, t.metodeBayarLabel)])
+  ]);
+
+  const getLabel = (key) => LABELS_M[key] ?? getPaymentMethodLabel(key, paymentMethods);
 
   // Per hari per metode
   const byDay = {};
