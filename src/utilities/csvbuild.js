@@ -54,28 +54,37 @@ function trxRow(t, at, categories = [], paymentMethods = []) {
   });
 }
 
-const LAP_HEADER = "Hari,Tanggal,Jumlah Trx,Pendapatan Kotor (Rp),Total Bersih (Rp),Total Modal (Rp),Laba Kotor (Rp),Keterangan,Waktu Unduh";
+const LAP_HEADER = "Hari,Tanggal,Jumlah Trx,Pendapatan Kotor (Rp),Total Bersih (Rp),Total Modal Item (Rp),Laba Kotor (Rp),Kas Awal (Rp),Total Pengeluaran (Rp),Kas Akhir (Rp),Laba Bersih (Rp),Keterangan,Waktu Unduh";
 function lapRow(t) { return [t]; } // placeholder, grouped below
 
-function csvLaporan(trxs, at) {
+function csvLaporan(trxs, at, meta = {}) {
   const byDay={};
+  const openingCash = Number(meta.openingCash || 0);
+  const totalExpenses = Number(meta.totalExpenses || 0);
+
   trxs.forEach(t=>{
     const k=`${t.hari}||${t.tgl} ${t.bln} ${t.thn}`;
     if(!byDay[k]) byDay[k]={hari:t.hari,tgl:`${t.tgl} ${t.bln} ${t.thn}`,trx:0,pendapatan:0,modal:0};
     byDay[k].trx++;
-    byDay[k].pendapatan+=t.total; // total includes everything
+    byDay[k].pendapatan+=t.total;
     t.items.forEach(i=>{byDay[k].modal+=(i.modal||0)*i.qty;});
   });
+
   const rows=Object.values(byDay).map(d=>{
-    const bersih=d.pendapatan;
-    const laba=bersih-d.modal;
-    const ket=d.modal===0?"Modal belum diinput":laba>=0?"LABA":"RUGI";
-    return [d.hari,d.tgl,d.trx,d.pendapatan,bersih,d.modal,laba,ket,at].join(",");
+    const totalRevenue = d.pendapatan;
+    const grossProfit = totalRevenue - d.modal;
+    const cashFinal = openingCash + grossProfit - totalExpenses;
+    const ket = d.modal === 0 ? "Modal belum diinput" : cashFinal >= 0 ? "LABA" : "RUGI";
+    return [d.hari,d.tgl,d.trx,d.pendapatan,totalRevenue,d.modal,grossProfit,openingCash,totalExpenses,cashFinal,grossProfit-totalExpenses,ket,at].join(",");
   });
+
   const tot={trx:0,pend:0,mod:0};
   trxs.forEach(t=>{tot.trx++;tot.pend+=t.total;t.items.forEach(i=>{tot.mod+=(i.modal||0)*i.qty;});});
-  const totBersih=tot.pend; const totLaba=totBersih-tot.mod;
-  rows.push(["TOTAL","",tot.trx,tot.pend,totBersih,tot.mod,totLaba,tot.mod===0?"Modal belum diinput":totLaba>=0?"LABA":"RUGI",at].join(","));
+  const totGross = tot.pend;
+  const totGrossProfit = totGross - tot.mod;
+  const totCashFinal = openingCash + totGrossProfit - totalExpenses;
+  const totNetProfit = totGrossProfit - totalExpenses;
+  rows.push(["TOTAL","",tot.trx,tot.pend,totGross,tot.mod,totGrossProfit,openingCash,totalExpenses,totCashFinal,totNetProfit,tot.mod===0?"Modal belum diinput":totCashFinal>=0?"LABA":"RUGI",at].join(","));
   return [LAP_HEADER,...rows].join("\n");
 }
 

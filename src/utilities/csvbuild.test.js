@@ -175,6 +175,17 @@ describe("csvbuild.js - CSV Generator Utilities", () => {
       expect(csv).toContain("RUGI");
     });
 
+    it("should include starting cash and expenses in the financial summary export", () => {
+      const csv = csvLaporan([sampleTrx1, sampleTrx2], timeDownload, {
+        openingCash: 150000,
+        totalExpenses: 25000,
+      });
+      expect(csv).toContain("Kas Awal");
+      expect(csv).toContain("Total Pengeluaran");
+      expect(csv).toContain("150000");
+      expect(csv).toContain("25000");
+    });
+
     it("should handle zero pax without divide-by-zero error", () => {
       const zeroPaxTrx = { ...sampleTrx1, pax: 0 };
       const csv = csvLaporan([zeroPaxTrx], timeDownload);

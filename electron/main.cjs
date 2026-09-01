@@ -721,7 +721,12 @@ function injectReceiptPrintCSS(rawHtml = "", paperWidthMm = DEFAULT_PAPER_WIDTH_
       word-break: break-word !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
-    }
+    } 
+      .item, .totals, .section, .payment-note, .footer-note 
+      { 
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+      }
   </style>`;
 
   if (/<\/body>/i.test(rawHtml)) return rawHtml.replace(/<\/body>/i, `${css}</body>`);
@@ -758,7 +763,10 @@ ipcMain.handle("print-receipt", (_e, { html, printerName, paperWidthMm }) => {
               printBackground: true,
               preferCSSPageSize: true, // use @page{size:210mm 297mm} verbatim, no scale-to-fit
               scale: 1,
-              margins: { marginType: "none" },
+              margins: { 
+                top: 0, bottom: 0, left: 0, 
+                right: (PAGE_WIDTH_MM - paperW) / 25.4, 
+               },
             });
 
             const { filePath, canceled } = await dialog.showSaveDialog(win, {

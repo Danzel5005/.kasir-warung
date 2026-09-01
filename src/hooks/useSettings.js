@@ -9,6 +9,14 @@ const DEFAULT_PAYMENT_METHODS = [
   { key: "qris-bni", label: "QRIS BNI", category: "qris" },
 ];
 
+const DEFAULT_EXPENSE_CATEGORIES = [
+  { key: "operasional", label: "Operasional" },
+  { key: "bahan-baku", label: "Bahan Baku" },
+  { key: "listrik", label: "Listrik" },
+  { key: "transport", label: "Transport" },
+  { key: "lainnya", label: "Lainnya" },
+];
+
 // useSettings — logo, settings (printer, payment methods), modals.
 // Tidak depend ke hook lain. Expose `printHTML(html)` generik supaya
 // useCart/useHistory bisa cetak tanpa import hook ini langsung — mereka
@@ -20,6 +28,7 @@ function useSettings({ toast_, onChange }) {
     printerName: "", 
     paymentMethods: DEFAULT_PAYMENT_METHODS,
     receiptAdditionals: DEFAULT_RECEIPT_ADDITIONALS,
+    expenseCategories: DEFAULT_EXPENSE_CATEGORIES,
     warungName: "",
     warungAddress: "",
     warungPhone: "",
@@ -29,6 +38,7 @@ function useSettings({ toast_, onChange }) {
   const [printerModal, setPrinterModal] = useState(false);
   const [printerList, setPrinterList]   = useState([]);
   const [newPaymentLabel, setNewPaymentLabel] = useState("");
+  const [newExpenseCategoryLabel, setNewExpenseCategoryLabel] = useState("");
   const [newReceiptFieldLabel, setNewReceiptFieldLabel] = useState("");
   const [newReceiptFieldType, setNewReceiptFieldType] = useState("text");
   const [warungNameInput, setWarungNameInput] = useState("");
@@ -62,6 +72,9 @@ function useSettings({ toast_, onChange }) {
     // Ensure receiptAdditionals exist; if not, use defaults
     if (!s.receiptAdditionals || !Array.isArray(s.receiptAdditionals) || s.receiptAdditionals.length === 0) {
       s.receiptAdditionals = DEFAULT_RECEIPT_ADDITIONALS;
+    }
+    if (!s.expenseCategories || !Array.isArray(s.expenseCategories) || s.expenseCategories.length === 0) {
+      s.expenseCategories = DEFAULT_EXPENSE_CATEGORIES;
     }
     // Ensure new fields exist
     if (!s.warungAddress) s.warungAddress = "";
@@ -159,6 +172,29 @@ function useSettings({ toast_, onChange }) {
     await api.saveSettings(s);
     setSettings(s);
     toast_("Metode pembayaran dihapus", "ok");
+  }, [settings, toast_]);
+
+  const addExpenseCategory = useCallback(async () => {
+    const label = newExpenseCategoryLabel.trim();
+    if (!label) { toast_("Nama kategori pengeluaran wajib diisi", "err"); return; }
+    if (settings.expenseCategories.some(c => c.label.toLowerCase() === label.toLowerCase())) {
+      toast_("Kategori pengeluaran sudah ada", "err"); return;
+    }
+    const newCategory = { key: `expense_${Date.now()}`, label };
+    const updated = [...settings.expenseCategories, newCategory];
+    const s = { ...settings, expenseCategories: updated };
+    await api.saveSettings(s);
+    setSettings(s);
+    setNewExpenseCategoryLabel("");
+    toast_(`Kategori "${label}" ditambahkan`, "ok");
+  }, [settings, newExpenseCategoryLabel, toast_]);
+
+  const deleteExpenseCategory = useCallback(async (key) => {
+    const updated = settings.expenseCategories.filter(c => c.key !== key);
+    const s = { ...settings, expenseCategories: updated };
+    await api.saveSettings(s);
+    setSettings(s);
+    toast_("Kategori pengeluaran dihapus", "ok");
   }, [settings, toast_]);
 
   // ── QRIS Image Upload ─────────────────────────────────────────────────────────
@@ -299,9 +335,11 @@ function useSettings({ toast_, onChange }) {
   }, [settings, toast_]);
 
   return {
-    logo, settings, settingsModal, setSettingsModal,
+    logo, settings, setSettings,
+    settingsModal, setSettingsModal,
     printerModal, printerList, logoRef,
     newPaymentLabel, setNewPaymentLabel,
+    newExpenseCategoryLabel, setNewExpenseCategoryLabel,
     newReceiptFieldLabel, setNewReceiptFieldLabel,
     newReceiptFieldType, setNewReceiptFieldType,
     warungNameInput, setWarungNameInput,
@@ -310,6 +348,7 @@ function useSettings({ toast_, onChange }) {
     loadInitial, handleLogoUpload, handleLogoRemove, printHTML,
     openPrinterModal, selectPrinter, setPrinterModal,
     addPaymentMethod, deletePaymentMethod,
+    addExpenseCategory, deleteExpenseCategory,
     handleQrisImageUpload, deleteQrisImage,
     toggleReceiptAdditionalRequired, deleteReceiptAdditional, addReceiptField,
     setWarungName, setWarungAddress, setWarungPhone,

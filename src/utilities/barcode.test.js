@@ -20,4 +20,10 @@ describe("barcode lookup helpers", () => {
     const menu = [{ id: "m-1", menuId: "M-1001", nama: "Kopi Susu" }];
     expect(findMenuByMenuId(menu, "NOT-FOUND")).toBeNull();
   });
+
+  it("does not treat item names as menu IDs for auto-add behavior", () => {
+    const menu = [{ id: "m-1", menuId: "M-1001", nama: "Kopi Susu" }];
+    expect(findMenuByMenuId(menu, "Kopi Susu")).toBeNull();
+    expect(findMenuByMenuId(menu, "M-1001")).toEqual(menu[0]);
+  });
 });

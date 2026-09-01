@@ -34,7 +34,7 @@ function useAuth({ getNow, toast_ }) {
   // hari ini (shiftNum) akan selalu dihitung dari snapshot shifts kosong.
   const doLogin = useCallback(async () => {
     const u = users.find(u => u.username === loginForm.username.trim() && u.password === loginForm.password);
-    if (!u) { setLoginForm(f => ({ ...f, error: "Username atau password salah" })); return; }
+    if (!u) { setLoginForm(f => ({ ...f, error: "Username atau password salah" })); return false; }
     const t = getNow();
     const todayKey = `${t.tgl}-${t.blnNum}-${t.thn}`;
     const todayShifts = shifts.filter(s => s.dateKey === todayKey);
@@ -51,6 +51,8 @@ function useAuth({ getNow, toast_ }) {
       operator: u.nama,
       username: u.username,
       status: "open",
+      openingCash: 0,
+      expenses: [],
     };
     const next = [...shifts, shift];
     await api.saveShifts(next);
@@ -60,7 +62,18 @@ function useAuth({ getNow, toast_ }) {
     // Simpan user yang login saat ini (untuk cek hak admin saat kelola pengguna)
     setCurrentUser(u);
     setLoginForm({ username: "", password: "", error: "" });
+    return true;
   }, [loginForm, users, shifts, getNow]);
+
+  const updateShift = useCallback(async (shiftId, patch) => {
+    if (!shiftId) return false;
+    const next = shifts.map(s => s.id === shiftId ? { ...s, ...patch } : s);
+    await api.saveShifts(next);
+    setShifts(next);
+    setActiveShift(current => current && current.id === shiftId ? { ...current, ...patch } : current);
+    setSelectedShiftId(current => current === shiftId ? shiftId : current);
+    return true;
+  }, [shifts]);
 
   // onShiftClosed: {clearCart} — dipass dari App.jsx SAAT DIPANGGIL
   // (argumen panggilan, bukan closure dependency), jadi TIDAK masuk deps array.
@@ -124,7 +137,7 @@ function useAuth({ getNow, toast_ }) {
   return {
     activeShift, shifts, loginForm, closingShift, selectedShiftId, users, currentUser,
     setLoginForm, setClosingShift, setSelectedShiftId,
-    loadInitial, doLogin, confirmCloseShift,
+    loadInitial, doLogin, updateShift, confirmCloseShift,
     addUser, deleteUser,
   };
 }

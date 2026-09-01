@@ -111,7 +111,7 @@ function AppSkeleton() {
 }
 
 // ─── MAIN APP (coordinator) ───────────────────────────────────────────────
-export default function Kasir() {
+function KasirWorkspace() {
   // ── Hooks: panggil semua di sini, App.jsx jadi satu-satunya tempat yang
   // tahu seluruh data flow antar domain. Tidak ada hook yang import hook lain.
   const toastH    = useToast();
@@ -145,6 +145,11 @@ export default function Kasir() {
   const [loginTransitioning, setLoginTransitioning] = useState(false); // keeps login screen visible during loader
   const [licenseTransitioning, setLicenseTransitioning] = useState(false); // keeps license screen visible during loader
   const [showPw, setShowPw] = useState(false); // hold-to-show password
+  const [openingCashModal, setOpeningCashModal] = useState(false);
+  const [openingCashInput, setOpeningCashInput] = useState("");
+  const [expenseModal, setExpenseModal] = useState(false);
+  const [expenseForm, setExpenseForm] = useState({ deskripsi: "", kategori: "operasional", jumlah: "" });
+  const [expenseCategoryDraft, setExpenseCategoryDraft] = useState("");
 
   // ── Shared login handler (button click + Enter key)
   const handleLogin = useCallback(async () => {
@@ -152,11 +157,48 @@ export default function Kasir() {
     setSnakeLoaderTrigger("login");
     setShowSnakeLoader(true);
     setLoginTransitioning(true);
-    await authH.doLogin();
+    const ok = await authH.doLogin();
     await new Promise(r => setTimeout(r, 1200));
     setShowSnakeLoader(false);
     setLoginTransitioning(false);
+    if (ok) setOpeningCashModal(true);
   }, [authH, showSnakeLoader])
+
+  const handleSaveOpeningCash = useCallback(async () => {
+    if (!authH.activeShift) return;
+    const value = Number(String(openingCashInput).replace(/[^\d]/g, "")) || 0;
+    await authH.updateShift(authH.activeShift.id, { openingCash: value });
+    setOpeningCashInput("");
+    setOpeningCashModal(false);
+    toastH.toast_("Uang kas berhasil disimpan", "ok");
+  }, [authH, openingCashInput, toastH]);
+
+  const handleSkipOpeningCash = useCallback(() => {
+    setOpeningCashInput("");
+    setOpeningCashModal(false);
+  }, []);
+
+  const handleSaveExpense = useCallback(async () => {
+    if (!authH.activeShift || !expenseForm.deskripsi.trim() || !expenseForm.jumlah) return;
+    const amount = Number(String(expenseForm.jumlah).replace(/[^\d]/g, "")) || 0;
+    const nextExpense = {
+      id: `exp_${Date.now()}`,
+      deskripsi: expenseForm.deskripsi.trim(),
+      kategori: expenseForm.kategori,
+      jumlah: amount,
+      createdAt: new Date().toISOString(),
+    };
+    const currentExpenses = Array.isArray(authH.activeShift?.expenses) ? authH.activeShift.expenses : [];
+    await authH.updateShift(authH.activeShift.id, { expenses: [...currentExpenses, nextExpense] });
+    setExpenseForm({ deskripsi: "", kategori: "operasional", jumlah: "" });
+    setExpenseModal(false);
+    toastH.toast_("Pengeluaran berhasil ditambahkan", "ok");
+  }, [authH, expenseForm, toastH]);
+
+  const expenseCategories = settingsH.settings.expenseCategories || [];
+  const currentShiftExpenses = Array.isArray(authH.activeShift?.expenses) ? authH.activeShift.expenses : [];
+  const totalExpenses = currentShiftExpenses.reduce((sum, item) => sum + Number(item.jumlah || 0), 0);
+  const openingCash = Number(authH.activeShift?.openingCash || 0);
 
   // ── Receipt & Pay modal — UI state yang menjembatani cart+history, tetap di App.jsx
   const [payModal, setPayModal] = useState(false);
@@ -208,7 +250,9 @@ export default function Kasir() {
     };
 
     const onKeyDown = (e) => {
+      const targetTag = e.target?.tagName || "";
       if (e.ctrlKey || e.altKey || e.metaKey) return;
+      if (targetTag === "INPUT" || targetTag === "TEXTAREA" || targetTag === "SELECT" || e.target?.isContentEditable) return;
       if (e.key === "Enter") {
         flushScan();
         return;
@@ -366,14 +410,15 @@ const executeConfirmDel = useCallback(() => {
   const at = historyH.at;
   const doCSV = historyH.doCSV;
 
-  // ─── LOADING ──────────────────────────────────────────────────────────────────
-  if(licenseH.licenseStatus===null) return <AppSkeleton />;
+  const showLicenseScreen = licenseH.licenseStatus !== null && (!licenseH.licenseStatus.valid || licenseTransitioning);
+  const showLoginScreen = licenseH.licenseStatus !== null && (!authH.activeShift || loginTransitioning);
 
-  // ─── AKTIVASI LICENSE ─────────────────────────────────────────────────────────
-  // Show license screen during transition even if license becomes valid
-  const showLicenseScreen = !licenseH.licenseStatus.valid || licenseTransitioning;
-  if(showLicenseScreen){
-    return(
+  let content;
+
+  if (licenseH.licenseStatus === null) {
+    content = <AppSkeleton />;
+  } else if (showLicenseScreen) {
+    content = (
       <div style={{minHeight:"100vh",background:`linear-gradient(135deg,${G} 0%,#0f3d24 100%)`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Segoe UI',sans-serif"}}>
         <div style={{background:W,borderRadius:18,padding:"36px 32px",width:400,maxWidth:"95vw",boxShadow:"0 24px 80px rgba(0,0,0,0.4)"}}>
           <div style={{textAlign:"center",marginBottom:24}}>
@@ -381,7 +426,6 @@ const executeConfirmDel = useCallback(() => {
             <div style={{fontSize:11,color:MT,marginTop:3}}>Software Kasir</div>
           </div>
 
-          {/* Hardware ID */}
           <div style={{background:LT,border:`1px solid ${BD}`,borderRadius:10,padding:"13px 15px",marginBottom:18}}>
             <div style={{fontSize:10,color:MT,fontWeight:600,marginBottom:6}}>HARDWARE ID PERANGKAT INI</div>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -393,7 +437,6 @@ const executeConfirmDel = useCallback(() => {
             <div style={{fontSize:10,color:MT,marginTop:8,lineHeight:1.6}}>Kirim kode ini ke penjual via WhatsApp/email untuk mendapat License Key.</div>
           </div>
 
-          {/* Input key */}
           <div style={{marginBottom:12}}>
             <label style={{fontSize:10,color:MT,fontWeight:600,display:"block",marginBottom:5}}>LICENSE KEY</label>
             <input autoFocus value={licenseH.licKey} onChange={e=>{licenseH.setLicKey(e.target.value.toUpperCase());licenseH.setLicErr("");}}
@@ -404,122 +447,113 @@ const executeConfirmDel = useCallback(() => {
             {licenseH.licErr&&<div style={{color:"#e84040",fontSize:11,fontWeight:600,marginTop:5}}>❌ {licenseH.licErr}</div>}
           </div>
           <div style={{ position: "relative", width: "100%" }}>
-          <button
-            onClick={async () => { 
-              setSnakeLoaderTrigger("license"); 
-              setShowSnakeLoader(true); 
-              setLicenseTransitioning(true);
-              await licenseH.doActivate();
-              // Wait minimum duration before hiding loader
-              await new Promise(r => setTimeout(r, 1200));
-              setShowSnakeLoader(false);
-              setLicenseTransitioning(false);
-            }}
-            disabled={!licenseH.licKey.trim()||licenseH.licLoad||showSnakeLoader}
-            style={{width:"100%",padding:13,background:licenseH.licKey.trim()&&!licenseH.licLoad&&!showSnakeLoader?G:"#aaa",color:W,border:"none",borderRadius:9,cursor:licenseH.licKey.trim()&&!licenseH.licLoad&&!showSnakeLoader?"pointer":"not-allowed",fontFamily:"inherit",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>
-            {showSnakeLoader && snakeLoaderTrigger === "license" ? <SnakeLoader visible={true} minDuration={1200} size={24} color="#fff" /> : (licenseH.licLoad?"Memvalidasi...":"Aktifkan Software")}
-          </button>
-        </div>
+            <button
+              onClick={async () => { 
+                setSnakeLoaderTrigger("license"); 
+                setShowSnakeLoader(true); 
+                setLicenseTransitioning(true);
+                await licenseH.doActivate();
+                await new Promise(r => setTimeout(r, 1200));
+                setShowSnakeLoader(false);
+                setLicenseTransitioning(false);
+              }}
+              disabled={!licenseH.licKey.trim()||licenseH.licLoad||showSnakeLoader}
+              style={{width:"100%",padding:13,background:licenseH.licKey.trim()&&!licenseH.licLoad&&!showSnakeLoader?G:"#aaa",color:W,border:"none",borderRadius:9,cursor:licenseH.licKey.trim()&&!licenseH.licLoad&&!showSnakeLoader?"pointer":"not-allowed",fontFamily:"inherit",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}
+            >
+              {showSnakeLoader && snakeLoaderTrigger === "license" ? <SnakeLoader visible={true} minDuration={1200} size={24} color="#fff" /> : (licenseH.licLoad?"Memvalidasi...":"Aktifkan Software")}
+            </button>
+          </div>
           <div style={{textAlign:"center",marginTop:16,fontSize:10,color:MT,lineHeight:1.7}}>
             License terikat ke perangkat ini.<br/>Pindah PC? Hubungi penjual untuk reset aktivasi.
           </div>
         </div>
       </div>
     );
-  }
-
-  // ─── LOGIN / START SHIFT SCREEN ─────────────────────────────────────────────
-  // Show login screen during transition even if shift becomes active
-  const showLoginScreen = !authH.activeShift || loginTransitioning;
-  if(showLoginScreen) return (
-    <div style={{minHeight:"100vh",background:`linear-gradient(135deg,${G} 0%,#0f3d24 100%)`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Segoe UI',sans-serif"}}>
-      <div style={{background:W,borderRadius:18,padding:"36px 32px",width:360,maxWidth:"95vw",boxShadow:"0 24px 80px rgba(0,0,0,0.4)"}}>
-        {/* Logo & Judul */}
-        <div style={{textAlign:"center",marginBottom:28}}>
-          {settingsH.logo&&<img src={settingsH.logo} alt="logo" style={{width:64,height:64,borderRadius:12,objectFit:"cover",marginBottom:10}}/>}
-          <div style={{fontSize:18,fontWeight:700,color:G}}>{settingsH.settings.warungName || "Warung"}</div>
-          <div style={{fontSize:12,color:MT,marginTop:2}}>Powered by DEN POS</div>
-        </div>
-
-        {/* Info shift terakhir */}
-        {authH.shifts.filter(s=>s.status==="closed").slice(-1).map(s=>(
-          <div key={s.id} style={{background:"#e8f5ee",border:"1px solid #a8d5b8",borderRadius:8,padding:"9px 12px",marginBottom:16,fontSize:10,color:"#1a5c38"}}>
-            <b>Shift terakhir:</b> Shift {s.shiftNum} · {s.hari} {s.tgl} {s.bln} {s.thn} · {s.startJam}–{s.endJam||"?"} · {s.operator}
+  } else if (showLoginScreen) {
+    content = (
+      <div style={{minHeight:"100vh",background:`linear-gradient(135deg,${G} 0%,#0f3d24 100%)`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Segoe UI',sans-serif"}}>
+        <div style={{background:W,borderRadius:18,padding:"36px 32px",width:360,maxWidth:"95vw",boxShadow:"0 24px 80px rgba(0,0,0,0.4)"}}>
+          <div style={{textAlign:"center",marginBottom:28}}>
+            {settingsH.logo&&<img src={settingsH.logo} alt="logo" style={{width:64,height:64,borderRadius:12,objectFit:"cover",marginBottom:10}}/>}
+            <div style={{fontSize:18,fontWeight:700,color:G}}>{settingsH.settings.warungName || "Warung"}</div>
+            <div style={{fontSize:12,color:MT,marginTop:2}}>Powered by DEN POS</div>
           </div>
-        ))}
 
-        {/* Form login */}
-        <div style={{marginBottom:11}}>
-          <label style={{fontSize:10,color:MT,fontWeight:600,display:"block",marginBottom:4}}>USERNAME</label>
-          <input
-            autoFocus
-            type="text" value={authH.loginForm.username}
-            onChange={e=>authH.setLoginForm(f=>({...f,username:e.target.value,error:""}))}
-            onKeyDown={e=>e.key==="Enter"&&document.getElementById("pw-input")?.focus()}
-            placeholder="Masukkan username..."
-            style={{width:"100%",padding:"10px 12px",boxSizing:"border-box",border:`1.5px solid ${authH.loginForm.error?"#e84040":BD}`,borderRadius:8,fontSize:13,fontFamily:"inherit",outline:"none",marginBottom:10}}
-          />
-          <label style={{fontSize:10,color:MT,fontWeight:600,display:"block",marginBottom:4}}>PASSWORD</label>
-          <div style={{position:"relative",width:"100%"}}>
+          {authH.shifts.filter(s=>s.status==="closed").slice(-1).map(s=>(
+            <div key={s.id} style={{background:"#e8f5ee",border:"1px solid #a8d5b8",borderRadius:8,padding:"9px 12px",marginBottom:16,fontSize:10,color:"#1a5c38"}}>
+              <b>Shift terakhir:</b> Shift {s.shiftNum} · {s.hari} {s.tgl} {s.bln} {s.thn} · {s.startJam}–{s.endJam||"?"} · {s.operator}
+            </div>
+          ))}
+
+          <div style={{marginBottom:11}}>
+            <label style={{fontSize:10,color:MT,fontWeight:600,display:"block",marginBottom:4}}>USERNAME</label>
             <input
-              id="pw-input"
-              type={showPw ? "text" : "password"}
-              value={authH.loginForm.password}
-              onChange={e=>authH.setLoginForm(f=>({...f,password:e.target.value,error:""}))}
-              onKeyDown={e=>e.key==="Enter"&&handleLogin()}
-              placeholder="Masukkan password..."
-              style={{width:"100%",padding:"10px 44px 10px 12px",boxSizing:"border-box",border:`1.5px solid ${authH.loginForm.error?"#e84040":BD}`,borderRadius:8,fontSize:13,fontFamily:"inherit",outline:"none"}}
+              autoFocus
+              type="text" value={authH.loginForm.username}
+              onChange={e=>authH.setLoginForm(f=>({...f,username:e.target.value,error:""}))}
+              onKeyDown={e=>e.key==="Enter"&&document.getElementById("pw-input")?.focus()}
+              placeholder="Masukkan username..."
+              style={{width:"100%",padding:"10px 12px",boxSizing:"border-box",border:`1.5px solid ${authH.loginForm.error?"#e84040":BD}`,borderRadius:8,fontSize:13,fontFamily:"inherit",outline:"none",marginBottom:10}}
             />
-            <button
-              type="button"
-              onMouseDown={() => setShowPw(true)}
-              onMouseUp={() => setShowPw(false)}
-              onMouseLeave={() => setShowPw(false)}
-              onTouchStart={(e) => { e.preventDefault(); setShowPw(true); }}
-              onTouchEnd={() => setShowPw(false)}
-              onTouchCancel={() => setShowPw(false)}
-              style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"transparent",border:"none",cursor:"pointer",padding:4,display:"flex",alignItems:"center",justifyContent:"center",color:MT}}
-              aria-label={showPw ? "Sembunyikan password" : "Tampilkan password"}
-            >
-              {showPw ? (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-              ) : (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              )}
-            </button>
-          </div>
-        </div>
-        {authH.loginForm.error&&<div style={{color:"#e84040",fontSize:11,fontWeight:600,marginBottom:10,textAlign:"center"}}>{authH.loginForm.error}</div>}
-        <div style={{ position: "relative", width: "100%" }}>
-          <button
-            onClick={handleLogin}
-            disabled={!authH.loginForm.username||!authH.loginForm.password||showSnakeLoader}
-            style={{width:"100%",padding:"12px",background:authH.loginForm.username&&authH.loginForm.password&&!showSnakeLoader?G:"#aaa",color:W,border:"none",borderRadius:9,cursor:authH.loginForm.username&&authH.loginForm.password&&!showSnakeLoader?"pointer":"not-allowed",fontFamily:"inherit",fontSize:13,fontWeight:700,transition:"background 0.2s",display:"flex",alignItems:"center",justifyContent:"center"}}
-          >
-            {showSnakeLoader && snakeLoaderTrigger === "login" ? <SnakeLoader visible={true} minDuration={1200} size={24} color="#fff" /> : "Mulai Shift"}
-          </button>
-        </div>
-
-        {/* Riwayat shift */}
-        {authH.shifts.length>0&&(
-          <div style={{marginTop:20}}>
-            <div style={{fontSize:10,color:MT,fontWeight:600,marginBottom:7}}>RIWAYAT SHIFT</div>
-            <div style={{maxHeight:140,overflowY:"auto",display:"flex",flexDirection:"column",gap:4}}>
-              {[...authH.shifts].reverse().slice(0,5).map(s=>(
-                <div key={s.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 10px",background:LT,borderRadius:6,fontSize:10}}>
-                  <span><b style={{color:G}}>Shift {s.shiftNum}</b> · {s.tgl} {s.bln} {s.thn}</span>
-                  <span style={{color:MT}}>{s.startJam}{s.endJam?`–${s.endJam}`:""} · {s.operator}</span>
-                </div>
-              ))}
+            <label style={{fontSize:10,color:MT,fontWeight:600,display:"block",marginBottom:4}}>PASSWORD</label>
+            <div style={{position:"relative",width:"100%"}}>
+              <input
+                id="pw-input"
+                type={showPw ? "text" : "password"}
+                value={authH.loginForm.password}
+                onChange={e=>authH.setLoginForm(f=>({...f,password:e.target.value,error:""}))}
+                onKeyDown={e=>e.key==="Enter"&&handleLogin()}
+                placeholder="Masukkan password..."
+                style={{width:"100%",padding:"10px 44px 10px 12px",boxSizing:"border-box",border:`1.5px solid ${authH.loginForm.error?"#e84040":BD}`,borderRadius:8,fontSize:13,fontFamily:"inherit",outline:"none"}}
+              />
+              <button
+                type="button"
+                onMouseDown={() => setShowPw(true)}
+                onMouseUp={() => setShowPw(false)}
+                onMouseLeave={() => setShowPw(false)}
+                onTouchStart={(e) => { e.preventDefault(); setShowPw(true); }}
+                onTouchEnd={() => setShowPw(false)}
+                onTouchCancel={() => setShowPw(false)}
+                style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"transparent",border:"none",cursor:"pointer",padding:4,display:"flex",alignItems:"center",justifyContent:"center",color:MT}}
+                aria-label={showPw ? "Sembunyikan password" : "Tampilkan password"}
+              >
+                {showPw ? (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                ) : (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                )}
+              </button>
             </div>
           </div>
-        )}
-      </div>
-    </div>
-  );
+          {authH.loginForm.error&&<div style={{color:"#e84040",fontSize:11,fontWeight:600,marginBottom:10,textAlign:"center"}}>{authH.loginForm.error}</div>}
+          <div style={{ position: "relative", width: "100%" }}>
+            <button
+              onClick={handleLogin}
+              disabled={!authH.loginForm.username||!authH.loginForm.password||showSnakeLoader}
+              style={{width:"100%",padding:"12px",background:authH.loginForm.username&&authH.loginForm.password&&!showSnakeLoader?G:"#aaa",color:W,border:"none",borderRadius:9,cursor:authH.loginForm.username&&authH.loginForm.password&&!showSnakeLoader?"pointer":"not-allowed",fontFamily:"inherit",fontSize:13,fontWeight:700,transition:"background 0.2s",display:"flex",alignItems:"center",justifyContent:"center"}}
+            >
+              {showSnakeLoader && snakeLoaderTrigger === "login" ? <SnakeLoader visible={true} minDuration={1200} size={24} color="#fff" /> : "Mulai Shift"}
+            </button>
+          </div>
 
-  // ─── RENDER ──────────────────────────────────────────────────────────────────
-  return (
+          {authH.shifts.length>0&&(
+            <div style={{marginTop:20}}>
+              <div style={{fontSize:10,color:MT,fontWeight:600,marginBottom:7}}>RIWAYAT SHIFT</div>
+              <div style={{maxHeight:140,overflowY:"auto",display:"flex",flexDirection:"column",gap:4}}>
+                {[...authH.shifts].reverse().slice(0,5).map(s=>(
+                  <div key={s.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 10px",background:LT,borderRadius:6,fontSize:10}}>
+                    <span><b style={{color:G}}>Shift {s.shiftNum}</b> · {s.tgl} {s.bln} {s.thn}</span>
+                    <span style={{color:MT}}>{s.startJam}{s.endJam?`–${s.endJam}`:""} · {s.operator}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  } else {
+    content = (
     <div
      style={{
       height:"100vh",
@@ -642,8 +676,11 @@ const executeConfirmDel = useCallback(() => {
             menu={menuH.menu}
             menuH={menuH}
             doCSV={doCSV} at={at}
-            paymentMethods={settingsH.settings.paymentMethods}
-          />
+            paymentMethods={settingsH.settings.paymentMethods}            expenseCategories={settingsH.settings.expenseCategories || []}
+            openingCash={openingCash}
+            totalExpenses={totalExpenses}
+            onOpenExpenseModal={() => setExpenseModal(true)}
+            onOpenCashModal={() => setOpeningCashModal(true)}          />
         )}
 
         {/* ══════ KELOLA MENU VIEW ════════════════════════════════════════ */}
@@ -699,6 +736,73 @@ const executeConfirmDel = useCallback(() => {
         <CloseShiftModal authH={authH} confirmCloseShift={confirmCloseShift} />
       )}
 
+      {/* ══ MODAL: MASUKAN UANG KAS ════════════════════════════════════════ */}
+      {openingCashModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(10,20,15,0.72)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 500 }}>
+          <div style={{ background: W, width: 420, maxWidth: "92vw", borderRadius: 16, padding: 24, boxShadow: "0 30px 80px rgba(0,0,0,0.3)" }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: G, marginBottom: 6 }}>Masukan Uang Kas</div>
+            <div style={{ fontSize: 12, color: MT, marginBottom: 18 }}>Masukkan jumlah uang kas awal saat mulai shift agar laporan bisa menghitung saldo kas.</div>
+            <label style={{ display: "block", fontSize: 11, color: MT, fontWeight: 700, marginBottom: 6 }}>Jumlah Kas (Rp)</label>
+            <input
+              autoFocus
+              type="text"
+              value={openingCashInput}
+              onChange={(e) => setOpeningCashInput(e.target.value.replace(/\D/g, ""))}
+              placeholder="0"
+              style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: 10, border: `1.5px solid ${BD}`, fontSize: 18, fontWeight: 700, fontFamily: "inherit", marginBottom: 18 }}
+            />
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button onClick={handleSkipOpeningCash} style={{ background: LT, color: TX, border: `1px solid ${BD}`, borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontFamily: "inherit", fontWeight: 700 }}>Lewati</button>
+              <button onClick={handleSaveOpeningCash} style={{ background: G, color: W, border: "none", borderRadius: 8, padding: "10px 18px", cursor: "pointer", fontFamily: "inherit", fontWeight: 700 }}>Simpan</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ MODAL: MASUKAN PENGELUARAN ══════════════════════════════════════ */}
+      {expenseModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(10,20,15,0.68)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 500 }}>
+          <div style={{ background: W, width: 500, maxWidth: "92vw", borderRadius: 16, padding: 24, boxShadow: "0 30px 80px rgba(0,0,0,0.3)" }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: G, marginBottom: 6 }}>Masukan Pengeluaran</div>
+            <div style={{ fontSize: 12, color: MT, marginBottom: 18 }}>Catat pengeluaran kas agar laporan keuangan menampilkan total pengeluaran dan laba bersih.</div>
+            <div style={{ display: "grid", gap: 14 }}>
+              <div>
+                <label style={{ display: "block", fontSize: 11, color: MT, fontWeight: 700, marginBottom: 6 }}>Deskripsi</label>
+                <input value={expenseForm.deskripsi} onChange={(e) => setExpenseForm(f => ({ ...f, deskripsi: e.target.value }))} placeholder="Contoh: Beli gula, bayar listrik, dll" style={{ width: "100%", boxSizing: "border-box", padding: "11px 12px", borderRadius: 10, border: `1.5px solid ${BD}`, fontSize: 13, fontFamily: "inherit" }} />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: 11, color: MT, fontWeight: 700, marginBottom: 6 }}>Kategori Pengeluaran</label>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                  {(expenseCategories.length ? expenseCategories : [{ key: "operasional", label: "Operasional" }]).map(cat => (
+                    <button key={cat.key} type="button" onClick={() => setExpenseForm(f => ({ ...f, kategori: cat.key }))} style={{ padding: "7px 10px", borderRadius: 8, border: expenseForm.kategori === cat.key ? `1.5px solid ${G}` : `1px solid ${BD}`, background: expenseForm.kategori === cat.key ? "#e8f5ee" : W, color: expenseForm.kategori === cat.key ? G : TX, fontFamily: "inherit", fontWeight: 700, cursor: "pointer" }}>{cat.label}</button>
+                  ))}
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input value={expenseCategoryDraft} onChange={(e) => setExpenseCategoryDraft(e.target.value)} placeholder="Tambah kategori baru" style={{ flex: 1, boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: `1.5px solid ${BD}`, fontSize: 12, fontFamily: "inherit" }} />
+                  <button type="button" onClick={async () => {
+                    const draft = expenseCategoryDraft.trim();
+                    if (!draft) return;
+                    const exists = expenseCategories.some(c => c.label.toLowerCase() === draft.toLowerCase());
+                    if (exists) { toastH.toast_("Kategori sudah ada", "err"); return; }
+                    settingsH.setNewExpenseCategoryLabel(draft);
+                    await settingsH.addExpenseCategory();
+                    setExpenseCategoryDraft("");
+                  }} style={{ padding: "10px 14px", border: "none", borderRadius: 8, background: G, color: W, fontFamily: "inherit", fontWeight: 700, cursor: "pointer" }}>Tambah</button>
+                </div>
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: 11, color: MT, fontWeight: 700, marginBottom: 6 }}>Jumlah Pengeluaran (Rp)</label>
+                <input value={expenseForm.jumlah} onChange={(e) => setExpenseForm(f => ({ ...f, jumlah: e.target.value.replace(/\D/g, "") }))} placeholder="0" style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: 10, border: `1.5px solid ${BD}`, fontSize: 18, fontWeight: 700, fontFamily: "inherit" }} />
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
+              <button onClick={() => setExpenseModal(false)} style={{ background: LT, color: TX, border: `1px solid ${BD}`, borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontFamily: "inherit", fontWeight: 700 }}>Batal</button>
+              <button onClick={handleSaveExpense} disabled={!expenseForm.deskripsi.trim() || !expenseForm.jumlah} style={{ background: expenseForm.deskripsi.trim() && expenseForm.jumlah ? G : "#a9b7b0", color: W, border: "none", borderRadius: 8, padding: "10px 18px", cursor: expenseForm.deskripsi.trim() && expenseForm.jumlah ? "pointer" : "not-allowed", fontFamily: "inherit", fontWeight: 700 }}>Simpan</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ══ MODAL: KONFIRMASI HAPUS ════════════════════════════════════════ */}
       {confirmDel && (
         <ConfirmDelModal confirmDel={confirmDel} setConfirmDel={setConfirmDel} executeConfirmDel={executeConfirmDel} />
@@ -719,5 +823,12 @@ const executeConfirmDel = useCallback(() => {
         </div>
       )}
     </div>
-  );
+    );
+  }
+
+  return content;
+}
+
+export default function Kasir() {
+  return <KasirWorkspace />;
 }
