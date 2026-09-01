@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
-contextBridge.exposeInMainWorld("kasirAPI", {
+const kasirAPI = {
   // Transactions
   loadTrx:     ()      => ipcRenderer.invoke("trx-load"),
   saveTrx:     (t)     => ipcRenderer.invoke("trx-save", t),
@@ -50,4 +50,12 @@ contextBridge.exposeInMainWorld("kasirAPI", {
   // Info
   getDataPath:  ()      => ipcRenderer.invoke("get-data-path"),
   processPayment: (data) => ipcRenderer.invoke("process-payment", data),
-});
+  onBarcodeScanned: (callback) => {
+    const listener = (_event, code) => callback(code);
+    ipcRenderer.on("barcode-scanned", listener);
+    return () => ipcRenderer.removeListener("barcode-scanned", listener);
+  },
+};
+
+contextBridge.exposeInMainWorld("kasirAPI", kasirAPI);
+contextBridge.exposeInMainWorld("api", kasirAPI);

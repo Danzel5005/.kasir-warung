@@ -26,10 +26,11 @@ export default function ItemModal({ menuH, photoRef, fmt: fmtProp }) {
 
         {/* Field teks */}
         {[
-          { l:"Nama Menu *",        k:"nama",  p:"Contoh: Kopi Susu Gula Aren" },
-          { l:"Harga Jual (Rp) *",  k:"harga", p:"Contoh: 50000" },
-          { l:"Harga Modal (Rp)",   k:"modal", p:"Untuk laporan laba/rugi" },
-          { l:"Deskripsi",          k:"desc",  p:"Contoh: Bestseller" },
+          { l:"Menu ID",            k:"menuId", p:"Contoh: M-1001" },
+          { l:"Nama Menu *",        k:"nama",   p:"Contoh: Kopi Susu Gula Aren" },
+          { l:"Harga Jual (Rp) *",  k:"harga",  p:"Contoh: 50000" },
+          { l:"Harga Modal (Rp)",   k:"modal",  p:"Untuk laporan laba/rugi" },
+          { l:"Deskripsi",          k:"desc",   p:"Contoh: Bestseller" },
         ].map(f => (
           <div key={f.k} style={{ marginBottom:8 }}>
             <label style={{ fontSize:TYPOGRAPHY.label.fontSize, color:MT, fontWeight:600, display:"block", marginBottom:3 }}>{f.l}</label>

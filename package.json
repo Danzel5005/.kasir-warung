@@ -14,16 +14,19 @@
     "build": "vite build",
     "test": "vitest run",
     "test:watch": "vitest",
+    "postinstall": "npx @electron/rebuild -f -w node-hid",
     "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
     "electron:build": "vite build && electron-builder --win"
   },
   "dependencies": {
     "better-sqlite3": "^11.8.1",
+    "node-hid": "^2.0.0",
     "node-machine-id": "^1.1.12",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@electron/rebuild": "^3.6.0",
     "@vitejs/plugin-react": "^4.3.1",
     "concurrently": "^8.2.2",
     "electron": "^31.7.7",

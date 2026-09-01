@@ -42,6 +42,44 @@ function activateLicense(inputKey) {
 
 const isDev = !app.isPackaged;
 const DATA_DIR = path.join(app.getPath("userData"), "data");
+let rawScanner = null;
+let HID = null;
+
+try {
+  HID = require("node-hid");
+} catch (err) {
+  console.warn("[Main] node-hid not available; using keyboard wedge only:", err.message);
+}
+
+function startRawScannerFallback(win) {
+  if (!HID || !win) return;
+
+  try {
+    const devices = HID.devices ? HID.devices() : [];
+    const candidate = devices.find((device) => {
+      const label = `${device.product || ""} ${device.manufacturer || ""} ${device.serialNumber || ""}`.toLowerCase();
+      return /scanner|barcode|reader|usb hid/i.test(label);
+    });
+
+    if (!candidate) {
+      console.warn("[Main] No raw HID scanner detected; keyboard wedge remains primary path");
+      return;
+    }
+
+    rawScanner = new HID.HID(candidate.vendorId, candidate.productId);
+    rawScanner.on("data", (chunk) => {
+      const code = Buffer.from(chunk).toString("utf8").replace(/[\r\n]+/g, "").trim();
+      if (!code) return;
+      win.webContents.send("barcode-scanned", code);
+    });
+    rawScanner.on("error", (err) => {
+      console.warn("[Main] Raw scanner error:", err?.message || err);
+    });
+    console.log("[Main] Raw HID barcode scanner connected:", candidate.product || "Unknown device");
+  } catch (err) {
+    console.warn("[Main] Raw HID scanner fallback unavailable:", err.message);
+  }
+}
 
 const FILES = {
   trx: path.join(DATA_DIR, "transactions.json"),
@@ -804,6 +842,7 @@ function createWindow() {
   
   mainWin.webContents.on('did-finish-load', () => {
     console.log('[Main] Page loaded successfully');
+    startRawScannerFallback(mainWin);
   });
   
   mainWin.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {

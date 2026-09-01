@@ -15,7 +15,7 @@ function useMenu({ toast_, addUndo }) {
   // modal tambah/edit item — murni milik domain menu
   const [itemModal, setItemModal]   = useState(false);
   const [editTarget, setEditTarget] = useState(null);
-  const [form, setForm] = useState({ nama: "", harga: "", modal: "", kategori: "kopi", desc: "", stok: "" });
+  const [form, setForm] = useState({ menuId: "", nama: "", harga: "", modal: "", kategori: "kopi", desc: "", stok: "" });
 
   // modal kelola kategori
   const [catModal, setCatModal]       = useState(false);
@@ -32,21 +32,22 @@ function useMenu({ toast_, addUndo }) {
 
   const displayMenu = useMemo(() => menu.filter(m => {
     const matchK = kategori === "semua" || m.kategori === kategori;
-    const matchQ = m.nama.toLowerCase().includes(search.toLowerCase());
+    const haystack = `${m.nama || ""} ${m.menuId || ""}`.toLowerCase();
+    const matchQ = haystack.includes(search.toLowerCase());
     return matchK && matchQ;
   }), [menu, kategori, search]);
 
   // ── Menu CRUD
   // PENTING: membaca cats[0] LANGSUNG dari closure. Wajib [cats] di deps.
   const openAdd = useCallback(() => {
-    setForm({ nama: "", harga: "", modal: "", kategori: cats[0]?.key || "kopi", desc: "", foto: null, stok: "" });
+    setForm({ menuId: "", nama: "", harga: "", modal: "", kategori: cats[0]?.key || "kopi", desc: "", foto: null, stok: "" });
     setEditTarget(null);
     setItemModal(true);
   }, [cats]);
 
   // deps kosong aman: `item` datang sebagai argumen panggilan, tidak baca state luar.
   const openEdit = useCallback((item) => {
-    setForm({ nama: item.nama, harga: String(item.harga), modal: String(item.modal || 0), kategori: item.kategori, desc: item.desc || "", stok: item.stok === null ? "" : String(item.stok) });
+    setForm({ menuId: item.menuId || "", nama: item.nama, harga: String(item.harga), modal: String(item.modal || 0), kategori: item.kategori, desc: item.desc || "", stok: item.stok === null ? "" : String(item.stok) });
     setEditTarget(item);
     setItemModal(true);
   }, []);
@@ -56,14 +57,24 @@ function useMenu({ toast_, addUndo }) {
   // selalu menyimpan data form dari render pertama (kosong/stale).
   const saveItem = useCallback(async () => {
     const nama = form.nama.trim();
+    const menuId = form.menuId.trim();
     const harga = parseInt(form.harga.replace(/\D/g, "")) || 0;
     const modal = parseInt(form.modal.replace(/\D/g, "")) || 0;
     if (!nama) { toast_("Nama wajib diisi", "err"); return; }
     if (harga <= 0) { toast_("Harga tidak valid", "err"); return; }
+
+    if (menuId) {
+      const duplicate = menu.some(item => {
+        if (editTarget && item.id === editTarget.id) return false;
+        return String(item.menuId || "").trim().toLowerCase() === menuId.toLowerCase();
+      });
+      if (duplicate) { toast_("Menu ID sudah dipakai", "err"); return; }
+    }
+
     const stok = form.stok === "" ? null : parseInt(form.stok) || 0;
     const next = editTarget
-      ? menu.map(m => m.id === editTarget.id ? { ...m, nama, harga, modal, kategori: form.kategori, desc: form.desc.trim(), stok } : m)
-      : [...menu, { id: `c_${Date.now()}`, nama, harga, modal, kategori: form.kategori, desc: form.desc.trim(), stok }];
+      ? menu.map(m => m.id === editTarget.id ? { ...m, menuId: menuId || undefined, nama, harga, modal, kategori: form.kategori, desc: form.desc.trim(), stok } : m)
+      : [...menu, { id: `c_${Date.now()}`, menuId: menuId || undefined, nama, harga, modal, kategori: form.kategori, desc: form.desc.trim(), stok }];
     await api.saveMenu(next); setMenu(next); setItemModal(false);
     toast_(`"${nama}" ${editTarget ? "diperbarui" : "ditambahkan"}`, "ok");
   }, [form, editTarget, menu, toast_]);
