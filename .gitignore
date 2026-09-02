@@ -23,6 +23,7 @@ license-key-generator-android/
 *.pem
 generator*
 API-Keys.md
+menuandcat.json
 
 # Logs
 logs

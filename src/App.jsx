@@ -155,14 +155,17 @@ function KasirWorkspace() {
   // ── Shared login handler (button click + Enter key)
   const handleLogin = useCallback(async () => {
     if (!authH.loginForm.username || !authH.loginForm.password || showSnakeLoader) return;
+
+    const ok = await authH.doLogin();
+    if (!ok) return;
+
     setSnakeLoaderTrigger("login");
     setShowSnakeLoader(true);
     setLoginTransitioning(true);
-    const ok = await authH.doLogin();
     await new Promise(r => setTimeout(r, 1200));
     setShowSnakeLoader(false);
     setLoginTransitioning(false);
-    if (ok) setOpeningCashModal(true);
+    setOpeningCashModal(true);
   }, [authH, showSnakeLoader])
 
   const handleSaveOpeningCash = useCallback(async () => {

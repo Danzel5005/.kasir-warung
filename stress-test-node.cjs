@@ -16,93 +16,652 @@ const fs = require('fs');
 // YOUR MENU ITEMS (from menu copy.js.txt)
 // ============================================
 const MENU_ITEMS = [
-  {id:"s1", nama:"Americano",               harga:40000,kategori:"kopi"},
-  {id:"s2", nama:"Doppio",                  harga:42000,kategori:"kopi"},
-  {id:"s3", nama:"Caffe Latte",             harga:50000,kategori:"kopi"},
-  {id:"s4", nama:"Cappucino",               harga:50000,kategori:"kopi"},
-  {id:"s5", nama:"Moccacino",               harga:45000,kategori:"kopi"},
-  {id:"s6", nama:"Thai Coffee",             harga:45000,kategori:"kopi"},
-  {id:"s7", nama:"Kopi Susu Gula Aren",     harga:50000,kategori:"kopi"},
-  {id:"s8", nama:"Kopi Susu",               harga:45000,kategori:"kopi"},
-  {id:"s9", nama:"Kopi Tarik",              harga:47000,kategori:"kopi"},
-  {id:"s10",nama:"Affogato",                harga:55000,kategori:"kopi"},
-  {id:"s11",nama:"House Tea",               harga:22000,kategori:"teh"},
-  {id:"s12",nama:"Lemon Tea",               harga:40000,kategori:"teh"},
-  {id:"s13",nama:"Lychee Tea",              harga:50000,kategori:"teh"},
-  {id:"s14",nama:"Teh Tarik",               harga:45000,kategori:"teh"},
-  {id:"s15",nama:"Thai Tea",                harga:45000,kategori:"teh"},
-  {id:"s16",nama:"Ice Chocolate",           harga:55000,kategori:"non-kopi"},
-  {id:"s17",nama:"Coca Cola Float",         harga:50000,kategori:"non-kopi"},
-  {id:"s18",nama:"Coca Cola/Fanta/Sprite",  harga:30000,kategori:"non-kopi"},
-  {id:"s19",nama:"Es Jeruk",                harga:40000,kategori:"non-kopi"},
-  {id:"s20",nama:"Mineral Water",           harga:22000,kategori:"non-kopi"},
-  {id:"s21",nama:"Wedang Uwuh",             harga:45000,kategori:"non-kopi"},
-  {id:"s22",nama:"Wedang Sereh",            harga:40000,kategori:"non-kopi"},
-  {id:"s23",nama:"Es Cincau",               harga:40000,kategori:"non-kopi"},
-  {id:"s24",nama:"Es Lidah Buaya",          harga:42000,kategori:"non-kopi"},
-  {id:"s25",nama:"Soda Gembira",            harga:50000,kategori:"non-kopi"},
-  {id:"s26",nama:"Jus Semangka",            harga:40000,kategori:"non-kopi"},
-  {id:"s27",nama:"Jus Melon",               harga:40000,kategori:"non-kopi"},
-  {id:"s28",nama:"Bintang",                 harga:70000,kategori:"non-kopi"},
-  {id:"s29",nama:"Bintang Redler Lemon",    harga:75000,kategori:"non-kopi"},
-  {id:"s30",nama:"One Scoop Ice Cream",     harga:40000,kategori:"non-kopi"},
-  {id:"s31",nama:"Double Scoop Ice Cream",  harga:60000,kategori:"non-kopi"},
-  {id:"s32",nama:"Roti Kesukaan Pak Yan",   harga:90000,kategori:"sandwich"},
-  {id:"s33",nama:"Black Toast with Kaya",   harga:45000,kategori:"sandwich"},
-  {id:"s34",nama:"Black Toast with Butter", harga:47000,kategori:"sandwich"},
-  {id:"s35",nama:"Black Toast Kaya Butter", harga:50000,kategori:"sandwich"},
-  {id:"s36",nama:"Roti Bakar Srikaya",      harga:58000,kategori:"sandwich"},
-  {id:"s37",nama:"Roti Bakar Peanut Butter",harga:63000,kategori:"sandwich"},
-  {id:"s38",nama:"Roti Bakar Chesee Chruncy",harga:65000,kategori:"sandwich"},
-  {id:"s39",nama:"Roti Bakar Choco Spread", harga:58000,kategori:"sandwich"},
-  {id:"s40",nama:"Roti Bakar Choco Chruncy",harga:63000,kategori:"sandwich"},
-  {id:"s41",nama:"Beef Sandwich YKK",       harga:69000,kategori:"sandwich"},
-  {id:"s42",nama:"Indomie Goreng Original", harga:30000,kategori:"indomie"},
-  {id:"s43",nama:"Indomie Rebus Kari Ayam", harga:32000,kategori:"indomie"},
-  {id:"s44",nama:"Add On Telor",            harga:15000,kategori:"indomie"},
-  {id:"s45",nama:"Add On Nasi",             harga:15000,kategori:"indomie"},
-  {id:"s46",nama:"French Fries",            harga:65000,kategori:"snack"},
-  {id:"s47",nama:"Chicken Wings Original",  harga:53000,kategori:"snack"},
-  {id:"s48",nama:"Chicken Wings BBQ Sauce", harga:53000,kategori:"snack"},
-  {id:"s49",nama:"Chicken Wings Baputjabe", harga:55000,kategori:"snack"},
-  {id:"s50",nama:"Singkong Goreng Sambal",  harga:40000,kategori:"snack"},
-  {id:"s51",nama:"Singkong Goreng Keju",    harga:45000,kategori:"snack"},
-  {id:"s52",nama:"Pisang Goreng Nona Manis",harga:40000,kategori:"snack"},
-  {id:"s53",nama:"Cireng",                  harga:40000,kategori:"snack"},
-  {id:"s54",nama:"Bakmi Goreng",            harga:55000,kategori:"main-course"},
-  {id:"s55",nama:"Nasi Goreng Coklat",      harga:55000,kategori:"main-course"},
-  {id:"s56",nama:"Nasi Goreng Pak Yan",     harga:55000,kategori:"main-course"},
-  {id:"s57",nama:"Bakmi Godog",             harga:45000,kategori:"main-course"},
-  {id:"s58",nama:"Nasi Soto Ayam",          harga:55000,kategori:"main-course"},
-  {id:"s59",nama:"Nasi Ayam Goreng Basah",  harga:45000,kategori:"main-course"},
-  {id:"s60",nama:"Nasi Ayam Goreng Serundeng",harga:50000,kategori:"main-course"},
-  {id:"s61",nama:"Nasi Ayam Goreng Lengkuas",harga:50000,kategori:"main-course"},
-  {id:"s62",nama:"Nasi Ayam Bumbu Bali",    harga:45000,kategori:"main-course"},
-  {id:"s63",nama:"Lele",                    harga:35000,kategori:"main-course"},
-  {id:"s64",nama:"Mie Nyemek",              harga:50000,kategori:"main-course"},
-  {id:"s65",nama:"Mie Ayam",                harga:45000,kategori:"main-course"},
-  {id:"s66",nama:"Nasi Kare Daging",        harga:55000,kategori:"main-course"},
-  {id:"s67",nama:"Nasi Garlic Butter",      harga:55000,kategori:"main-course"},
-  {id:"s68",nama:"Srikaya 1/2 Loaf",        harga:38000,kategori:"sandwich"},
-  {id:"s69",nama:"Peanut Butter 1/2 Loaf",  harga:43000,kategori:"sandwich"},
+  {
+    "id": "c_1787618078963",
+    "nama": "FILTER 12",
+    "harga": 517000,
+    "modal": 450000,
+    "kategori": "cat_1787618024611",
+    "desc": "",
+    "stok": null,
+    "menuId": "F-10023"
+  },
+  {
+    "id": "c_1787618095361",
+    "nama": "SUPER 12",
+    "harga": 228500,
+    "modal": 170000,
+    "kategori": "cat_1787618024611",
+    "desc": "",
+    "stok": null,
+    "menuId": "MS-1001"
+  },
+  {
+    "id": "c_1787618147844",
+    "nama": "MILD 16",
+    "harga": 351000,
+    "modal": 0,
+    "kategori": "cat_1787618024611",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787618394589",
+    "nama": "SURYA 12",
+    "harga": 258500,
+    "modal": 0,
+    "kategori": "cat_1787618024611",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787618419689",
+    "nama": "MAGNUM HTM",
+    "harga": 262000,
+    "modal": 0,
+    "kategori": "cat_1787618024611",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787618441761",
+    "nama": "MAGNUM BINTANG",
+    "harga": 231000,
+    "modal": 0,
+    "kategori": "cat_1787618024611",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787618456355",
+    "nama": "NESTLITE MENTHOL",
+    "harga": 216500,
+    "modal": 0,
+    "kategori": "cat_1787618024611",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787618474668",
+    "nama": "NESTLITE PUTIH",
+    "harga": 216500,
+    "modal": 0,
+    "kategori": "cat_1787618024611",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787618486915",
+    "nama": "NESTLITE HITAM",
+    "harga": 216500,
+    "modal": 0,
+    "kategori": "cat_1787618024611",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787618501210",
+    "nama": "DIPLOMAT EVO",
+    "harga": 257500,
+    "modal": 0,
+    "kategori": "cat_1787618024611",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787618533473",
+    "nama": "ESSE CHANGE 20",
+    "harga": 401000,
+    "modal": 0,
+    "kategori": "cat_1787618024611",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787618551840",
+    "nama": "MARLBORO MERAH",
+    "harga": 519000,
+    "modal": 0,
+    "kategori": "cat_1787618024611",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787618569006",
+    "nama": "MARLBORO FIL 20",
+    "harga": 389000,
+    "modal": 0,
+    "kategori": "cat_1787618024611",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787618624121",
+    "nama": "SUPER 16",
+    "harga": 307500,
+    "modal": 0,
+    "kategori": "cat_1787618024611",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787618634552",
+    "nama": "SK",
+    "harga": 153000,
+    "modal": 0,
+    "kategori": "cat_1787618024611",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787618647789",
+    "nama": "SK PRIMA HTM",
+    "harga": 152000,
+    "modal": 0,
+    "kategori": "cat_1787618024611",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787618658798",
+    "nama": "SAMSU 12",
+    "harga": 194000,
+    "modal": 0,
+    "kategori": "cat_1787618024611",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787618678304",
+    "nama": "GG JAYA",
+    "harga": 135500,
+    "modal": 0,
+    "kategori": "cat_1787618024611",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787618705806",
+    "nama": "JUARA KRETEK",
+    "harga": 131000,
+    "modal": 0,
+    "kategori": "cat_1787618024611",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787618724089",
+    "nama": "DJARUM COKLAT 12",
+    "harga": 163500,
+    "modal": 0,
+    "kategori": "cat_1787618024611",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787618733593",
+    "nama": "76 APEL",
+    "harga": 145000,
+    "modal": 0,
+    "kategori": "cat_1787618024611",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787618746664",
+    "nama": "MUSTANG",
+    "harga": 165500,
+    "modal": 0,
+    "kategori": "cat_1787618024611",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787618758782",
+    "nama": "ZIGA",
+    "harga": 166000,
+    "modal": 0,
+    "kategori": "cat_1787618024611",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787618781342",
+    "nama": "CAMEL PURPLE 16",
+    "harga": 247500,
+    "modal": 0,
+    "kategori": "cat_1787618024611",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787618847617",
+    "nama": "CAMEL BIRU 16",
+    "harga": 220000,
+    "modal": 0,
+    "kategori": "cat_1787618024611",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787618872837",
+    "nama": "AROMA MILE 16",
+    "harga": 219000,
+    "modal": 0,
+    "kategori": "cat_1787618024611",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787618890259",
+    "nama": "KOMIX ANAK OBH",
+    "harga": 31500,
+    "modal": 0,
+    "kategori": "cat_1787618029936",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787618915719",
+    "nama": "SOFFEL JERUK 1000",
+    "harga": 57500,
+    "modal": 0,
+    "kategori": "cat_1787618036138",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787618932504",
+    "nama": "KOREK KUPING",
+    "harga": 10000,
+    "modal": 0,
+    "kategori": "cat_1787618036138",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787618948193",
+    "nama": "KOPI LIONG",
+    "harga": 35000,
+    "modal": 0,
+    "kategori": "cat_1787618036138",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787618969350",
+    "nama": "KAPAL API MIX",
+    "harga": 195000,
+    "modal": 0,
+    "kategori": "cat_1787618041838",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787619442371",
+    "nama": "GOODDAY CAPPUCINO",
+    "harga": 240000,
+    "modal": 0,
+    "kategori": "cat_1787618041838",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787619459830",
+    "nama": "KAPAL API KECIL",
+    "harga": 185000,
+    "modal": 0,
+    "kategori": "cat_1787618041838",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787619517768",
+    "nama": "INDOCAFE",
+    "harga": 785000,
+    "modal": 0,
+    "kategori": "cat_1787618041838",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787619546414",
+    "nama": "LUWAK WHITE KOPI",
+    "harga": 175000,
+    "modal": 0,
+    "kategori": "cat_1787618041838",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787619568789",
+    "nama": "NEXTAR COKLAT BARU",
+    "harga": 153000,
+    "modal": 0,
+    "kategori": "cat_1787618041838",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787619584256",
+    "nama": "ROMA ARDEN",
+    "harga": 165000,
+    "modal": 0,
+    "kategori": "cat_1787618041838",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787619604971",
+    "nama": "SUPERSTAR BARU",
+    "harga": 166000,
+    "modal": 0,
+    "kategori": "cat_1787618041838",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787619623662",
+    "nama": "KACANG ATOM 1000",
+    "harga": 49500,
+    "modal": 0,
+    "kategori": "cat_1787618049502",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787619660842",
+    "nama": "SARIMI GORENG KREMES",
+    "harga": 86000,
+    "modal": 0,
+    "kategori": "cat_1787618041838",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787619688440",
+    "nama": "SUSU BENDERA COKLAT SAK",
+    "harga": 153000,
+    "modal": 0,
+    "kategori": "cat_1787618041838",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787619709546",
+    "nama": "SUSU BENDERA PUTIH SAK",
+    "harga": 153000,
+    "modal": 0,
+    "kategori": "cat_1787618041838",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787619727344",
+    "nama": "GARAM 500GR",
+    "harga": 68000,
+    "modal": 0,
+    "kategori": "cat_1787618049502",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787619745704",
+    "nama": "MIE DOROKO",
+    "harga": 91000,
+    "modal": 0,
+    "kategori": "cat_1787618049502",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787619775012",
+    "nama": "SASA 5000",
+    "harga": 362000,
+    "modal": 0,
+    "kategori": "cat_1787618041838",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787619799048",
+    "nama": "KECAP BANGO 720GR",
+    "harga": 255000,
+    "modal": 0,
+    "kategori": "cat_1787618041838",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787619824106",
+    "nama": "KECAP BANGO 77 GR/3000",
+    "harga": 114000,
+    "modal": 0,
+    "kategori": "cat_1787618041838",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787619841615",
+    "nama": "RINSO CAIR MOLTO",
+    "harga": 75000,
+    "modal": 0,
+    "kategori": "cat_1787618041838",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787619867546",
+    "nama": "RINSO BBK BARU 1000",
+    "harga": 57000,
+    "modal": 0,
+    "kategori": "cat_1787618041838",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787619879778",
+    "nama": "LADAKU",
+    "harga": 460000,
+    "modal": 0,
+    "kategori": "cat_1787618041838",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787619923181",
+    "nama": "KATING IRISAN BAWANG PUTIH",
+    "harga": 364000,
+    "modal": 0,
+    "kategori": "cat_1787618041838",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787619949689",
+    "nama": "GULA GMP",
+    "harga": 845000,
+    "modal": 0,
+    "kategori": "cat_1787618049502",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787619967643",
+    "nama": "TERIGU LM",
+    "harga": 183000,
+    "modal": 0,
+    "kategori": "cat_1787618049502",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787619995099",
+    "nama": "MINYAK SAYUR CURAH",
+    "harga": 300000,
+    "modal": 0,
+    "kategori": "cat_1787618059762",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787620022568",
+    "nama": "HYDRO COCO",
+    "harga": 140000,
+    "modal": 0,
+    "kategori": "cat_1787618041838",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787620040033",
+    "nama": "ORANGE WATER",
+    "harga": 145000,
+    "modal": 0,
+    "kategori": "cat_1787618041838",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1787620057955",
+    "nama": "SODIUM CANGKIR",
+    "harga": 43000,
+    "modal": 0,
+    "kategori": "cat_1787618036138",
+    "desc": "",
+    "stok": null
+  },
+  {
+    "id": "c_1788287968597",
+    "menuId": "KB-9012",
+    "nama": "KERBAU",
+    "harga": 140000,
+    "modal": 100000,
+    "kategori": "cat_1787618024611",
+    "desc": "",
+    "stok": null
+  }
 ];
 
 const PAYMENT_METHODS = ['cash', 'qris', 'transfer', 'edc'];
 
 // ============================================
-// DATABASE PATH
+// JSON STORAGE PATHS
 // ============================================
-const DB_PATH = path.join(process.env.APPDATA, 'kasir-warung', 'data', 'kasir.db');
+const APPDATA_DIR = path.join(process.env.APPDATA || path.join(require('os').homedir(), 'AppData', 'Roaming'), 'kasir-warung', 'data');
+const DB_PATH = path.join(APPDATA_DIR, 'kasir.db');
+const TRANSACTION_PATH = path.join(APPDATA_DIR, 'transactions.json');
+const LEGACY_TRANSACTION_PATH = path.join(APPDATA_DIR, 'transaction.json');
+const SHIFT_PATH = path.join(APPDATA_DIR, 'shifts.json');
 
-console.log('📁 Database:', DB_PATH);
+function ensureJsonDir() {
+  fs.mkdirSync(APPDATA_DIR, { recursive: true });
+}
+
+function ensureSqliteDatabase() {
+  ensureJsonDir();
+  const Database = require('better-sqlite3');
+  const db = new Database(DB_PATH);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS transactions (
+      id TEXT PRIMARY KEY,
+      data TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS shifts (
+      id TEXT PRIMARY KEY,
+      data TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_trx_created ON transactions(created_at);
+    CREATE INDEX IF NOT EXISTS idx_shifts_created ON shifts(created_at);
+  `);
+  db.close();
+}
+
+function readJson(filePath, fallback = []) {
+  try {
+    if (!fs.existsSync(filePath)) return fallback;
+    const raw = fs.readFileSync(filePath, 'utf8').trim();
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : fallback;
+  } catch (err) {
+    console.warn(`⚠️ Gagal membaca ${filePath}:`, err.message);
+    return fallback;
+  }
+}
+
+function writeJson(filePath, data) {
+  ensureJsonDir();
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+}
+
+function addTransactionsAndShifts(transactions) {
+  const current = readJson(TRANSACTION_PATH, []);
+  const next = [...transactions, ...current];
+  writeJson(TRANSACTION_PATH, next);
+  writeJson(LEGACY_TRANSACTION_PATH, next);
+
+  const currentShifts = readJson(SHIFT_PATH, []);
+  const shiftMap = new Map(currentShifts.map(shift => [String(shift.id), shift]));
+
+  for (const trx of transactions) {
+    if (!trx.shiftId) continue;
+    const id = String(trx.shiftId);
+    const existing = shiftMap.get(id);
+    const entry = existing || {
+      id,
+      shiftNum: trx.shiftNum || 1,
+      operator: trx.kasir || 'StressTest',
+      status: 'closed',
+      total: 0,
+      count: 0,
+      openedAt: trx.timestamp,
+      closedAt: trx.timestamp,
+    };
+
+    entry.total = Number(entry.total || 0) + Number(trx.total || 0);
+    entry.count = Number(entry.count || 0) + 1;
+    entry.closedAt = trx.timestamp;
+    entry.updatedAt = trx.timestamp;
+    shiftMap.set(id, entry);
+  }
+
+  writeJson(SHIFT_PATH, Array.from(shiftMap.values()));
+
+  ensureSqliteDatabase();
+  const Database = require('better-sqlite3');
+  const db = new Database(DB_PATH);
+  const insertTrx = db.prepare('INSERT OR REPLACE INTO transactions (id, data, created_at) VALUES (?, ?, ?)');
+  const insertShift = db.prepare('INSERT OR REPLACE INTO shifts (id, data, created_at) VALUES (?, ?, ?)');
+
+  const trxTx = db.transaction((items) => {
+    for (const trx of items) {
+      insertTrx.run(trx.id, JSON.stringify(trx), trx.timestamp || new Date().toISOString());
+    }
+  });
+  const shiftTx = db.transaction((items) => {
+    for (const shift of items) {
+      insertShift.run(String(shift.id), JSON.stringify(shift), shift.closedAt || shift.updatedAt || shift.startTime || new Date().toISOString());
+    }
+  });
+
+  trxTx(transactions);
+  shiftTx(Array.from(shiftMap.values()));
+  db.close();
+}
+
+console.log('📁 JSON data directory:', APPDATA_DIR);
+console.log('📄 Database file:', DB_PATH);
+console.log('📄 Transactions file:', TRANSACTION_PATH);
+console.log('📄 Legacy transactions file:', LEGACY_TRANSACTION_PATH);
+console.log('📄 Shifts file:', SHIFT_PATH);
 console.log('📋 Menu items:', MENU_ITEMS.length);
 
-// Check database exists
-if (!fs.existsSync(DB_PATH)) {
-  console.error('❌ Database not found at:', DB_PATH);
-  console.log('💡 Make sure you\'ve run the Electron app at least once');
-  process.exit(1);
-}
+ensureJsonDir();
 
 // ============================================
 // HELPER FUNCTIONS
@@ -120,7 +679,7 @@ function generateTransaction(index) {
   // Random items (1-6 items per transaction)
   const items = [];
   let subtotal = 0;
-  const itemCount = randomInt(1, 6);
+  const itemCount = randomInt(3, 7);
   
   for (let i = 0; i < itemCount; i++) {
     const menu = randomItem(MENU_ITEMS);
@@ -134,14 +693,14 @@ function generateTransaction(index) {
       qty, 
       subtotal: lineTotal, 
       kategori: menu.kategori, 
-      catatan: '' 
+      catatan: 'Stress test item' 
     });
   }
   
   // Discount 0-10%
-  const discount = Math.round(subtotal * randomInt(0, 10) / 100);
+  const discount = 0; //Math.round(subtotal * randomInt(0, 10) / 100);
   // Tax 11%
-  const tax = Math.round((subtotal - discount) * 0.11);
+  const tax = 0; //Math.round((subtotal - discount) * 0.11);
   const total = subtotal - discount + tax;
   
   const method = randomItem(PAYMENT_METHODS);
@@ -174,7 +733,6 @@ function generateTransaction(index) {
     shiftId,
     shiftNum,
     kasir: 'StressTest',
-    meja: randomInt(1, 20),
     catatan: 'Stress test data',
     createdAt: date.toISOString()
   };
@@ -184,95 +742,52 @@ function generateTransaction(index) {
 // MAIN
 // ============================================
 async function main() {
-  const TOTAL = 100000;
-  const BATCH_SIZE = 5000;
-  
-  console.log(`\n🚀 Starting stress test: ${TOTAL.toLocaleString()} transactions`);
+  const TOTAL = 1000;
+  const BATCH_SIZE = 500;
+
+  console.log(`\n🚀 Starting JSON stress test: ${TOTAL.toLocaleString()} transactions`);
   console.log(`📦 Batch size: ${BATCH_SIZE.toLocaleString()}`);
-  
-  const db = new Database(DB_PATH);
-  db.pragma('journal_mode = WAL');
-  db.pragma('synchronous = NORMAL');
-  db.pragma('cache_size = -32768'); // 32MB cache
-  
-  // Prepare insert statement
-  const insertStmt = db.prepare('INSERT INTO transactions (id, data) VALUES (?, ?)');
-  
-  // Batch insert transaction
-  const insertBatch = db.transaction((transactions) => {
-    for (const trx of transactions) {
-      insertStmt.run(trx.id, JSON.stringify(trx));
-    }
-  });
-  
+
   const startTime = Date.now();
   let inserted = 0;
   const batches = Math.ceil(TOTAL / BATCH_SIZE);
-  
+
   for (let batch = 0; batch < batches; batch++) {
     const batchStart = batch * BATCH_SIZE;
     const batchEnd = Math.min(batchStart + BATCH_SIZE, TOTAL);
     const batchCount = batchEnd - batchStart;
-    
-    // Generate batch
+
     const transactions = [];
     for (let i = batchStart; i < batchEnd; i++) {
       transactions.push(generateTransaction(i + 1));
     }
-    
-    // Insert batch
-    insertBatch(transactions);
+
+    addTransactionsAndShifts(transactions);
     inserted += batchCount;
-    
-    // Progress
+
     const elapsed = (Date.now() - startTime) / 1000;
-    const rate = (inserted / elapsed).toFixed(1);
+    const rate = elapsed > 0 ? (inserted / elapsed).toFixed(1) : '0.0';
     const remaining = TOTAL - inserted;
-    const eta = remaining > 0 ? (remaining / rate).toFixed(0) : 0;
-    
+    const eta = remaining > 0 && Number(rate) > 0 ? (remaining / Number(rate)).toFixed(0) : 0;
+
     console.log(`📦 Batch ${batch + 1}/${batches} | ${inserted.toLocaleString()}/${TOTAL.toLocaleString()} | ${rate} tx/s | ETA: ${eta}s`);
   }
-  
+
   const totalTime = (Date.now() - startTime) / 1000;
   console.log(`\n✅ COMPLETE!`);
   console.log(`   Inserted: ${inserted.toLocaleString()}`);
   console.log(`   Time: ${totalTime.toFixed(1)}s`);
   console.log(`   Rate: ${(inserted / totalTime).toFixed(1)} tx/s`);
-  
-  // Verify
-  const count = db.prepare('SELECT COUNT(*) as total FROM transactions').get();
-  console.log(`\n🔍 Database verification: ${count.total.toLocaleString()} transactions total`);
-  
-  // Show sample
-  const sample = db.prepare('SELECT id, data FROM transactions ORDER BY created_at DESC LIMIT 3').all();
+
+  const finalTransactions = readJson(TRANSACTION_PATH, []);
+  console.log(`\n🔍 Verification: ${finalTransactions.length.toLocaleString()} transactions saved to ${TRANSACTION_PATH}`);
+  console.log(`🔍 Shifts saved: ${readJson(SHIFT_PATH, []).length.toLocaleString()} shift entries`);
+
+  const sample = finalTransactions.slice(0, 3);
   console.log('\n📄 Sample transactions:');
-  sample.forEach(row => {
-    const t = JSON.parse(row.data);
-    console.log(`   ${t.id} | ${t.items.length} items | Rp${t.total.toLocaleString()} | ${t.paymentMethod} | ${new Date(t.timestamp).toLocaleString()}`);
+  sample.forEach(t => {
+    console.log(`   ${t.id} | ${t.items.length} items | Rp${Number(t.total || 0).toLocaleString()} | ${t.paymentMethod} | ${new Date(t.timestamp).toLocaleString()}`);
   });
-  
-  // Date range
-  const range = db.prepare(`
-    SELECT 
-      MIN(date(created_at)) as earliest,
-      MAX(date(created_at)) as latest
-    FROM transactions
-  `).get();
-  console.log(`\n📅 Date range: ${range.earliest} to ${range.latest}`);
-  
-  // Payment method breakdown
-  const payments = db.prepare(`
-    SELECT 
-      json_extract(data, '$.paymentMethod') as method,
-      COUNT(*) as count
-    FROM transactions
-    GROUP BY json_extract(data, '$.paymentMethod')
-    ORDER BY count DESC
-  `).all();
-  console.log('\n💳 Payment methods:');
-  payments.forEach(p => console.log(`   ${p.method}: ${p.count.toLocaleString()}`));
-  
-  db.close();
 }
 
 main().catch(err => {
