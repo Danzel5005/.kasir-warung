@@ -708,6 +708,11 @@ function injectReceiptPrintCSS(rawHtml = "", paperWidthMm = DEFAULT_PAPER_WIDTH_
   const pageSize = forceA4 ? `${PAGE_WIDTH_MM}mm ${PAGE_HEIGHT_MM}mm` : `${w}mm auto`;
 
   const css = `<style id="receipt-override">
+  @media print {
+    header, .header-container {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+      }
     @page { size: ${pageSize}; margin: 0; }
     html, body {
       width: ${w}mm !important;
@@ -730,6 +735,27 @@ function injectReceiptPrintCSS(rawHtml = "", paperWidthMm = DEFAULT_PAPER_WIDTH_
       page-break-inside: avoid !important;
       break-inside: avoid !important;
       }
+      .receipt > .section.header {
+        padding-bottom: 0 !important;
+      }
+      .receipt > .section.body {
+        padding-top: 0 !important;
+      }
+      .receipt > .section.body > .item:first-child {
+        margin-top: 0 !important;
+      }
+      .receipt-body {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+      header, .receipt-body {
+        display: block !important;
+        float: none !important;
+        position: static !important;
+        margin : 0;
+        padding: 0;
+      }
+  }
   </style>`;
 
   if (/<\/body>/i.test(rawHtml)) return rawHtml.replace(/<\/body>/i, `${css}</body>`);
@@ -833,7 +859,12 @@ function kvLine(printer, label, value) {
   printer.leftRight(label, value);
 }
 
-function buildEscPosReceipt(printer, trx, warungName, warungAddress, warungPhone, operatorName) {
+function getCategoryLabel(categoryKey, cats = []) {
+  const category = cats.find((entry) => String(entry.key ?? entry.id) === String(categoryKey));
+  return category?.label || category?.name || categoryKey || "Lainnya";
+}
+
+function buildEscPosReceipt(printer, trx, warungName, warungAddress, warungPhone, operatorName, cats = []) {
   const storeName = warungName || trx.warungName || "Warung";
   const addressLine = warungAddress || trx.warungAddress || "";
   const phoneLine = warungPhone || trx.warungPhone || "";
@@ -857,7 +888,8 @@ function buildEscPosReceipt(printer, trx, warungName, warungAddress, warungPhone
   printer.drawLine();
 
   trx.items.forEach((i) => {
-    const qtyName = `${i.qty}x ${i.nama}`;
+    const categoryLabel = getCategoryLabel(i.kategori, cats);
+    const qtyName = `${i.qty}x ${categoryLabel} ${i.nama}`;
     kvLine(printer, qtyName, fmtRp(i.harga * i.qty));
     printer.println(`   ${fmtRp(i.harga)}`);
   });
@@ -881,7 +913,7 @@ function buildEscPosReceipt(printer, trx, warungName, warungAddress, warungPhone
   printer.cut();
 }
 
-ipcMain.handle("print-receipt-escpos", async (_e, { trx, printerName, paperWidthMm, warungName, warungAddress, warungPhone, operatorName }) => {
+ipcMain.handle("print-receipt-escpos", async (_e, { trx, printerName, paperWidthMm, warungName, warungAddress, warungPhone, operatorName, cats = [] }) => {
   const selectedName = printerName || "auto";
   try {
     const paperW = normalizePaperWidthMm(paperWidthMm);
@@ -905,7 +937,10 @@ ipcMain.handle("print-receipt-escpos", async (_e, { trx, printerName, paperWidth
       return { ok: false, error: `Printer thermal tidak terdeteksi/terhubung: ${selectedName}` };
     }
 
-    buildEscPosReceipt(printer, trx, warungName, warungAddress, warungPhone, operatorName);
+    // Use persisted categories as the source of truth when the renderer has stale data.
+    const persistedCats = rJSON(FILES.cats) || [];
+    const categoryList = [...cats, ...persistedCats];
+    buildEscPosReceipt(printer, trx, warungName, warungAddress, warungPhone, operatorName, categoryList);
 
     await printer.execute();
     console.log("[ESC/POS] Print successful to:", selectedName);

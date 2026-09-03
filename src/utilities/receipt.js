@@ -83,12 +83,12 @@ const getQrisImage = (metodeBayar, qrisImages) => {
   return qrisImages[metodeBayar] || null;
 };
 
-// Get category display name (resolves key to label if cats provided, case-sensitive)
+// Get category display name (resolves persisted key/id to the current label)
 const getCategoryName = (cat, cats) => {
   if (!cat) return "";
   if (cats && cats.length) {
-    const found = cats.find(c => c.key === cat);
-    if (found) return found.label;
+    const found = cats.find(c => String(c.key ?? c.id) === String(cat));
+    if (found) return found.label || found.name || cat;
   }
   return cat;
 };

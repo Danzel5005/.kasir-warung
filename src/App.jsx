@@ -401,6 +401,7 @@ const printReceipt = useCallback(async (trx) => {
       warungAddress: settingsH.settings.warungAddress,
       warungPhone: settingsH.settings.warungPhone,
       operatorName: trx.operator,
+      cats: menuH.cats,
     });
     if (res?.ok) toastH.toast_("Selesai Mencetak Resi", "ok");
     else toastH.toast_(res?.error || "Gagal cetak thermal", "err");
