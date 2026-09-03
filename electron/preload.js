@@ -39,6 +39,7 @@ const kasirAPI = {
   saveCSV:     (data)  => ipcRenderer.invoke("csv-save", data),
   // Printer
   getPrinters:   ()    => ipcRenderer.invoke("get-printers"),
+  printReceiptEscPos: (data) => ipcRenderer.invoke("print-receipt-escpos", data),
   printReceipt:  (data)=> ipcRenderer.invoke("print-receipt", data),
   // Shifts
   loadShifts:  ()      => ipcRenderer.invoke("shifts-load"),

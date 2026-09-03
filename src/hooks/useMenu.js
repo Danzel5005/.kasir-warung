@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { SEED } from "../constants/menu.js";
 import { DEFAULT_CATS } from "../constants/categories.js";
+import { updateCategoryLabel } from "../utilities/categoryManagement.js";
 import { api } from "../utilities/utils.js";
 
 // useMenu — menu CRUD, kategori CRUD, displayMenu filter+memo.
@@ -108,6 +109,19 @@ function useMenu({ toast_, addUndo }) {
     addUndo("Hapus Kategori", async () => { await api.saveCats(snap); setCats(snap); });
   }, [cats, addUndo]);
 
+  const editCat = useCallback(async (key, nextLabel) => {
+    try {
+      const updated = updateCategoryLabel(cats, key, nextLabel);
+      await api.saveCats(updated);
+      setCats(updated);
+      toast_("Kategori diperbarui", "ok");
+      return true;
+    } catch (error) {
+      toast_(error.message || "Gagal mengubah kategori", "err");
+      return false;
+    }
+  }, [cats, toast_]);
+
   // PENTING: membaca cats LANGSUNG dari closure. Wajib [cats, toast_].
   const addTagToCategory = useCallback(async (catKey, tag) => {
     const updated = cats.map(c => {
@@ -179,7 +193,7 @@ const clearAllMenu = useCallback(async () => {
     setKategori, setSearch, setItemModal, setForm, setCatModal, setNewCatLabel,
     setMenu, // diperlukan App.jsx untuk commit stok SETELAH IPC processPayment sukses
     loadInitial, openAdd, openEdit, saveItem, deleteItem,
-    addCat, deleteCat, addTagToCategory, removeTagFromCategory, computeStockDeduction, computeStockRestoration, clearAllMenu
+    addCat, editCat, deleteCat, addTagToCategory, removeTagFromCategory, computeStockDeduction, computeStockRestoration, clearAllMenu
   };
 }
 

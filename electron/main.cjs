@@ -2,7 +2,14 @@ const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const { LICENSE_SECRET, generateKey } = require("./license-secret.cjs");
-
+const ThermalPrinter = require("node-thermal-printer").printer;
+const PrinterTypes = require("node-thermal-printer").types;
+let NodePrinterDriver = null;
+try {
+  NodePrinterDriver = require("electron-printer");
+} catch (err) {
+  console.warn("[Main] electron-printer unavailable; continuing without legacy native printer driver:", err.message);
+}
 // ─── LICENSE ──────────────────────────────────────────────────────────────────
 function getHardwareId() {
   try {
@@ -689,11 +696,7 @@ function normalizePaperWidthMm(w) {
   return Math.min(MAX_PAPER_WIDTH_MM, Math.max(MIN_PAPER_WIDTH_MM, n));
 }
 
-// Detect "print to PDF"-style virtual printers. These are routed through
-// printToPDF() below instead of the OS print spooler, because drivers like
-// "Microsoft Print to PDF" silently ignore Electron's custom pageSize/margins
-// when going through webContents.print() and fall back to Letter/A4 centered
-// on their own — there is no reliable way to fix that from the caller side.
+
 function isPdfPrinter(name = "") {
   return /pdf/i.test(name);
 }
@@ -808,11 +811,110 @@ ipcMain.handle("print-receipt", (_e, { html, printerName, paperWidthMm }) => {
       }, 250);
     });
 
+   
+
     win.webContents.once("did-fail-load", (_event, _code, description) => {
       setTimeout(() => win.close(), 500);
       resolve({ ok: false, error: description || "Gagal memuat halaman cetak resi" });
     });
   });
+});
+
+// ── ESC/POS raw printing (bypass driver Windows untuk printer thermal fisik)
+function charsPerLineForWidth(paperWidthMm) {
+  if (paperWidthMm <= 58) return 32;
+  if (paperWidthMm >= 80) return 42;
+  return Math.round(32 + ((paperWidthMm - 58) / (80 - 58)) * (42 - 32));
+}
+
+const fmtRp = (n) => `Rp ${Number(n || 0).toLocaleString("id-ID")}`;
+
+function kvLine(printer, label, value) {
+  printer.leftRight(label, value);
+}
+
+function buildEscPosReceipt(printer, trx, warungName, warungAddress, warungPhone, operatorName) {
+  const storeName = warungName || trx.warungName || "Warung";
+  const addressLine = warungAddress || trx.warungAddress || "";
+  const phoneLine = warungPhone || trx.warungPhone || "";
+  const total = trx.total || trx.subtotal;
+
+  printer.alignCenter();
+  printer.bold(true);
+  printer.setTextDoubleHeight();
+  printer.println(storeName);
+  printer.setTextNormal();
+  printer.bold(false);
+  if (addressLine) printer.println(addressLine);
+  if (phoneLine) printer.println(`Telp: ${phoneLine}`);
+  printer.println(`${trx.hari}, ${trx.tgl} ${trx.bln} ${trx.thn} - ${trx.jam}:${trx.mnt}:${trx.dtk}`);
+
+  printer.alignLeft();
+  printer.drawLine();
+  kvLine(printer, "NO TRX", trx.id);
+  kvLine(printer, "KASIR", operatorName || trx.operator || "Kasir");
+  kvLine(printer, "METODE", trx.metodeBayarLabel || trx.metodeBayar || "");
+  printer.drawLine();
+
+  trx.items.forEach((i) => {
+    const qtyName = `${i.qty}x ${i.nama}`;
+    kvLine(printer, qtyName, fmtRp(i.harga * i.qty));
+    printer.println(`   ${fmtRp(i.harga)}`);
+  });
+
+  printer.drawLine();
+  kvLine(printer, "SubTotal", fmtRp(trx.subtotal));
+  printer.bold(true);
+  kvLine(printer, "TOTAL", fmtRp(total));
+  printer.bold(false);
+
+  if (trx.metodeBayar === "cash") {
+    kvLine(printer, "Bayar", fmtRp(trx.bayar));
+    kvLine(printer, "Kembalian", fmtRp(trx.kembalian));
+  }
+
+  printer.drawLine();
+  printer.alignCenter();
+  printer.println("Barang yang sudah dibeli tidak bisa");
+  printer.println("dikembalikan");
+  printer.println("Terimakasih");
+  printer.cut();
+}
+
+ipcMain.handle("print-receipt-escpos", async (_e, { trx, printerName, paperWidthMm, warungName, warungAddress, warungPhone, operatorName }) => {
+  const selectedName = printerName || "auto";
+  try {
+    const paperW = normalizePaperWidthMm(paperWidthMm);
+
+    if (!selectedName || /pdf/i.test(selectedName)) {
+      return { ok: false, error: "Printer yang dipilih bukan printer thermal. Pilih printer thermal fisik atau gunakan printer sistem/PDF." };
+    }
+
+    const printer = new ThermalPrinter({
+      type: PrinterTypes.EPSON,
+      interface: selectedName === "auto" ? "printer:auto" : `printer:${selectedName}`,
+      ...(NodePrinterDriver ? { driver: NodePrinterDriver } : {}),
+      width: charsPerLineForWidth(paperW),
+      removeSpecialCharacters: false,
+      options: { timeout: 5000 },
+    });
+
+    const isConnected = await printer.isPrinterConnected();
+    if (!isConnected) {
+      console.warn("[ESC/POS] Printer not connected:", selectedName);
+      return { ok: false, error: `Printer thermal tidak terdeteksi/terhubung: ${selectedName}` };
+    }
+
+    buildEscPosReceipt(printer, trx, warungName, warungAddress, warungPhone, operatorName);
+
+    await printer.execute();
+    console.log("[ESC/POS] Print successful to:", selectedName);
+    return { ok: true };
+  } catch (err) {
+    const msg = err && err.message ? err.message : String(err);
+    console.error("[ESC/POS] Print failed for:", selectedName, msg);
+    return { ok: false, error: msg };
+  }
 });
 
 // ── License

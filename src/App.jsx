@@ -3,6 +3,7 @@ import { METODE_LABELS} from "./constants/payments.js";
 import { G, OR, W, LT, BD, TX, MT } from "./constants/colors.js";
 import { buildReceiptHTML, buildPreviewHTML, fmt } from "./utilities/receipt.js";
 import { normalizeBarcodeInput, findMenuByMenuId } from "./utilities/barcode.js";
+import { getPrinterSelectionStatus } from "./utilities/printer.js";
 import { api } from "./utilities/utils.js";
 import { resolveShiftTarget } from "./utilities/shiftState.js";
 import { row } from "./constants/styles.js";
@@ -380,12 +381,37 @@ function KasirWorkspace() {
     clearCart: cartH.clearCart,
   }), [authH.confirmCloseShift, cartH.clearCart]);
 
-  // printReceipt(trx) — generic, dari useSettings.printHTML + buildReceiptHTML
-  // PENTING: membaca settingsH.logo langsung. Wajib di deps.
-  const printReceipt = useCallback(async (trx) => {
+ // printReceipt(trx) — thermal fisik pakai ESC/POS langsung (bypass driver Windows),
+// printer PDF virtual (mis. "Microsoft Print to PDF") tetap lewat buildReceiptHTML + printToPDF.
+const printReceipt = useCallback(async (trx) => {
+  const printerName = settingsH.settings.printerName || "";
+  const selection = getPrinterSelectionStatus(printerName);
+
+  if (selection.isThermal) {
+    const res = await window.api.printReceiptEscPos({
+      trx,
+      printerName,
+      paperWidthMm: settingsH.settings.receiptPaperWidthMm,
+      warungName: settingsH.settings.warungName,
+      warungAddress: settingsH.settings.warungAddress,
+      warungPhone: settingsH.settings.warungPhone,
+      operatorName: trx.operator,
+    });
+    if (res?.ok) toastH.toast_("Selesai Mencetak Resi", "ok");
+    else toastH.toast_(res?.error || "Gagal cetak thermal", "err");
+    return res;
+  }
+
+  if (selection.isPdf) {
     const html = buildReceiptHTML(trx, settingsH.logo, settingsH.settings.receiptAdditionals, settingsH.settings.qrisImages, settingsH.settings.warungName, menuH.cats, settingsH.settings.warungAddress, settingsH.settings.warungPhone, settingsH.settings.paymentMethods, settingsH.settings.receiptPaperWidthMm);
-    await settingsH.printHTML(html, "Selesai Mencetak Resi");
-  }, [settingsH.logo, settingsH.printHTML, settingsH.settings.receiptAdditionals, settingsH.settings.qrisImages, settingsH.settings.warungName, settingsH.settings.warungAddress, settingsH.settings.warungPhone, menuH.cats, settingsH.settings.paymentMethods, settingsH.settings.receiptPaperWidthMm]);
+    const res = await settingsH.printHTML(html, "Selesai Mencetak Resi");
+    return res;
+  }
+
+  const html = buildReceiptHTML(trx, settingsH.logo, settingsH.settings.receiptAdditionals, settingsH.settings.qrisImages, settingsH.settings.warungName, menuH.cats, settingsH.settings.warungAddress, settingsH.settings.warungPhone, settingsH.settings.paymentMethods, settingsH.settings.receiptPaperWidthMm);
+  const res = await settingsH.printHTML(html, "Selesai Mencetak Resi");
+  return res;
+}, [settingsH.logo, settingsH.printHTML, settingsH.settings.printerName, settingsH.settings.receiptAdditionals, settingsH.settings.qrisImages, settingsH.settings.warungName, settingsH.settings.warungAddress, settingsH.settings.warungPhone, menuH.cats, settingsH.settings.paymentMethods, settingsH.settings.receiptPaperWidthMm, toastH.toast_]);
 
   // printPreview — depend ke cart (items/receiptAdditionalValues), pakai printHTML generic dari settings
   // PENTING: membaca cartH.items/receiptAdditionalValues dan settingsH.logo langsung. Semua wajib di deps.
