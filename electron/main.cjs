@@ -875,6 +875,7 @@ function buildEscPosReceipt(printer, trx, warungName, warungAddress, warungPhone
   printer.setTextDoubleHeight();
   printer.println(storeName);
   printer.setTextNormal();
+  printer.resetLineSpacing();
   printer.bold(false);
   if (addressLine) printer.println(addressLine);
   if (phoneLine) printer.println(`Telp: ${phoneLine}`);
