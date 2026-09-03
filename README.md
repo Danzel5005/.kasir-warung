@@ -252,11 +252,12 @@ Output: release/Kasir Warung Setup 1.1.0.exe (NSIS installer)
 
  Catatan Penting
 
-· Data Directory: %APPDATA%/kasir-warung/data/ (SQLite, JSON, backup, license)
-· File .env, kunci lisensi, dan berkas generator (generator.cjs, generator.test.js) diabaikan oleh .gitignore — jangan dikomit
-· Migrasi Data: Saat pertama kali jalan versi SQLite, JSON lama otomatis dimigrasi ke SQLite dan dibackup ke data/json-backups/
-· Recovery: Jika aplikasi crash saat bayar, transaksi tertangguh di trx.wal dan dipulihkan otomatis saat startup berikutnya
-· Setelah update file apapun, dan ingin build .exe, selalu jalankan
+- Data Directory: %APPDATA%/kasir-warung/data/ (SQLite, JSON, backup, license)
+- File .env, kunci lisensi, dan berkas generator (generator.cjs, generator.test.js) diabaikan oleh .gitignore — jangan dikomit
+- Migrasi Data: Saat pertama kali jalan versi SQLite, JSON lama otomatis dimigrasi ke SQLite dan dibackup ke data/json-backups/
+- Recovery: Jika aplikasi crash saat bayar, transaksi tertangguh di trx.wal dan dipulihkan otomatis saat startup berikutnya
+- Setelah update file apapun, dan ingin build .exe, selalu jalankan
+
 ```bash
 npm run build
 ```
@@ -265,13 +266,13 @@ npm run build
  Hotkeys (Keyboard Shortcuts)
 
 Key Aksi
-K Buka Kasir (Menu)
-O Buka Open Bill
-R Buka Riwayat
-L Buka Laporan
-M Buka Kelola Menu
-P Toggle Cart Drawer
-/ Fokus Search Menu
+- K Buka Kasir (Menu)
+- O Buka Open Bill
+- R Buka Riwayat
+- L Buka Laporan
+- M Buka Kelola Menu
+- P Toggle Cart Drawer
+- / Fokus Search Menu
 
 ---
 
@@ -281,8 +282,8 @@ Proyek internal/pribadi — MIT License.
 
 ---
 
-Author: Danzel Tampilang
-Contact: danzeltampilang@gmail.com / WhatsApp
-Version: 1.1.0
+- Author: Danzel Tampilang
+- Contact: danzeltampilang@gmail.com / WhatsApp
+- Version: 1.1.0
 
 ```
