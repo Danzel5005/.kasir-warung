@@ -1,12 +1,20 @@
-# Kasir Warung DEN POS
 
-Aplikasi kasir (POS) desktop untuk warung/kedai kopi, dibangun dengan **React 18 + Electron 31 + Vite 5**. Mendukung manajemen menu, open bill, shift kerja, banyak metode pembayaran (Tunai, Debit, QRIS), cetak struk thermal, laporan penjualan lengkap, dan sistem lisensi berbasis hardware ID — didesain agar mudah dijalankan sebagai aplikasi Windows (.exe) mandiri.
+# Kasir Warung — POS Desktop
+
+**Aplikasi kasir (Point of Sale) desktop untuk warung/kedai kopi**, dibangun dengan **React 18 + Electron 31 + Vite 5**.
+
+Mendukung manajemen menu, open bill, shift kerja, berbagai metode pembayaran (Tunai, Debit, QRIS), cetak struk thermal, laporan penjualan lengkap, dan sistem lisensi berbasis hardware ID — didesain agar mudah dijalankan sebagai aplikasi Windows (.exe) mandiri.
+
+---
 
 ## Fitur Utama
 
 ### Kasir & Keranjang
 - Pencarian menu real-time, filter kategori, grid menu responsif
-- **Customisasi Minuman (Drinks Tag System)** — item kategori "Drinks" otomatis menampilkan modal pilihan: Cupsize (Small/Medium/Large), Sugar (Less/Normal/More), Temperature (Ice dengan level Less/Normal/More, Hot)
+- **Customisasi Minuman (Drinks Tag System)** — item kategori "Drinks" otomatis menampilkan modal pilihan:
+  - Cupsize (Small/Medium/Large)
+  - Sugar (Less/Normal/More)
+  - Temperature — Ice (Less/Normal/More) atau Hot
 - Tambahan pada resi (receipt additionals) dinamis — bisa dikonfigurasi di Settings: Nomor Meja, Jumlah Pax, Catatan, dll.
 - Keranjang samping (drawer) dengan qty control, preview item, dan ringkasan harga
 - Perhitungan otomatis: Subtotal, Pajak (10%), Service (5%), Total
@@ -16,11 +24,11 @@ Aplikasi kasir (POS) desktop untuk warung/kedai kopi, dibangun dengan **React 18
 - Simpan pesanan yang belum dibayar (status "open") dan lanjutkan transaksi nanti
 - Update item pada open bill yang sudah ada (tambah/kurangi/hapus) dengan deduksi stok delta
 - Hapus open bill (batalkan) dengan restore stok otomatis
-- Bayar open bill langsung dari daftar (stock sudah dipotong saat buat bill, tidak double deduct)
+- Bayar open bill langsung dari daftar — stock sudah dipotong saat buat bill, tidak double deduct
 
 ### Manajemen Shift & Pengguna
 - Login multi-user dengan role Admin/Kasir
-- Mulai shift baru otomatis menentukan nomor urut shift harian
+- Mulai shift baru — otomatis menentukan nomor urut shift harian
 - Tutup shift dengan ringkasan: jam buka/tutup, operator, total transaksi, omset
 - **Open bill TIDAK dihapus otomatis saat tutup shift** — hanya dihapus jika sudah dibayar
 - Kelola pengguna (Admin only): tambah/hapus user, password, nama tampilan
@@ -29,20 +37,22 @@ Aplikasi kasir (POS) desktop untuk warung/kedai kopi, dibangun dengan **React 18
 ### Kelola Menu & Kategori
 - CRUD item menu: nama, harga, harga modal (untuk laporan laba/rugi), kategori, deskripsi, foto, stok (null = unlimited)
 - CRUD kategori: label, key, **tags** (mis. "drinks", "rokok") untuk fitur khusus
-- Tag "Drinks" → otomatis munculkan customisasi minuman di kasir
-- Tag "Rokok" → ditampilkan terpisah di footer struk (Total ROKOK)
+  - Tag "Drinks" → otomatis munculkan customisasi minuman di kasir
+  - Tag "Rokok" → ditampilkan terpisah di footer struk (Total ROKOK)
 - Pencarian & filter kategori di halaman Kelola
 
 ### Riwayat Transaksi
 - Filter per rentang tanggal (Dari - Sampai)
-- **Dua mode tampilan**: Per Hari (default, collapse/expand per hari) atau Per Shift
-- Grup per shift menampilkan: nomor shift, operator, jam, total transaksi, total pax
+- **Dua mode tampilan**:
+  - Per Hari (default, collapse/expand per hari)
+  - Per Shift — menampilkan: nomor shift, operator, jam, total transaksi, total pax
 - Klik transaksi → buka modal detail struk lengkap
-- Hapus transaksi individu atau hapus semua (dengan undo 9 detik)
+- Hapus transaksi individu atau hapus semua (dengan **undo 9 detik**)
 - Unduh CSV transaksi (detail per hari dalam 1 file)
 
 ### Laporan & Ekspor CSV
 Pilih shift (Semua / Shift tertentu / Shift aktif) untuk memfilter laporan:
+
 - **Laporan Keuangan** — ringkasan per hari: pendapatan, modal, laba/rugi, margin %
 - **Sales Rate** — Top 10 terlaris, Bottom 10, menu tidak terjual sama sekali
 - **Rangkuman Per Item** — qty, pendapatan, modal, laba, margin % per item
@@ -51,7 +61,7 @@ Pilih shift (Semua / Shift tertentu / Shift aktif) untuk memfilter laporan:
 - **Laporan Per Metode Bayar** — rincian jumlah transaksi & total per metode pembayaran
 
 ### Cetak Struk Thermal
-- Dukungan printer thermal 80mm dan 58mm (Ukuran customizable sesuai kebutuhan) via Electron `webContents.print()`
+- Dukungan printer thermal 80mm dan 58mm (ukuran customizable sesuai kebutuhan) via Electron `webContents.print()`
 - Pilih printer langsung dari aplikasi (modal Printer)
 - Format struk memiliki: logo, nama warung, alamat, telepon, no transaksi, waktu, kasir, metode bayar, item, total, kembalian, QRIS image (jika QRIS), footer kategori, catatan "Barang yang sudah dibeli tidak bisa dikembalikan"
 - Cetak preview (Print Preview) sebelum cetak aktual
@@ -74,6 +84,8 @@ Pilih shift (Semua / Shift tertentu / Shift aktif) untuk memfilter laporan:
 - Design System terpusat di `src/constants/theme.js`: 8-step color palette, 6-step typographic scale, 5 radius tokens, 4-step spacing
 - Multi-bahasa (i18n) ringan di `src/utilities/i18n.js` — Bahasa Indonesia & English
 
+---
+
 ## Tech Stack
 
 | Layer | Technology |
@@ -87,6 +99,8 @@ Pilih shift (Semua / Shift tertentu / Shift aktif) untuk memfilter laporan:
 | **Concurrency** | `concurrently` 8.2, `wait-on` 8.0 |
 | **Build Tool** | `node-gyp` 13.0 (native modules rebuild) |
 
+---
+
 ## Arsitektur Data & Persistensi
 
 ### SQLite (Primary) — `data/kasir.db`
@@ -95,6 +109,7 @@ Pilih shift (Semua / Shift tertentu / Shift aktif) untuk memfilter laporan:
 - Migrasi otomatis dari JSON lama ke SQLite saat pertama kali jalan (backup JSON disimpan di `data/json-backups/`)
 
 ### JSON Files (Fallback & Config) — `data/`
+
 | File | Fungsi |
 |------|--------|
 | `menu.json` | Daftar menu item |
@@ -110,9 +125,12 @@ Pilih shift (Semua / Shift tertentu / Shift aktif) untuk memfilter laporan:
 - **Write-Ahead Log (WAL)** — `trx.wal` mencatat transaksi sebelum commit; recovery otomatis saat startup jika crash
 - **Daily Backup** — `data/backups/trx_YYYY-MM-DD.json` (retensi 30 hari)
 
-## Struktur Proyek
+---
+
+## 📁 Struktur Proyek
 
 ```
+
 .
 ├── electron/                    # Main process Electron
 │   ├── main.cjs                 # Window, IPC handlers, SQLite, License, WAL, Backup, Print
@@ -169,7 +187,10 @@ Pilih shift (Semua / Shift tertentu / Shift aktif) untuk memfilter laporan:
 ├── vitest.config.mjs
 ├── package.json
 └── generator.cjs / test-*.js    # Script generator lisensi & test printer/db
+
 ```
+
+---
 
 ## Menjalankan Secara Lokal
 
@@ -179,15 +200,18 @@ Pilih shift (Semua / Shift tertentu / Shift aktif) untuk memfilter laporan:
 - Windows 10/11 (target build), macOS/Linux untuk development
 
 ### Instalasi
+
 ```bash
 # Clone & masuk folder
+git clone https://github.com/Danzel5005/.kasir-warung.git
 cd kasir-warung
 
 # Install dependencies (termasuk native module better-sqlite3 & node-machine-id)
 npm install
 ```
 
-### Development Mode
+Development Mode
+
 ```bash
 # Browser only (Vite dev server, no Electron)
 npm run dev
@@ -196,7 +220,8 @@ npm run dev
 npm run electron:dev
 ```
 
-### Testing
+Testing
+
 ```bash
 # Run once
 npm test
@@ -205,46 +230,56 @@ npm test
 npm run test:watch
 ```
 
-## Build Aplikasi Windows (.exe)
+---
+
+ Build Aplikasi Windows (.exe)
 
 ```bash
 # Build production (Vite build + electron-builder NSIS)
 npm run electron:build
 ```
 
-**Output:** `release/Kasir Warung Setup 1.0.0.exe` (NSIS installer)
-- One-click install: **tidak** (user bisa pilih folder)
-- Desktop shortcut: **ya**
-- Start Menu shortcut: **ya**
-- Shortcut name: **Kasir WRG**
-- App ID: `com.warung.kasir`
-- Ikon: `src/assets/icon.ico`
+Output: release/Kasir Warung Setup 1.1.0.exe (NSIS installer)
 
-## Catatan Penting
-
-- **Data Directory**: `%APPDATA%/kasir-warung/data/` (SQLite, JSON, backup, license)
-- **File `.env`**, kunci lisensi, dan berkas *generator* (`generator.cjs`, `generator.test.js`) diabaikan oleh `.gitignore` — **jangan dikomit**
-- **Migrasi Data**: Saat pertama kali jalan versi SQLite, JSON lama ototomatis dimigrasi ke SQLite dan dibackup ke `data/json-backups/`
-- **Recovery**: Jika aplikasi crash saat bayar, transaksi tertangguh di `trx.wal` dan dipulihkan otomatis saat startup berikutnya
-
-## Hotkeys (Keyboard Shortcuts)
-
-| Key | Aksi |
-|-----|------|
-| `K` | Buka Kasir (Menu) |
-| `O` | Buka Open Bill |
-| `R` | Buka Riwayat |
-| `L` | Buka Laporan |
-| `M` | Buka Kelola Menu |
-| `P` | Toggle Cart Drawer |
-| `/` | Fokus Search Menu |
-
-## Lisensi
-
-Proyek internal/pribadi — **MIT License**.
+· One-click install: tidak (user bisa pilih folder)
+· Desktop shortcut: ya
+· Start Menu shortcut: ya
+· Shortcut name: Kasir WRG
+· App ID: com.warung.kasir
+· Ikon: src/assets/icon.ico
 
 ---
 
-**Author**: Danzel Tampilang  
-**Contact**: danzeltampilang@gmail.com / [WhatsApp](https://wa.me/6289502417252)  
-**Version**: 1.1.0
+ Catatan Penting
+
+· Data Directory: %APPDATA%/kasir-warung/data/ (SQLite, JSON, backup, license)
+· File .env, kunci lisensi, dan berkas generator (generator.cjs, generator.test.js) diabaikan oleh .gitignore — jangan dikomit
+· Migrasi Data: Saat pertama kali jalan versi SQLite, JSON lama otomatis dimigrasi ke SQLite dan dibackup ke data/json-backups/
+· Recovery: Jika aplikasi crash saat bayar, transaksi tertangguh di trx.wal dan dipulihkan otomatis saat startup berikutnya
+
+---
+
+ Hotkeys (Keyboard Shortcuts)
+
+Key Aksi
+K Buka Kasir (Menu)
+O Buka Open Bill
+R Buka Riwayat
+L Buka Laporan
+M Buka Kelola Menu
+P Toggle Cart Drawer
+/ Fokus Search Menu
+
+---
+
+ Lisensi
+
+Proyek internal/pribadi — MIT License.
+
+---
+
+Author: Danzel Tampilang
+Contact: danzeltampilang@gmail.com / WhatsApp
+Version: 1.1.0
+
+```
