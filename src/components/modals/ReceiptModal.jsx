@@ -134,6 +134,9 @@ export default function ReceiptModal({ receipt, logo, printReceipt, setReceipt, 
           )}
 
           <div style={{ ...row, fontSize:TYPOGRAPHY.label.fontSize, color:MT }}><span>Subtotal</span><span>{fmt(receipt.subtotal)}</span></div>
+          {(receipt.discount || 0) > 0 && <div style={{ ...row, fontSize:TYPOGRAPHY.label.fontSize, color:G }}><span>Diskon</span><span>-{fmt(receipt.discount)}</span></div>}
+          {(receipt.pajak || 0) > 0 && <div style={{ ...row, fontSize:TYPOGRAPHY.label.fontSize, color:MT }}><span>Pajak</span><span>{fmt(receipt.pajak)}</span></div>}
+          {(receipt.service || 0) > 0 && <div style={{ ...row, fontSize:TYPOGRAPHY.label.fontSize, color:MT }}><span>Service</span><span>{fmt(receipt.service)}</span></div>}
           <div style={{ ...row, fontSize:TYPOGRAPHY.body.fontSize, fontWeight:700, marginTop:3 }}>
             <span>TOTAL</span><span style={{ color:OR }}>{fmt(receipt.total)}</span>
           </div>

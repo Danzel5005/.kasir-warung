@@ -13,7 +13,7 @@ function ViewKasir({
   // dari cartH
   cart, drawerOpen, setDrawerOpen,
   receiptAdditionalValues, receiptAdditionals, updateReceiptAdditionalValue,
-  items, subtotal, service, pajak, total, activeBill,
+  items, subtotal, service, pajak, discount, total, activeBill,
   addToCart, decCart, delCart, clearCart,
   // App.jsx wrapper functions (sudah di-useCallback di App.jsx)
   saveOpenBill, printPreview, printingPreview, setPayModal,
@@ -209,6 +209,7 @@ function ViewKasir({
         {items.length>0&&(
           <div style={{padding:"10px 13px",borderTop:`1px solid ${BD}`}}>
             <div style={{...row,fontSize:11,color:MT,marginBottom:3}}><span>Subtotal</span><span style={{fontWeight:600,color:TX}}>{fmt(subtotal)}</span></div>
+            {discount > 0 && <div style={{...row,fontSize:11,color:G,marginBottom:3}}><span>Diskon</span><span style={{fontWeight:600}}>-{fmt(discount)}</span></div>}
             <div style={{...row,borderTop:`1px solid ${BD}`,paddingTop:7,marginBottom:9}}>
               <span style={{fontSize:14,fontWeight:700}}>Total</span>
               <span style={{fontSize:15,fontWeight:700,color:OR}}>{fmt(total)}</span>

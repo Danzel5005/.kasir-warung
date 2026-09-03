@@ -125,6 +125,7 @@ function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName,
   // Use stored tax/service from transaction (no recalculation)
   const pajak = trx.pajak || 0;
   const service = trx.service || 0;
+  const discount = trx.discount || 0;
   const total = trx.total || trx.subtotal;
   // Use stored label from transaction, fallback to lookup, NEVER show raw key
   const metodeLabel = trx.metodeBayarLabel 
@@ -215,6 +216,9 @@ ${buildPrintCSS(paperWidthMm)}
         ${rows}
         <div class="totals">
           <div class="kv"><span class="k">SubTotal</span><span class="v">${fmt(trx.subtotal)}</span></div>
+          ${discount > 0 ? `<div class="kv"><span class="k">Diskon</span><span class="v">-${fmt(discount)}</span></div>` : ""}
+          ${pajak > 0 ? `<div class="kv"><span class="k">Pajak</span><span class="v">${fmt(pajak)}</span></div>` : ""}
+          ${service > 0 ? `<div class="kv"><span class="k">Service</span><span class="v">${fmt(service)}</span></div>` : ""}
           <div class="kv grand bold"><span class="k">TOTAL</span><span class="v">${fmt(total)}</span></div>
           ${trx.metodeBayar==="cash"?`<div class="kv"><span class="k">Bayar</span><span class="v">${fmt(trx.bayar)}</span></div><div class="kv"><span class="k">Kembalian</span><span class="v">${fmt(trx.kembalian)}</span></div>`:""}
         </div>
@@ -233,9 +237,9 @@ ${buildPrintCSS(paperWidthMm)}
   </body></html>`;
 }
 
-function buildPreviewHTML(receiptAdditionalValues, items, logo, receiptAdditionals, warungName, cats = [], warungAddress = "", warungPhone = "", paperWidthMm = DEFAULT_PAPER_WIDTH_MM) {
+function buildPreviewHTML(receiptAdditionalValues, items, logo, receiptAdditionals, warungName, cats = [], warungAddress = "", warungPhone = "", paperWidthMm = DEFAULT_PAPER_WIDTH_MM, pricingConfig = {}) {
   const subtotal = items.reduce((s, i) => s + i.harga * i.qty, 0);
-  const { pajak, service, total } = calcPrice(subtotal);
+  const { pajak, service, discount, total } = calcPrice(subtotal, { ...pricingConfig, items });
   const t = getNow();
   const addFields = buildAdditionalFields(receiptAdditionalValues, receiptAdditionals);
   const storeName = warungName || DEFAULT_WARUNG;
@@ -306,6 +310,9 @@ ${buildPrintCSS(paperWidthMm)}
         ${rows}
         <div class="totals">
           <div class="kv"><span class="k">SubTotal</span><span class="v">${fmt(subtotal)}</span></div>
+          ${discount > 0 ? `<div class="kv"><span class="k">Diskon</span><span class="v">-${fmt(discount)}</span></div>` : ""}
+          ${pajak > 0 ? `<div class="kv"><span class="k">Pajak</span><span class="v">${fmt(pajak)}</span></div>` : ""}
+          ${service > 0 ? `<div class="kv"><span class="k">Service</span><span class="v">${fmt(service)}</span></div>` : ""}
           <div class="kv grand bold"><span class="k">TOTAL</span><span class="v">${fmt(total)}</span></div>
         </div>
       </div>

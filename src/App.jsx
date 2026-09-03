@@ -128,6 +128,11 @@ function KasirWorkspace() {
     toast_: toastH.toast_, 
     onChange: (newSettings) => {
       cartH.setReceiptAdditionals(newSettings.receiptAdditionals || []);
+      cartH.setPricingConfig({
+        discounts: newSettings.discounts || [],
+        pajak: newSettings.pajak || { enabled: false, value: 0 },
+        service: newSettings.service || { enabled: false, value: 0 },
+      });
     }
   });
 
@@ -419,12 +424,12 @@ const printReceipt = useCallback(async (trx) => {
     if (!cartH.items.length) { toastH.toast_("Isi pesanan dulu", "err"); return; }
     setPrintingPreview(true);
     try {
-      const html = buildPreviewHTML(cartH.receiptAdditionalValues, cartH.items, settingsH.logo, settingsH.settings.receiptAdditionals, settingsH.settings.warungName, menuH.cats, settingsH.settings.warungAddress, settingsH.settings.warungPhone, settingsH.settings.receiptPaperWidthMm);
+      const html = buildPreviewHTML(cartH.receiptAdditionalValues, cartH.items, settingsH.logo, settingsH.settings.receiptAdditionals, settingsH.settings.warungName, menuH.cats, settingsH.settings.warungAddress, settingsH.settings.warungPhone, settingsH.settings.receiptPaperWidthMm, cartH.pricingConfig);
       await settingsH.printHTML(html, "Mencetak preview tagihan...");
     } finally {
       setPrintingPreview(false);
     }
-  }, [cartH.items, cartH.receiptAdditionalValues, toastH.toast_, settingsH.logo, settingsH.printHTML, settingsH.settings.receiptAdditionals, settingsH.settings.warungName, settingsH.settings.warungAddress, settingsH.settings.warungPhone, menuH.cats, settingsH.settings.receiptPaperWidthMm]);
+  }, [cartH.items, cartH.receiptAdditionalValues, cartH.pricingConfig, toastH.toast_, settingsH.logo, settingsH.printHTML, settingsH.settings.receiptAdditionals, settingsH.settings.warungName, settingsH.settings.warungAddress, settingsH.settings.warungPhone, menuH.cats, settingsH.settings.receiptPaperWidthMm]);
 
   // Dipanggil dari tombol "Bayar" di Open Bill view — pola setTimeout
   // DIPERTAHANKAN PERSIS dari kode asli (lihat catatan di useCart.js bagian
@@ -667,7 +672,7 @@ const executeConfirmDel = useCallback(() => {
             search={menuH.search} setSearch={menuH.setSearch} displayMenu={menuH.displayMenu} cats={menuH.cats}
             cart={cartH.cart} drawerOpen={cartH.drawerOpen} setDrawerOpen={cartH.setDrawerOpen}
             receiptAdditionalValues={cartH.receiptAdditionalValues} receiptAdditionals={cartH.receiptAdditionals} updateReceiptAdditionalValue={cartH.updateReceiptAdditionalValue}
-            items={cartH.items} subtotal={cartH.subtotal} service={cartH.service}
+            items={cartH.items} subtotal={cartH.subtotal} service={cartH.service} discount={cartH.discount}
             pajak={cartH.pajak} total={cartH.total} activeBill={cartH.activeBill}
             addToCart={cartH.addToCart} decCart={cartH.decCart} delCart={cartH.delCart} clearCart={cartH.clearCart}
             saveOpenBill={saveOpenBill} printPreview={printPreview} printingPreview={printingPreview} setPayModal={setPayModal}
@@ -686,6 +691,7 @@ const executeConfirmDel = useCallback(() => {
             loadBillAndPay={loadBillAndPay}
             setConfirmDel={setConfirmDel}
             settingsH={settingsH}
+            pricingConfig={cartH.pricingConfig}
           />
         )}
 
@@ -772,7 +778,7 @@ const executeConfirmDel = useCallback(() => {
 
       {/* ══ MODAL: SETTINGS (PRINTER & PAYMENT) ════════════════════════════ */}
       {settingsH.settingsModal && (
-        <SettingsModal settingsH={settingsH} authH={authH} />
+        <SettingsModal settingsH={settingsH} authH={authH} menu={menuH.menu} cats={menuH.cats} />
       )}
 
       {/* ══ MODAL: PRINTER (Legacy, kept for backward compatibility) ════════ */}

@@ -1,17 +1,97 @@
 import { useState, useEffect, useRef } from "react";
-import { G, W, BD, MT, LT } from "../../constants/colors.js";
+import { G, W, BD, MT, LT, TX } from "../../constants/colors.js";
 import { row, inp, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/theme.js";
 
-export default function SettingsModal({ settingsH, authH }) {
+export default function SettingsModal({ settingsH, authH, menu = [], cats = [] }) {
   const [tab, setTab] = useState("printer"); // "printer", "payment", "qris", or "receipt"
   const [loadingPrinters, setLoadingPrinters] = useState(false);
   const qrisImageRef = useRef({});
   const [newUser, setNewUser] = useState({ username: "", password: "", nama: "" });
+  const [pricingDraft, setPricingDraft] = useState({
+    type: "percentage", value: "", scope: "global", target: "", minQty: "1", perChunk: false, chunkQty: "5",
+  });
   // Local draft for receipt paper width; committed via Simpan button
   const [paperWidthDraft, setPaperWidthDraft] = useState(settingsH.settings.receiptPaperWidthMm || 80);
   useEffect(() => {
     setPaperWidthDraft(settingsH.settings.receiptPaperWidthMm || 80);
   }, [settingsH.settings.receiptPaperWidthMm]);
+
+  const savePricingPatch = async (patch) => {
+    await settingsH.savePricing(patch);
+  };
+
+  const addDiscount = async () => {
+    if (!pricingDraft.type) {
+      settingsH.toast_("Jenis diskon wajib dipilih", "err");
+      return;
+    }
+    if (String(pricingDraft.value).trim() === "") {
+      settingsH.toast_("Nilai diskon wajib diisi", "err");
+      return;
+    }
+    const value = Number(pricingDraft.value);
+    if (!Number.isFinite(value) || value <= 0) {
+      settingsH.toast_("Nilai diskon harus lebih besar dari 0", "err");
+      return;
+    }
+    if (!pricingDraft.scope) {
+      settingsH.toast_("Lingkup diskon wajib dipilih", "err");
+      return;
+    }
+    if (pricingDraft.type === "percentage" && value > 100) {
+      settingsH.toast_("Persentase diskon maksimal 100%", "err");
+      return;
+    }
+    if (pricingDraft.scope !== "global" && !pricingDraft.target) {
+      settingsH.toast_("Target diskon wajib dipilih", "err");
+      return;
+    }
+    if (String(pricingDraft.minQty).trim() === "") {
+      settingsH.toast_("Jumlah minimum wajib diisi", "err");
+      return;
+    }
+    if (!Number.isFinite(Number(pricingDraft.minQty)) || Number(pricingDraft.minQty) < 1) {
+      settingsH.toast_("Jumlah minimum harus minimal 1", "err");
+      return;
+    }
+    if (pricingDraft.perChunk && (!Number.isFinite(Number(pricingDraft.chunkQty)) || Number(pricingDraft.chunkQty) < 1)) {
+      settingsH.toast_("Jumlah pembagian harus minimal 1", "err");
+      return;
+    }
+    const rule = {
+      id: `discount_${Date.now()}`,
+      enabled: true,
+      type: pricingDraft.type,
+      value,
+      scope: pricingDraft.scope,
+      target: pricingDraft.scope === "global" ? "" : pricingDraft.target,
+      minQty: Math.max(1, Number(pricingDraft.minQty) || 1),
+      perChunk: pricingDraft.perChunk,
+      chunkQty: Math.max(1, Number(pricingDraft.chunkQty) || 1),
+    };
+    await savePricingPatch({ discounts: [...(settingsH.settings.discounts || []), rule] });
+    setPricingDraft({ ...pricingDraft, value: "", target: "" });
+  };
+
+  const removeDiscount = (id) => savePricingPatch({
+    discounts: (settingsH.settings.discounts || []).filter(rule => rule.id !== id),
+  });
+
+  const toggleDiscount = (id) => savePricingPatch({
+    discounts: (settingsH.settings.discounts || []).map(rule => rule.id === id ? { ...rule, enabled: rule.enabled === false } : rule),
+  });
+
+  const getDiscountTargetLabel = (rule) => {
+    if (rule.scope === "global") return "Semua item dan kategori";
+    const source = rule.scope === "category" ? cats : menu;
+    const target = source.find(entry => String(entry.key || entry.id) === String(rule.target));
+    const targetName = target?.label || target?.nama || rule.target || "Target tidak ditemukan";
+    return `${rule.scope === "category" ? "Kategori" : "Item"}: ${targetName}`;
+  };
+
+  const getDiscountValueLabel = (rule) => rule.type === "fixed"
+    ? `Rp ${Number(rule.value || 0).toLocaleString("id-ID")}`
+    : `${rule.value || 0}%`;
 
   const handleAddUser = async () => {
     const u = newUser.username.trim();
@@ -167,6 +247,23 @@ return (
             }}
           >
           Resi
+          </button>
+          <button
+            onClick={() => setTab("pricing")}
+            style={{
+              background: "none",
+              border: `2px solid ${tab === "pricing" ? G : MT}`,
+              padding: "6px 12px",
+              borderBottom: tab === "pricing" ? `2px solid ${G}` : "none",
+              cursor: "pointer",
+              fontFamily: "inherit",
+              fontSize: TYPOGRAPHY.small.fontSize,
+              fontWeight: tab === "pricing" ? 700 : 600,
+              color: tab === "pricing" ? G : MT,
+              paddingBottom: 6,
+            }}
+          >
+          Harga
           </button>
           <button
             onClick={() => setTab("users")}
@@ -802,6 +899,78 @@ return (
                     Tambah
                   </button>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {tab === "pricing" && (
+            <div>
+              <div style={{ fontSize: TYPOGRAPHY.label.fontSize, color: MT, marginBottom: 12 }}>
+                Atur diskon bertingkat, pajak, dan service untuk transaksi baru.
+              </div>
+              {["pajak", "service"].map((key) => {
+                const config = settingsH.settings[key] || { enabled: false, value: 0 };
+                return (
+                  <div key={key} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <input type="checkbox" checked={config.enabled !== false} onChange={(e) => savePricingPatch({ [key]: { ...config, enabled: e.target.checked } })} />
+                    <span style={{ width: 70, fontSize: TYPOGRAPHY.small.fontSize, fontWeight: 600 }}>{key === "pajak" ? "Pajak" : "Service"}</span>
+                    <input type="number" min="0" max="100" value={config.value || ""} onChange={(e) => savePricingPatch({ [key]: { ...config, value: Number(e.target.value) || 0 } })} style={{ ...inp, width: 90 }} />
+                    <span style={{ fontSize: TYPOGRAPHY.small.fontSize }}>%</span>
+                  </div>
+                );
+              })}
+
+              <div style={{ borderTop: `1px solid ${BD}`, paddingTop: 12, marginTop: 12 }}>
+                <div style={{ fontSize: TYPOGRAPHY.label.fontSize, fontWeight: 700, color: G, marginBottom: 8 }}>Tambah Diskon</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
+                  <select value={pricingDraft.type} onChange={(e) => setPricingDraft({ ...pricingDraft, type: e.target.value })} style={inp}>
+                    <option value="percentage">Persentase (%)</option>
+                    <option value="fixed">Nominal (Rp)</option>
+                  </select>
+                  <input type="number" min="0" value={pricingDraft.value} onChange={(e) => setPricingDraft({ ...pricingDraft, value: e.target.value })} placeholder="Nilai diskon" style={inp} />
+                  <select value={pricingDraft.scope} onChange={(e) => setPricingDraft({ ...pricingDraft, scope: e.target.value, target: "" })} style={inp}>
+                    <option value="global">Semua item</option>
+                    <option value="category">Kategori</option>
+                    <option value="item">Item</option>
+                  </select>
+                  <input type="number" min="1" value={pricingDraft.minQty} onChange={(e) => setPricingDraft({ ...pricingDraft, minQty: e.target.value })} placeholder="Min. jumlah" style={inp} />
+                </div>
+                <label style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 8, fontSize: TYPOGRAPHY.small.fontSize }}>
+                  <input type="checkbox" checked={pricingDraft.perChunk} onChange={(e) => setPricingDraft({ ...pricingDraft, perChunk: e.target.checked })} />
+                  Terapkan diskon per kelompok jumlah
+                </label>
+                {pricingDraft.perChunk && (
+                  <input type="number" min="1" value={pricingDraft.chunkQty} onChange={(e) => setPricingDraft({ ...pricingDraft, chunkQty: e.target.value })} placeholder="Jumlah per kelompok (contoh: 5)" style={{ ...inp, width: "100%", marginTop: 7 }} />
+                )}
+                {pricingDraft.scope !== "global" && (
+                  <select value={pricingDraft.target} onChange={(e) => setPricingDraft({ ...pricingDraft, target: e.target.value })} style={{ ...inp, width: "100%", marginTop: 7 }}>
+                    <option value="">Pilih {pricingDraft.scope === "category" ? "kategori" : "item"}</option>
+                    {(pricingDraft.scope === "category" ? cats : menu).map(entry => (
+                      <option key={entry.key || entry.id} value={entry.key || entry.id}>{entry.label || entry.nama}</option>
+                    ))}
+                  </select>
+                )}
+                <button onClick={addDiscount} style={{ marginTop: 8, padding: "8px 14px", background: G, color: W, border: "none", borderRadius: RADIUS.md, cursor: "pointer", fontFamily: "inherit", fontSize: TYPOGRAPHY.small.fontSize, fontWeight: 700 }}>Tambah Diskon</button>
+              </div>
+
+              <div style={{ marginTop: 14 }}>
+                <div style={{ fontSize: TYPOGRAPHY.label.fontSize, fontWeight: 700, color: G, marginBottom: 8 }}>
+                  Diskon Aktif dan Tersimpan:
+                </div>
+                {(settingsH.settings.discounts || []).map(rule => (
+                  <div key={rule.id} style={{ ...row, alignItems: "flex-start", padding: "8px 10px", background: rule.enabled === false ? LT : COLOR_PALETTE.primaryLight, borderRadius: RADIUS.md, marginBottom: 6 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: TYPOGRAPHY.small.fontSize, fontWeight: 700, color: rule.enabled === false ? MT : TX }}>
+                        {getDiscountTargetLabel(rule)}
+                      </div>
+                      <div style={{ fontSize: TYPOGRAPHY.label.fontSize, color: MT, marginTop: 3 }}>
+                        Diskon {getDiscountValueLabel(rule)} • Minimal {rule.minQty || 1} item{rule.perChunk ? ` • Per ${rule.chunkQty || 1} item` : ""}
+                      </div>
+                    </div>
+                    <button onClick={() => toggleDiscount(rule.id)} style={{ ...inp, width: "auto", padding: "4px 7px", cursor: "pointer" }}>{rule.enabled === false ? "Aktifkan" : "Matikan"}</button>
+                    <button onClick={() => removeDiscount(rule.id)} style={{ background: COLOR_PALETTE.dangerLight, color: COLOR_PALETTE.danger, border: "none", borderRadius: RADIUS.sm, padding: "4px 7px", cursor: "pointer" }}>Hapus</button>
+                  </div>
+                ))}
               </div>
             </div>
           )}

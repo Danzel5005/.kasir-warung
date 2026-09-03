@@ -33,6 +33,9 @@ function useSettings({ toast_, onChange }) {
     warungAddress: "",
     warungPhone: "",
     receiptPaperWidthMm: 80,
+    discounts: [],
+    pajak: { enabled: false, value: 0 },
+    service: { enabled: false, value: 0 },
   });
   const [settingsModal, setSettingsModal] = useState(false);
   const [printerModal, setPrinterModal] = useState(false);
@@ -76,6 +79,9 @@ function useSettings({ toast_, onChange }) {
     if (!s.expenseCategories || !Array.isArray(s.expenseCategories) || s.expenseCategories.length === 0) {
       s.expenseCategories = DEFAULT_EXPENSE_CATEGORIES;
     }
+    if (!Array.isArray(s.discounts)) s.discounts = [];
+    if (!s.pajak || typeof s.pajak !== "object") s.pajak = { enabled: false, value: 0 };
+    if (!s.service || typeof s.service !== "object") s.service = { enabled: false, value: 0 };
     // Ensure new fields exist
     if (!s.warungAddress) s.warungAddress = "";
     if (!s.warungPhone) s.warungPhone = "";
@@ -334,7 +340,15 @@ function useSettings({ toast_, onChange }) {
     toast_("Lebar kertas resi disimpan", "ok");
   }, [settings, toast_]);
 
+  const savePricing = useCallback(async (patch) => {
+    const s = { ...settings, ...patch };
+    await api.saveSettings(s);
+    setSettings(s);
+    onChange?.(s);
+  }, [settings, onChange]);
+
   return {
+    toast_,
     logo, settings, setSettings,
     settingsModal, setSettingsModal,
     printerModal, printerList, logoRef,
@@ -353,6 +367,7 @@ function useSettings({ toast_, onChange }) {
     toggleReceiptAdditionalRequired, deleteReceiptAdditional, addReceiptField,
     setWarungName, setWarungAddress, setWarungPhone,
     setReceiptPaperWidth,
+    savePricing,
   };
 }
 
