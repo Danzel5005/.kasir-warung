@@ -1,7 +1,7 @@
 
 # Kasir Warung — POS Desktop
 
-**Aplikasi kasir (Point of Sale) desktop untuk warung/kedai kopi**, dibangun dengan **React 18 + Electron 31 + Vite 5**.
+**Aplikasi kasir (Point of Sale) desktop untuk warung/restoran**, dibangun dengan **React 18 + Electron 31 + Vite 5**.
 
 Mendukung manajemen menu, open bill, shift kerja, berbagai metode pembayaran (Tunai, Debit, QRIS), cetak struk thermal, laporan penjualan lengkap, dan sistem lisensi berbasis hardware ID — didesain agar mudah dijalankan sebagai aplikasi Windows (.exe) mandiri.
 
@@ -256,7 +256,10 @@ Output: release/Kasir Warung Setup 1.1.0.exe (NSIS installer)
 · File .env, kunci lisensi, dan berkas generator (generator.cjs, generator.test.js) diabaikan oleh .gitignore — jangan dikomit
 · Migrasi Data: Saat pertama kali jalan versi SQLite, JSON lama otomatis dimigrasi ke SQLite dan dibackup ke data/json-backups/
 · Recovery: Jika aplikasi crash saat bayar, transaksi tertangguh di trx.wal dan dipulihkan otomatis saat startup berikutnya
-
+· Setelah update file apapun, dan ingin build .exe, selalu jalankan
+```bash
+npm run build
+```
 ---
 
  Hotkeys (Keyboard Shortcuts)
