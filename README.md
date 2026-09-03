@@ -127,7 +127,7 @@ Pilih shift (Semua / Shift tertentu / Shift aktif) untuk memfilter laporan:
 
 ---
 
-## 📁 Struktur Proyek
+## Struktur Proyek
 
 ```
 
