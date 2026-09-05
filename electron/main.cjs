@@ -719,7 +719,7 @@ function injectReceiptPrintCSS(rawHtml = "", paperWidthMm = DEFAULT_PAPER_WIDTH_
       max-width: ${w}mm !important;
       margin: 0 !important;
       padding: 0 !important;
-      overflow: hidden !important;
+      overflow: visible !important;
       background: #ffffff !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
@@ -730,10 +730,13 @@ function injectReceiptPrintCSS(rawHtml = "", paperWidthMm = DEFAULT_PAPER_WIDTH_
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     } 
-      .item, .totals, .section, .payment-note, .footer-note 
-      { 
+      .item, .totals, .payment-note, .footer-note {
       page-break-inside: avoid !important;
       break-inside: avoid !important;
+      }
+      .section, .receipt-body {
+        page-break-inside: auto !important;
+        break-inside: auto !important;
       }
       .receipt > .section.header {
         padding-bottom: 0 !important;
@@ -743,10 +746,6 @@ function injectReceiptPrintCSS(rawHtml = "", paperWidthMm = DEFAULT_PAPER_WIDTH_
       }
       .receipt > .section.body > .item:first-child {
         margin-top: 0 !important;
-      }
-      .receipt-body {
-        page-break-inside: avoid !important;
-        break-inside: avoid !important;
       }
       header, .receipt-body {
         display: block !important;
@@ -768,7 +767,7 @@ ipcMain.handle("print-receipt", (_e, { html, printerName, paperWidthMm }) => {
     ensureDir();
 
     const paperW = normalizePaperWidthMm(paperWidthMm);
-    const paperH = Math.max(paperW * 2, 100);
+    const paperH = 1000;
     const forceA4 = isPdfPrinter(printerName);
 
     const win = new BrowserWindow({
@@ -914,6 +913,38 @@ function buildEscPosReceipt(printer, trx, warungName, warungAddress, warungPhone
   printer.cut();
 }
 
+const ESC_POS_CHUNK_SIZE = 512;
+const ESC_POS_CHUNK_DELAY_MS = 25;
+
+function waitForEscPosChunk(driver, printerName, data) {
+  return new Promise((resolve, reject) => {
+    driver.printDirect({
+      data,
+      printer: printerName,
+      type: "RAW",
+      docname: false,
+      success: resolve,
+      error: reject,
+    });
+  });
+}
+
+async function executeEscPosInChunks(printer, printerName) {
+  const buffer = printer.getBuffer();
+  const driver = printer.Interface?.driver;
+
+  if (!buffer || !buffer.length) throw new Error("Buffer ESC/POS kosong");
+  if (!driver?.printDirect) throw new Error("Driver printer RAW tidak tersedia");
+
+  for (let offset = 0; offset < buffer.length; offset += ESC_POS_CHUNK_SIZE) {
+    const chunk = buffer.subarray(offset, Math.min(offset + ESC_POS_CHUNK_SIZE, buffer.length));
+    await waitForEscPosChunk(driver, printerName, chunk);
+    if (offset + ESC_POS_CHUNK_SIZE < buffer.length) {
+      await new Promise((resolve) => setTimeout(resolve, ESC_POS_CHUNK_DELAY_MS));
+    }
+  }
+}
+
 ipcMain.handle("print-receipt-escpos", async (_e, { trx, printerName, paperWidthMm, warungName, warungAddress, warungPhone, operatorName, cats = [] }) => {
   const selectedName = printerName || "auto";
   try {
@@ -943,7 +974,8 @@ ipcMain.handle("print-receipt-escpos", async (_e, { trx, printerName, paperWidth
     const categoryList = [...cats, ...persistedCats];
     buildEscPosReceipt(printer, trx, warungName, warungAddress, warungPhone, operatorName, categoryList);
 
-    await printer.execute();
+    const rawPrinterName = printer.Interface.getPrinterName();
+    await executeEscPosInChunks(printer, rawPrinterName);
     console.log("[ESC/POS] Print successful to:", selectedName);
     return { ok: true };
   } catch (err) {

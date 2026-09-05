@@ -101,13 +101,17 @@ function useMenu({ toast_, addUndo }) {
     toast_(`Kategori "${label}" ditambahkan`, "ok");
   }, [newCatLabel, cats, toast_]);
 
-  // PENTING: membaca cats LANGSUNG dari closure. Wajib [cats, addUndo].
+  // PENTING: membaca cats dan menu LANGSUNG dari closure. Wajib [cats, menu, addUndo, toast_].
   const deleteCat = useCallback(async (key) => {
+    if (menu.some(item => item.kategori === key)) {
+      toast_("Kategori masih dipakai menu. Pindahkan menu ke kategori lain terlebih dahulu", "err");
+      return;
+    }
     const snap = [...cats];
     const next = cats.filter(c => c.key !== key);
     await api.saveCats(next); setCats(next);
     addUndo("Hapus Kategori", async () => { await api.saveCats(snap); setCats(snap); });
-  }, [cats, addUndo]);
+  }, [cats, menu, addUndo, toast_]);
 
   const editCat = useCallback(async (key, nextLabel) => {
     try {
