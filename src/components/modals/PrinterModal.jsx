@@ -1,5 +1,4 @@
-import { G, W, BD, MT } from "../../constants/colors.js";
-import { row, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/theme.js";
+import { G, W, BD, MT, row, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/design.js";
 
 export default function PrinterModal({ settingsH }) {
   return (

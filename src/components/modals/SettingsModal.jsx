@@ -1,6 +1,37 @@
 import { useState, useEffect, useRef } from "react";
-import { G, W, BD, MT, LT, TX } from "../../constants/colors.js";
-import { row, inp, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/theme.js";
+import { G, W, BD, MT, LT, TX, row, inp, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/design.js";
+
+const SETTINGS_TABS = [
+  ["printer", "Printer"],
+  ["warung", "Nama Warung"],
+  ["payment", "Metode Bayar"],
+  ["qris", "QRIS"],
+  ["receipt", "Resi"],
+  ["pricing", "Harga"],
+  ["users", "Kelola Pengguna"],
+];
+
+function SettingsTabButton({ tab, activeTab, onSelect, children }) {
+  return (
+    <button
+      onClick={() => onSelect(tab)}
+      style={{
+        background: "none",
+        border: `2px solid ${activeTab === tab ? G : MT}`,
+        padding: "6px 12px",
+        borderBottom: activeTab === tab ? `2px solid ${G}` : "none",
+        cursor: "pointer",
+        fontFamily: "inherit",
+        fontSize: TYPOGRAPHY.small.fontSize,
+        fontWeight: activeTab === tab ? 700 : 600,
+        color: activeTab === tab ? G : MT,
+        paddingBottom: 6,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
 
 export default function SettingsModal({ settingsH, authH, menu = [], cats = [] }) {
   const [tab, setTab] = useState("printer"); // "printer", "payment", "qris", or "receipt"
@@ -171,125 +202,11 @@ return (
 
         {/* Tabs */}
         <div style={{ display: "flex", gap: 6, marginBottom: 14, borderBottom: `1px solid ${BD}`, paddingBottom: 10 }}>
-          <button
-            onClick={() => setTab("printer")}
-            style={{
-              background: "none",
-              border: `2px solid ${tab === "printer" ? G : MT}`,
-              padding: "6px 12px",
-              borderBottom: tab === "printer" ? `2px solid ${G}` : "none",
-              cursor: "pointer",
-              fontFamily: "inherit",
-              fontSize: TYPOGRAPHY.small.fontSize,
-              fontWeight: tab === "printer" ? 700 : 600,
-              color: tab === "printer" ? G : MT,
-              paddingBottom: 6,
-            }}
-          >
-          Printer
-          </button>
-          <button
-            onClick={() => setTab("warung")}
-            style={{
-              background: "none",
-              border: `2px solid ${tab === "warung" ? G : MT}`,
-              padding: "6px 12px",
-              borderBottom: tab === "warung" ? `2px solid ${G}` : "none",
-              cursor: "pointer",
-              fontFamily: "inherit",
-              fontSize: TYPOGRAPHY.small.fontSize,
-              fontWeight: tab === "warung" ? 700 : 600,
-              color: tab === "warung" ? G : MT,
-              paddingBottom: 6,
-            }}
-          >
-          Nama Warung
-          </button>
-          <button
-            onClick={() => setTab("payment")}
-            style={{
-              background: "none",
-              border: `2px solid ${tab === "payment" ? G : MT}`,
-              padding: "6px 12px",
-              borderBottom: tab === "payment" ? `2px solid ${G}` : "none",
-              cursor: "pointer",
-              fontFamily: "inherit",
-              fontSize: TYPOGRAPHY.small.fontSize,
-              fontWeight: tab === "payment" ? 700 : 600,
-              color: tab === "payment" ? G : MT,
-              paddingBottom: 6,
-            }}
-          >
-          Metode Bayar
-          </button>
-          <button
-            onClick={() => setTab("qris")}
-            style={{
-              background: "none",
-              border: `2px solid ${tab === "qris" ? G : MT}`,
-              padding: "6px 12px",
-              borderBottom: tab === "qris" ? `2px solid ${G}` : "none",
-              cursor: "pointer",
-              fontFamily: "inherit",
-              fontSize: TYPOGRAPHY.small.fontSize,
-              fontWeight: tab === "qris" ? 700 : 600,
-              color: tab === "qris" ? G : MT,
-              paddingBottom: 6,
-            }}
-          >
-          QRIS
-          </button>
-          <button
-            onClick={() => setTab("receipt")}
-            style={{
-              background: "none",
-              border: `2px solid ${tab === "receipt" ? G : MT}`,
-              padding: "6px 12px",
-              borderBottom: tab === "receipt" ? `2px solid ${G}` : "none",
-              cursor: "pointer",
-              fontFamily: "inherit",
-              fontSize: TYPOGRAPHY.small.fontSize,
-              fontWeight: tab === "receipt" ? 700 : 600,
-              color: tab === "receipt" ? G : MT,
-              paddingBottom: 6,
-            }}
-          >
-          Resi
-          </button>
-          <button
-            onClick={() => setTab("pricing")}
-            style={{
-              background: "none",
-              border: `2px solid ${tab === "pricing" ? G : MT}`,
-              padding: "6px 12px",
-              borderBottom: tab === "pricing" ? `2px solid ${G}` : "none",
-              cursor: "pointer",
-              fontFamily: "inherit",
-              fontSize: TYPOGRAPHY.small.fontSize,
-              fontWeight: tab === "pricing" ? 700 : 600,
-              color: tab === "pricing" ? G : MT,
-              paddingBottom: 6,
-            }}
-          >
-          Harga
-          </button>
-          <button
-            onClick={() => setTab("users")}
-            style={{
-              background: "none",
-              border: `2px solid ${tab === "users" ? G : MT}`,
-              padding: "6px 12px",
-              borderBottom: tab === "users" ? `2px solid ${G}` : "none",
-              cursor: "pointer",
-              fontFamily: "inherit",
-              fontSize: TYPOGRAPHY.small.fontSize,
-              fontWeight: tab === "users" ? 700 : 600,
-              color: tab === "users" ? G : MT,
-              paddingBottom: 6,
-            }}
-          >
-          Kelola Pengguna
-          </button>
+          {SETTINGS_TABS.map(([key, label]) => (
+            <SettingsTabButton key={key} tab={key} activeTab={tab} onSelect={setTab}>
+              {label}
+            </SettingsTabButton>
+          ))}
         </div>
 
         {/* Content (scrollable) */}

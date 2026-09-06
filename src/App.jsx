@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { METODE_LABELS} from "./constants/payments.js";
-import { G, OR, W, LT, BD, TX, MT } from "./constants/colors.js";
+import { G, OR, W, LT, BD, TX, MT } from "./constants/design.js";
 import { buildReceiptHTML, buildPreviewHTML, fmt } from "./utilities/receipt.js";
 import { getPrinterSelectionStatus } from "./utilities/printer.js";
 import { api } from "./utilities/utils.js";
@@ -17,7 +17,7 @@ import { useBills } from "./hooks/useBills.js";
 import { useCart } from "./hooks/useCart.js";
 import { useHistory } from "./hooks/useHistory.js";
 import { useBarcodeScanner } from "./hooks/useBarcodeScanner.js";
-import { row } from "./constants/styles.js";
+import { row } from "./constants/design.js";
 
 import ViewOpenBill from "./views/ViewOpenBill.jsx";
 import ViewKasir from "./views/ViewKasir.jsx";

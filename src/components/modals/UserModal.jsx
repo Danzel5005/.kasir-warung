@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { G, W, LT, BD, MT } from "../../constants/colors.js";
-import { row, inp, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/theme.js";
+import { G, W, LT, BD, MT, row, inp, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/design.js";
 
 export default function UserModal({ authH, setUserModal }) {
   const { users, addUser, deleteUser, currentUser } = authH;
