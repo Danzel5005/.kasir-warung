@@ -10,6 +10,7 @@ export default function SettingsModal({ settingsH, authH, menu = [], cats = [] }
   const [pricingDraft, setPricingDraft] = useState({
     type: "percentage", value: "", scope: "global", target: "", minQty: "1", perChunk: false, chunkQty: "5",
   });
+  const [discountTargetSearch, setDiscountTargetSearch] = useState("");
   // Local draft for receipt paper width; committed via Simpan button
   const [paperWidthDraft, setPaperWidthDraft] = useState(settingsH.settings.receiptPaperWidthMm || 80);
   useEffect(() => {
@@ -92,6 +93,13 @@ export default function SettingsModal({ settingsH, authH, menu = [], cats = [] }
   const getDiscountValueLabel = (rule) => rule.type === "fixed"
     ? `Rp ${Number(rule.value || 0).toLocaleString("id-ID")}`
     : `${rule.value || 0}%`;
+
+  const discountTargetEntries = pricingDraft.scope === "category" ? cats : menu;
+  const discountTargetQuery = discountTargetSearch.trim().toLowerCase();
+  const filteredDiscountTargets = discountTargetEntries.filter(entry => {
+    if (!discountTargetQuery) return true;
+    return `${entry.label || entry.nama || ""} ${entry.key || entry.id || ""}`.toLowerCase().includes(discountTargetQuery);
+  });
 
   const handleAddUser = async () => {
     const u = newUser.username.trim();
@@ -928,7 +936,7 @@ return (
                     <option value="fixed">Nominal (Rp)</option>
                   </select>
                   <input type="number" min="0" value={pricingDraft.value} onChange={(e) => setPricingDraft({ ...pricingDraft, value: e.target.value })} placeholder="Nilai diskon" style={inp} />
-                  <select value={pricingDraft.scope} onChange={(e) => setPricingDraft({ ...pricingDraft, scope: e.target.value, target: "" })} style={inp}>
+                  <select value={pricingDraft.scope} onChange={(e) => { setPricingDraft({ ...pricingDraft, scope: e.target.value, target: "" }); setDiscountTargetSearch(""); }} style={inp}>
                     <option value="global">Semua item</option>
                     <option value="category">Kategori</option>
                     <option value="item">Item</option>
@@ -943,12 +951,39 @@ return (
                   <input type="number" min="1" value={pricingDraft.chunkQty} onChange={(e) => setPricingDraft({ ...pricingDraft, chunkQty: e.target.value })} placeholder="Jumlah per kelompok (contoh: 5)" style={{ ...inp, width: "100%", marginTop: 7 }} />
                 )}
                 {pricingDraft.scope !== "global" && (
-                  <select value={pricingDraft.target} onChange={(e) => setPricingDraft({ ...pricingDraft, target: e.target.value })} style={{ ...inp, width: "100%", marginTop: 7 }}>
-                    <option value="">Pilih {pricingDraft.scope === "category" ? "kategori" : "item"}</option>
-                    {(pricingDraft.scope === "category" ? cats : menu).map(entry => (
-                      <option key={entry.key || entry.id} value={entry.key || entry.id}>{entry.label || entry.nama}</option>
-                    ))}
-                  </select>
+                  <>
+                    <input
+                      type="search"
+                      value={discountTargetSearch}
+                      onChange={(e) => setDiscountTargetSearch(e.target.value)}
+                      placeholder={`Cari ${pricingDraft.scope === "category" ? "kategori" : "item"}...`}
+                      aria-label={`Cari ${pricingDraft.scope === "category" ? "kategori" : "item"} diskon`}
+                      style={{ ...inp, width: "100%", marginTop: 7 }}
+                    />
+                    <div style={{ border: `1px solid ${BD}`, borderRadius: RADIUS.md, marginTop: 7, maxHeight: 150, overflowY: "auto" }}>
+                      {filteredDiscountTargets.length > 0 ? filteredDiscountTargets.map(entry => {
+                        const entryKey = entry.key || entry.id;
+                        const entryName = entry.label || entry.nama;
+                        return (
+                          <button
+                            key={entryKey}
+                            type="button"
+                            onClick={() => setPricingDraft({ ...pricingDraft, target: entryKey })}
+                            style={{ display: "block", width: "100%", padding: "8px 10px", border: "none", borderBottom: `1px solid ${BD}`, background: pricingDraft.target === entryKey ? COLOR_PALETTE.primaryLight : W, color: TX, textAlign: "left", cursor: "pointer", fontFamily: "inherit", fontSize: TYPOGRAPHY.small.fontSize }}
+                          >
+                            {entryName}
+                          </button>
+                        );
+                      }) : (
+                        <div style={{ padding: "8px 10px", color: MT, fontSize: TYPOGRAPHY.small.fontSize }}>
+                          Tidak ada nama yang cocok untuk item/kategori tersebut!
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ marginTop: 5, fontSize: TYPOGRAPHY.label.fontSize, color: pricingDraft.target ? G : MT }}>
+                      {pricingDraft.target ? `Terpilih: ${discountTargetEntries.find(entry => String(entry.key || entry.id) === String(pricingDraft.target))?.label || discountTargetEntries.find(entry => String(entry.key || entry.id) === String(pricingDraft.target))?.nama || pricingDraft.target}` : `Pilih ${pricingDraft.scope === "category" ? "kategori" : "item"} dari hasil pencarian`}
+                    </div>
+                  </>
                 )}
                 <button onClick={addDiscount} style={{ marginTop: 8, padding: "8px 14px", background: G, color: W, border: "none", borderRadius: RADIUS.md, cursor: "pointer", fontFamily: "inherit", fontSize: TYPOGRAPHY.small.fontSize, fontWeight: 700 }}>Tambah Diskon</button>
               </div>
