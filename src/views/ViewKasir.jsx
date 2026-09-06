@@ -1,6 +1,7 @@
 import { memo, useState } from "react";
 import { fmt } from "../utilities/receipt.js";
-import { G, OR, W, LT, BD, TX, MT, inp, row } from "../constants/design.js";
+import { G, OR, W, LT, BD, TX, MT } from "../constants/colors.js";
+import { inp, row } from "../constants/styles.js";
 import StockBadge from "../components/StockBadge.jsx";
 import AdditionalsModal from "../components/modals/AdditionalsModal.jsx";
 

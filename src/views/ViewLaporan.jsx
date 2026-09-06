@@ -2,7 +2,7 @@ import { memo, useEffect, useState } from "react";
 import { csvByDay, TRX_HEADER, trxRow, csvLaporan, csvSalesRate, csvPerMenu, csvMetodeBayar, csvStok } from "../utilities/csvbuild.js";
 import { fmt, fmtNum } from "../utilities/receipt.js";
 import { METODE_LABELS } from "../constants/payments.js";
-import { G, OR, W, LT, BD, TX, MT, METODE_COLORS } from "../constants/design.js";
+import { G, OR, W, LT, BD, TX, MT, METODE_COLORS } from "../constants/colors.js";
 
 // ViewLaporan — laporan keuangan & penjualan per shift, dengan CSV export.
 function ViewLaporan({

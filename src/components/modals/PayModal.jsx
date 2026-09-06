@@ -1,5 +1,6 @@
 import { fmt } from "../../utilities/receipt.js";
-import { G, OR, W, LT, BD, TX, MT, row, inp, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/design.js";
+import { G, OR, W, LT, BD, TX, MT } from "../../constants/colors.js";
+import { row, inp, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/theme.js";
 
 export default function PayModal({ cartH, processPayment, setPayModal, paymentMethods = [], receiptAdditionals = [] }) {
   // Group payment methods by category

@@ -1,5 +1,6 @@
 import { memo } from "react";
-import { G, OR, W, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../constants/design.js";
+import { G, OR, W } from "../constants/colors.js";
+import { RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../constants/theme.js";
 
 function StockBadge({ stok }) {
   if (stok === null || stok === undefined) return null;

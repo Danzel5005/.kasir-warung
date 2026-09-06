@@ -1,4 +1,5 @@
-import { W, BD, MT, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/design.js";
+import { W, BD, MT } from "../../constants/colors.js";
+import { RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/theme.js";
 
 export default function CloseShiftModal({ authH, confirmCloseShift }) {
   return (

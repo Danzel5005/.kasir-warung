@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { calcPrice } from "../../utilities/calculations.js";
 import { fmt } from "../../utilities/receipt.js";
 import { METODE_LABELS} from "../../constants/payments.js";
-import { METODE_COLORS, G, OR, W, BD, MT, row, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/design.js";
+import { METODE_COLORS, G, OR, W, BD, MT } from "../../constants/colors.js";
+import { row, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/theme.js";
 
 export default function ReceiptModal({ receipt, logo, printReceipt, setReceipt, receiptAdditionals, qrisImages, paymentMethods = [] }) {
   const [isPrinting, setIsPrinting] = useState(false);

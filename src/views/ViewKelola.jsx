@@ -1,6 +1,7 @@
 import { memo, useMemo } from "react";
 import { fmt } from "../utilities/receipt.js";
-import { G, W, BD, MT, row, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../constants/design.js";
+import { G, W, BD, MT } from "../constants/colors.js";
+import { row, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../constants/theme.js";
 import StockBadge from "../components/StockBadge.jsx";
 
 // ViewKelola — kelola menu, kategori (CRUD).

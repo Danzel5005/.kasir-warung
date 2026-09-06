@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { G, W, BD, row, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/design.js";
+import { G, W, BD } from "../../constants/colors.js";
+import { row, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/theme.js";
 import { ADDITIONALS } from "../../constants/additionals.js";
 
 export default function AdditionalsModal({ item, isOpen, onClose, onConfirm, cats }) {
