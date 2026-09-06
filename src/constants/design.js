@@ -1,19 +1,11 @@
-// Design System Tokens for restaurant / Kasir Warung Nusantara
+// Single source of truth for the Kasir Warung visual design system.
 
-/**
- * 8-Step Color Palette
- */
 export const COLOR_PALETTE = {
-  // Brand / Primary (Emerald Green)
   primary: "#1a5c38",
   primaryDark: "#0f3d24",
   primaryLight: "#e8f5ee",
-
-  // Accent / Secondary (Warm Orange)
   secondary: "#e87c2a",
   secondaryLight: "#fff8e0",
-
-  // Status & Semantics
   danger: "#d32f2f",
   dangerLight: "#ffebee",
   info: "#1a5fb4",
@@ -22,8 +14,6 @@ export const COLOR_PALETTE = {
   warningLight: "#fff0e8",
   teal: "#0a7a7a",
   tealLight: "#e0f5f5",
-
-  // Neutrals & Surface Colors
   background: "#0f0e0c",
   surface: "#ffffff",
   surfaceAlt: "#f5f5f0",
@@ -33,22 +23,16 @@ export const COLOR_PALETTE = {
   textMuted: "#888888",
 };
 
-/**
- * Payment Method Specific Colors (Standardized mapping)
- */
 export const METODE_COLORS = {
-  "cash":         { bg: COLOR_PALETTE.secondaryLight, tc: "#b87a00" },
-  "debit-bca":    { bg: COLOR_PALETTE.infoLight, tc: COLOR_PALETTE.info },
-  "debit-bni":    { bg: COLOR_PALETTE.warningLight, tc: COLOR_PALETTE.warning },
-  "qris-bca":     { bg: COLOR_PALETTE.primaryLight, tc: COLOR_PALETTE.primary },
-  "qris-bni":     { bg: COLOR_PALETTE.tealLight, tc: COLOR_PALETTE.teal },
+  cash: { bg: COLOR_PALETTE.secondaryLight, tc: "#b87a00" },
+  "debit-bca": { bg: COLOR_PALETTE.infoLight, tc: COLOR_PALETTE.info },
+  "debit-bni": { bg: COLOR_PALETTE.warningLight, tc: COLOR_PALETTE.warning },
+  "qris-bca": { bg: COLOR_PALETTE.primaryLight, tc: COLOR_PALETTE.primary },
+  "qris-bni": { bg: COLOR_PALETTE.tealLight, tc: COLOR_PALETTE.teal },
   "transfer-bca": { bg: COLOR_PALETTE.infoLight, tc: COLOR_PALETTE.info },
-  "qris":         { bg: COLOR_PALETTE.primaryLight, tc: COLOR_PALETTE.primary },
+  qris: { bg: COLOR_PALETTE.primaryLight, tc: COLOR_PALETTE.primary },
 };
 
-/**
- * 6-Step Typographic Scale
- */
 export const TYPOGRAPHY = {
   h1: { fontSize: 24, lineHeight: 1.2, fontWeight: 700 },
   h2: { fontSize: 18, lineHeight: 1.3, fontWeight: 700 },
@@ -60,9 +44,6 @@ export const TYPOGRAPHY = {
   code: { fontSize: 12, fontFamily: "monospace" },
 };
 
-/**
- * 5 Border Radius Tokens
- */
 export const RADIUS = {
   none: 0,
   sm: 4,
@@ -72,9 +53,6 @@ export const RADIUS = {
   full: 9999,
 };
 
-/**
- * 4-Step Spacing Scale
- */
 export const SPACING = {
   none: 0,
   xs: 4,
@@ -85,9 +63,6 @@ export const SPACING = {
   xxl: 32,
 };
 
-/**
- * Standardized Input & Form Layout Style Tokens
- */
 export const inp = {
   width: "100%",
   padding: "8px 10px",
@@ -106,7 +81,6 @@ export const row = {
   alignItems: "center",
 };
 
-// Legacy shorthand aliases for backward compatibility across existing files
 export const G = COLOR_PALETTE.primary;
 export const OR = COLOR_PALETTE.secondary;
 export const W = COLOR_PALETTE.surface;

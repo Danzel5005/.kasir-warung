@@ -1,6 +1,5 @@
 import { fmt } from "../../utilities/receipt.js";
-import { G, W, LT, BD, TX, MT } from "../../constants/colors.js";
-import { row, inp, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/theme.js";
+import { G, W, LT, BD, TX, MT, row, inp, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/design.js";
 
 export default function ItemModal({ menuH, photoRef, fmt: fmtProp }) {
   // Gunakan fmt dari prop kalau ada (backward compat), fallback ke import lokal

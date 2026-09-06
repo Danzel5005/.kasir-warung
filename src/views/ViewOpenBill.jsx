@@ -1,8 +1,7 @@
 import { useState, memo } from "react";
 import { calcPrice } from "../utilities/calculations.js";
 import { fmt } from "../utilities/receipt.js";
-import { G, OR, W, BD, MT, BG } from "../constants/colors.js";
-import { row, RADIUS, TYPOGRAPHY, COLOR_PALETTE, SPACING } from "../constants/theme.js";
+import { G, OR, W, BD, MT, BG, row, RADIUS, TYPOGRAPHY, COLOR_PALETTE, SPACING } from "../constants/design.js";
 import { Tag } from "../components/Tag.jsx";
 import BillDetailModal from "../components/BillDetailModal.jsx";
 

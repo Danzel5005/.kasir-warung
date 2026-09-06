@@ -2,10 +2,8 @@ import { memo, useState, useCallback } from "react";
 import { csvByDay, TRX_HEADER, trxRow } from "../utilities/csvbuild.js";
 import { fmt } from "../utilities/receipt.js";
 import { METODE_LABELS } from "../constants/payments.js";
-import { G, OR, W, LT, BD, TX, MT } from "../constants/colors.js";
-import { inp, row } from "../constants/styles.js";
+import { G, OR, W, LT, BD, TX, MT, inp, row, METODE_COLORS } from "../constants/design.js";
 import { Tag } from "../components/Tag.jsx";
-import { METODE_COLORS } from "../constants/colors.js";
 
 // ViewRiwayat — riwayat transaksi dengan filter tanggal, collapse-by-day,
 // view per shift, pagination, dan CSV download.

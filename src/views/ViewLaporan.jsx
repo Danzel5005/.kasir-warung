@@ -1,8 +1,8 @@
-import { memo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { csvByDay, TRX_HEADER, trxRow, csvLaporan, csvSalesRate, csvPerMenu, csvMetodeBayar, csvStok } from "../utilities/csvbuild.js";
 import { fmt, fmtNum } from "../utilities/receipt.js";
 import { METODE_LABELS } from "../constants/payments.js";
-import { G, OR, W, LT, BD, TX, MT, METODE_COLORS } from "../constants/colors.js";
+import { G, OR, W, LT, BD, TX, MT, METODE_COLORS } from "../constants/design.js";
 
 // ViewLaporan — laporan keuangan & penjualan per shift, dengan CSV export.
 function ViewLaporan({
@@ -11,7 +11,7 @@ function ViewLaporan({
   history,                                // historyH
   menu,                                   // menuH.menu (array)
   menuH,                                  // menuH (hook object with cats)
-  doCSV, at,                              // historyH
+  doCSV, at, loadAllForReport,            // historyH
   paymentMethods,                         // settingsH
   expenseCategories = [],
   openingCash = 0,
@@ -19,12 +19,22 @@ function ViewLaporan({
   onOpenExpenseModal,
   onOpenCashModal,
 }) {
-  const shiftTrx = selectedShiftId==="all"
-    ? history
-    : selectedShiftId
-      ? history.filter(t=>t.shiftId===selectedShiftId)
-      : history.filter(t=>t.shiftId===activeShift?.id);
   const selShift = shifts.find(s=>s.id===selectedShiftId) || activeShift;
+  const reportShiftId = selectedShiftId === "all" ? undefined : selectedShiftId || activeShift?.id;
+  const [shiftTrx, setShiftTrx] = useState([]);
+  const [isReportLoading, setIsReportLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsReportLoading(true);
+    loadAllForReport(reportShiftId).then((transactions) => {
+      if (cancelled) return;
+      setShiftTrx(transactions);
+      setIsReportLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [loadAllForReport, reportShiftId]);
+
   const shiftLabel = selectedShiftId==="all"
     ? "Semua Shift"
     : selShift
@@ -165,7 +175,7 @@ function ViewLaporan({
         </div>
       </div>
 
-      <div style={{fontSize:11,fontWeight:700,color:G,marginBottom:10}}>📊 {shiftLabel} — {shiftTrx.length} transaksi</div>
+      <div style={{fontSize:11,fontWeight:700,color:G,marginBottom:10}}>📊 {shiftLabel} — {isReportLoading ? "memuat..." : `${shiftTrx.length} transaksi`}</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))",gap:10,marginBottom:20}}>
         {[
           {l:"Total Pendapatan",v:fmt(rev),c:G,s:`dari ${shiftTrx.length} trx`,key:"income"},

@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { G, W, LT, BD } from "../../constants/colors.js";
-import { row, inp, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/theme.js";
+import { G, W, LT, BD, row, inp, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/design.js";
 
 export default function CatModal({ menuH }) {
   const [tagModalCat, setTagModalCat] = useState(null);

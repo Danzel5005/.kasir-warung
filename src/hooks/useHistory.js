@@ -201,6 +201,31 @@ function useHistory({ toast_, addUndo, getNow }) {
     }
   }, [fFrom, fTo, shiftIdFilter, sortOrder]);
 
+  const loadAllForReport = useCallback(async (shiftId) => {
+    try {
+      const pageSizeForReport = 10000;
+      const transactions = [];
+      let page = 0;
+      let total = 0;
+      do {
+        const result = await api.loadTrxFiltered({
+          page,
+          pageSize: pageSizeForReport,
+          shiftId: shiftId || undefined,
+          sort: sortOrder,
+        });
+        transactions.push(...(result.transactions || []));
+        total = Number(result.total || transactions.length);
+        page += 1;
+        if (!result.transactions?.length) break;
+      } while (transactions.length < total);
+      return transactions;
+    } catch (err) {
+      console.error("[useHistory] loadAllForReport error:", err);
+      return [];
+    }
+  }, [sortOrder]);
+
   // Toggle sort order
   const toggleSort = useCallback(() => {
     setSortOrder(prev => prev === "asc" ? "desc" : "asc");
@@ -240,6 +265,7 @@ function useHistory({ toast_, addUndo, getNow }) {
     at,
     doCSV,
     loadAllForExport,
+    loadAllForReport,
   };
 }
 

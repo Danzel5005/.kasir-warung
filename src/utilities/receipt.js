@@ -85,7 +85,7 @@ const getQrisImage = (metodeBayar, qrisImages) => {
 
 // Get category display name (resolves persisted key/id to the current label)
 const getCategoryName = (cat, cats) => {
-  if (!cat) return "";
+  if (!cat) return "Lainnya";
   if (cats && cats.length) {
     const found = cats.find(c => String(c.key ?? c.id) === String(cat));
     if (found) return found.label || found.name || cat;
@@ -326,4 +326,4 @@ ${buildPrintCSS(paperWidthMm)}
   </body></html>`;
 }
 
-export {buildReceiptHTML, buildPreviewHTML, fmt, fmtNum, DEFAULT_WARUNG, DEFAULT_PAPER_WIDTH_MM};
+export {buildReceiptHTML, buildPreviewHTML, fmt, fmtNum, DEFAULT_WARUNG, DEFAULT_PAPER_WIDTH_MM, getCategoryName};

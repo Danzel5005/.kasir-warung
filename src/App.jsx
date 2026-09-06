@@ -1,12 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { METODE_LABELS} from "./constants/payments.js";
-import { G, OR, W, LT, BD, TX, MT } from "./constants/colors.js";
+import { G, OR, W, LT, BD, TX, MT, row } from "./constants/design.js";
 import { buildReceiptHTML, buildPreviewHTML, fmt } from "./utilities/receipt.js";
-import { normalizeBarcodeInput, findMenuByMenuId } from "./utilities/barcode.js";
 import { getPrinterSelectionStatus } from "./utilities/printer.js";
 import { api } from "./utilities/utils.js";
 import { resolveShiftTarget } from "./utilities/shiftState.js";
-import { row } from "./constants/styles.js";
 import { ClockBadge } from "./components/ClockBadge.jsx";
 import { SnakeLoader } from "./components/SnakeLoader.jsx";
 
@@ -18,6 +16,7 @@ import { useMenu } from "./hooks/useMenu.js";
 import { useBills } from "./hooks/useBills.js";
 import { useCart } from "./hooks/useCart.js";
 import { useHistory } from "./hooks/useHistory.js";
+import { useBarcodeScanner } from "./hooks/useBarcodeScanner.js";
 
 import ViewOpenBill from "./views/ViewOpenBill.jsx";
 import ViewKasir from "./views/ViewKasir.jsx";
@@ -238,74 +237,14 @@ function KasirWorkspace() {
 
   const logoRef   = settingsH.logoRef;
   const searchRef = useRef();
-  const scanBufferRef = useRef("");
-  const scanTimeoutRef = useRef(null);
-  const lastScanRef = useRef({ code: "", time: 0 });
-
-  const handleBarcodeScanned = useCallback((rawCode, source = "keyboard") => {
-    const code = normalizeBarcodeInput(rawCode);
-    if (!code) return;
-
-    const now = Date.now();
-    if (code === lastScanRef.current.code && now - lastScanRef.current.time < 300) return;
-    lastScanRef.current = { code, time: now };
-
-    if (source === "keyboard") {
-      menuH.setSearch(code);
-      return;
-    }
-
-    menuH.setSearch(code);
-  }, [menuH.setSearch]);
-
-  useEffect(() => {
-    const trimmed = menuH.search.trim();
-    if (!trimmed) return;
-
-    const match = findMenuByMenuId(menuH.menu, trimmed);
-    if (!match) return;
-
-    setView("menu");
-    cartH.addToCart(match);
-    toastH.toast_(`+1 ${match.nama}`, "ok");
-    menuH.setSearch("");
-  }, [cartH.addToCart, menuH.menu, menuH.search, menuH.setSearch, toastH.toast_]);
-
-  useEffect(() => {
-    const flushScan = () => {
-      const code = normalizeBarcodeInput(scanBufferRef.current);
-      scanBufferRef.current = "";
-      if (code) handleBarcodeScanned(code, "keyboard");
-    };
-
-    const onKeyDown = (e) => {
-      const targetTag = e.target?.tagName || "";
-      if (e.ctrlKey || e.altKey || e.metaKey) return;
-      if (targetTag === "INPUT" || targetTag === "TEXTAREA" || targetTag === "SELECT" || e.target?.isContentEditable) return;
-      if (e.key === "Enter") {
-        flushScan();
-        return;
-      }
-      if (e.key.length !== 1) return;
-
-      if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
-      scanBufferRef.current += e.key;
-      scanTimeoutRef.current = setTimeout(flushScan, 80);
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
-    };
-  }, [handleBarcodeScanned]);
-
-  useEffect(() => {
-    if (!window.kasirAPI?.onBarcodeScanned) return undefined;
-    return window.kasirAPI.onBarcodeScanned((code) => {
-      handleBarcodeScanned(code, "hid");
-    });
-  }, [handleBarcodeScanned]);
+  useBarcodeScanner({
+    menu: menuH.menu,
+    search: menuH.search,
+    setSearch: menuH.setSearch,
+    setView,
+    addToCart: cartH.addToCart,
+    toast_: toastH.toast_,
+  });
 
   // ── Cek license dulu sebelum load data
   useEffect(() => { licenseH.checkLicenseOnLoad(); }, []);
@@ -732,6 +671,7 @@ const executeConfirmDel = useCallback(() => {
             menu={menuH.menu}
             menuH={menuH}
             doCSV={doCSV} at={at}
+            loadAllForReport={historyH.loadAllForReport}
             paymentMethods={settingsH.settings.paymentMethods}            expenseCategories={settingsH.settings.expenseCategories || []}
             openingCash={openingCash}
             totalExpenses={totalExpenses}
