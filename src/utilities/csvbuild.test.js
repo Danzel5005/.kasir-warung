@@ -11,6 +11,7 @@ import {
   csvStok,
 } from "./csvbuild.js";
 import { calcPrice } from "./calculations.js";
+import { resolveShiftTarget } from "./shiftState.js";
 
 describe("csvbuild.js - CSV Generator Utilities", () => {
   const timeDownload = "2025-01-15 10:00:00";
@@ -175,10 +176,40 @@ describe("csvbuild.js - CSV Generator Utilities", () => {
       expect(csv).toContain("RUGI");
     });
 
+    it("should include starting cash and expenses in the financial summary export", () => {
+      const csv = csvLaporan([sampleTrx1, sampleTrx2], timeDownload, {
+        openingCash: 150000,
+        totalExpenses: 25000,
+      });
+      expect(csv).toContain("Kas Awal");
+      expect(csv).toContain("Total Pengeluaran");
+      expect(csv).toContain("150000");
+      expect(csv).toContain("25000");
+    });
+
     it("should handle zero pax without divide-by-zero error", () => {
       const zeroPaxTrx = { ...sampleTrx1, pax: 0 };
       const csv = csvLaporan([zeroPaxTrx], timeDownload);
       expect(csv).not.toContain("NaN");
+    });
+  });
+
+  describe("shift state resolution", () => {
+    it("should prefer the persisted open shift over a stale activeShift when saving opening cash", () => {
+      const staleActiveShift = { id: "shift_old", status: "closed", openingCash: 0 };
+      const persistedShifts = [
+        { id: "shift_old", status: "closed", openingCash: 0 },
+        { id: "shift_new", status: "open", openingCash: 0 },
+      ];
+
+      const result = resolveShiftTarget({
+        shifts: persistedShifts,
+        activeShift: staleActiveShift,
+        selectedShiftId: null,
+      });
+
+      expect(result.id).toBe("shift_new");
+      expect(result.status).toBe("open");
     });
   });
 
@@ -220,6 +251,24 @@ describe("csvbuild.js - CSV Generator Utilities", () => {
       expect(csv).toContain("Debit BCA"); // transfer-bca normalized
       expect(csv).toContain("QRIS BCA"); // qris-bca
       expect(csv).toContain("GRAND TOTAL");
+    });
+
+    it("should prefer transaction payment label over raw custom key when settings are stale", () => {
+      const customTrx = {
+        ...sampleTrx1,
+        id: "TRX-CUSTOM-001",
+        metodeBayar: "custom_1787620237595",
+        metodeBayarLabel: "Saku Bank",
+        total: 25000,
+        subtotal: 25000,
+        bayar: 25000,
+        kembalian: 0,
+      };
+
+      const csv = csvMetodeBayar([customTrx], timeDownload, []);
+
+      expect(csv).toContain("Saku Bank");
+      expect(csv).not.toContain("custom_1787620237595");
     });
 
     it("should handle empty transaction list in csvMetodeBayar", () => {

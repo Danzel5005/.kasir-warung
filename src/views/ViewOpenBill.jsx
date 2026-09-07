@@ -1,8 +1,7 @@
 import { useState, memo } from "react";
 import { calcPrice } from "../utilities/calculations.js";
 import { fmt } from "../utilities/receipt.js";
-import { G, OR, W, BD, MT, BG } from "../constants/colors.js";
-import { row, RADIUS, TYPOGRAPHY, COLOR_PALETTE, SPACING } from "../constants/theme.js";
+import { G, OR, W, BD, MT, BG, row, RADIUS, TYPOGRAPHY, COLOR_PALETTE, SPACING } from "../constants/design.js";
 import { Tag } from "../components/Tag.jsx";
 import BillDetailModal from "../components/BillDetailModal.jsx";
 
@@ -14,6 +13,7 @@ function ViewOpenBill({
   loadBillAndPay,
   setConfirmDel,
   settingsH,
+  pricingConfig,
 }) {
   const openBills = bills.filter(b => b.status === "open");
   const [selectedBill, setSelectedBill] = useState(null);
@@ -119,7 +119,7 @@ function ViewOpenBill({
           <div style={{ display: "grid", gap: SPACING.md }}>
             {openBills.map((bill, index) => {
               const sub = bill.items?.reduce((s, i) => s + (i.harga || 0) * (i.qty || 0), 0) || 0;
-              const { pajak: p, service: s, total: tot } = calcPrice(sub);
+              const { pajak: p, service: s, total: tot } = calcPrice(sub, { ...pricingConfig, items: bill.items || [] });
               const itemCount = bill.items?.reduce((sum, i) => sum + (i.qty || 0), 0) || 0;
 
               return (

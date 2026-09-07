@@ -35,10 +35,15 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
   const [pendingItem, setPendingItem] = useState(null);
   // Reactive state for receiptAdditionals - initialized from props, can be updated via setter
   const [receiptAdditionals, setReceiptAdditionals] = useState(initialReceiptAdditionals);
+  const [pricingConfig, setPricingConfig] = useState({
+    discounts: [],
+    pajak: { enabled: false, value: 0 },
+    service: { enabled: false, value: 0 },
+  });
 
   const items    = Object.values(cart);
   const subtotal = items.reduce((s, i) => s + i.harga * i.qty, 0);
-  const { pajak, service, total } = calcPrice(subtotal);
+  const { pajak, service, discount, total } = calcPrice(subtotal, { ...pricingConfig, items });
   const paidNum   = parseInt(paid.replace(/\D/g, "")) || 0;
   const kembalian = paidNum - total;
 
@@ -249,7 +254,7 @@ const processPayment = useCallback(async ({
   menu, // Pass current menu for open bill payment (no stock deduction)
 }) => {
   const t = getNow();
-  const { pajak: p, service: s, total: tot } = calcPrice(subtotal);
+  const { pajak: p, service: s, discount: d, total: tot } = calcPrice(subtotal, { ...pricingConfig, items });
   
   // Build receipt additional values for the transaction
   const receiptAdditionalData = {};
@@ -262,14 +267,25 @@ const processPayment = useCallback(async ({
   }
   
   // Resolve payment method label for the transaction (never show key)
-  const metodeLabel = paymentMethods.find(m => m.key === metode)?.label 
-    ?? globalThis.METODE_LABELS?.[metode] 
+  const savedSettingsLabel = (() => {
+    try {
+      const savedSettings = JSON.parse(localStorage.getItem("ykk_settings") || "{}");
+      const storedMethod = (savedSettings?.paymentMethods || []).find(m => String(m.key || "").trim() === String(metode || "").trim());
+      return storedMethod?.label || "";
+    } catch (_) {
+      return "";
+    }
+  })();
+
+  const metodeLabel = paymentMethods.find(m => String(m.key || "").trim() === String(metode || "").trim())?.label
+    ?? savedSettingsLabel
+    ?? globalThis.METODE_LABELS?.[metode]
     ?? metode.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   
   const trxId = generateTrxId();
   const trx = {
     id: trxId, ...t, items: [...items],
-    subtotal, pajak: p, service: s, total: tot, 
+    subtotal, pajak: p, service: s, discount: d, total: tot,
     metodeBayar: metode,
     metodeBayarLabel: metodeLabel, // NEW: store label in transaction
     bayar: metode === "cash" ? paidNum : tot,
@@ -306,15 +322,16 @@ const processPayment = useCallback(async ({
   clearCart();
   if (onSuccess) onSuccess(trx);
   return trx;
-}, [items, subtotal, metode, paidNum, kembalian, cart, toast_, getNow, clearCart]);
+}, [items, subtotal, pricingConfig, metode, paidNum, kembalian, cart, toast_, getNow, clearCart]);
 
   return {
     cart, drawerOpen, receiptAdditionalValues, receiptAdditionals, metode, paid, activeBill,
-    items, subtotal, pajak, service, total, paidNum, kembalian, canPay,
+    items, subtotal, pajak, service, discount, total, pricingConfig, paidNum, kembalian, canPay,
     setDrawerOpen, updateReceiptAdditionalValue, setMetode, setPaid,
     addToCart, decCart, delCart, clearCart,
     saveOpenBill, loadBillToCart, processPayment, checkRequiredAdditionals, getCanPay,
     setReceiptAdditionals,
+    setPricingConfig,
   };
 }
 

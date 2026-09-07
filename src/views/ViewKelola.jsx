@@ -1,7 +1,6 @@
 import { memo, useMemo } from "react";
 import { fmt } from "../utilities/receipt.js";
-import { G, W, BD, MT } from "../constants/colors.js";
-import { row, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../constants/theme.js";
+import { G, W, BD, MT, row, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../constants/design.js";
 import StockBadge from "../components/StockBadge.jsx";
 
 // ViewKelola — kelola menu, kategori (CRUD).
@@ -84,7 +83,6 @@ function ViewKelola({
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(185px,1fr))",gap:8}}>
                 {items_.map(item=>
                   <div key={item.id} style={{background:W,border:`1px solid ${BD}`,borderRadius:RADIUS.md,overflow:"hidden",boxShadow:"0 1px 3px rgba(0,0,0,0.04)"}}>
-                    {item.foto?<img src={item.foto} alt={item.nama} style={{width:"100%",height:80,objectFit:"cover"}}/>:<div style={{height:50,background:"linear-gradient(135deg,#e8f5ee,#d4ead8)",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{fontSize:TYPOGRAPHY.label.fontSize,color:"#5a8a6a",fontWeight:600,textAlign:"center",padding:"0 6px"}}>{item.nama}</span></div>}
                     <div style={{padding:"6px 9px"}}>
                       <div style={{...row,marginBottom:1}}><span style={{fontSize:TYPOGRAPHY.small.fontSize,fontWeight:700}}>{item.nama}</span><StockBadge stok={item.stok}/></div>
                       {item.desc&&<div style={{fontSize:TYPOGRAPHY.label.fontSize,color:MT,marginBottom:2}}>{item.desc}</div>}

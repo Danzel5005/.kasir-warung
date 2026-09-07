@@ -1,22 +1,25 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { api } from "../utilities/utils.js";
 
-// useHistory — transaksi history, filter tanggal, group per hari (memo),
+// useHistory — transaksi history dengan server-side filtering & pagination untuk skalabilitas
 // collapse-by-day UI state, delete + undo, dan CSV download generic.
 // Juga mendukung view mode per shift (shiftIdFilter).
 function useHistory({ toast_, addUndo, getNow }) {
-  const [history, setHistory] = useState([]);
+  // ── State untuk pagination & filtering
+  const [history, setHistory] = useState([]);       // current page transactions
+  const [totalCount, setTotalCount] = useState(0);  // total matching transactions
+  const [currentPage, setCurrentPage] = useState(0);
+  const [pageSize] = useState(100);                 // fixed page size
+  const [isLoading, setIsLoading] = useState(false);
+  
   const [fFrom, setFFrom]     = useState("");
   const [fTo, setFTo]         = useState("");
-  // hari mana yang di-expand — null = belum diinisialisasi (default: hari
-  // pertama/terbaru expand, sisanya collapsed). Lihat Lag_Fix.md Tahap 1.3.
   const [expandedDays, setExpandedDays] = useState(null);
-
-  // ── Filter mode: "day" (default) atau "shift"
   const [viewMode, setViewMode] = useState("day");
   const [shiftIdFilter, setShiftIdFilter] = useState(null);
+  const [sortOrder, setSortOrder] = useState("desc");
 
-  // Generate TRX ID in format: TRX-ddmmyyN where N is sequential for the day (no space, no parentheses)
+  // Generate TRX ID in format: TRX-ddmmyyN where N is sequential for the day
   const generateTrxId = useCallback((date = new Date()) => {
     const d = getNow ? getNow() : {
       tgl: String(date.getDate()).padStart(2, "0"),
@@ -24,7 +27,7 @@ function useHistory({ toast_, addUndo, getNow }) {
       thn: String(date.getFullYear())
     };
     const dateStr = `${d.tgl}${d.blnNum}${d.thn.slice(-2)}`;
-    // Count transactions for this date
+    // Count transactions for this date from loaded history
     const count = history.filter(t => {
       const tDate = new Date(t.timestamp);
       return tDate.getDate() === date.getDate() &&
@@ -34,45 +37,82 @@ function useHistory({ toast_, addUndo, getNow }) {
     return `TRX-${dateStr}${count}`;
   }, [history, getNow]);
 
-  // deps kosong aman: hanya setter, tidak baca state apapun.
-  const loadInitial = useCallback((savedTrx) => {
-    const list = savedTrx || [];
-    setHistory(list);
-  }, []);
+  // ── Core: Load filtered & paginated transactions from backend
+  const loadFiltered = useCallback(async (page = 0, filters = {}) => {
+    setIsLoading(true);
+    try {
+      const { fFrom: ff = fFrom, fTo: ft = fTo, shiftId = shiftIdFilter, sort = sortOrder } = filters;
+      const result = await api.loadTrxFiltered({
+        fFrom: ff,
+        fTo: ft,
+        shiftId,
+        page,
+        pageSize,
+        sort
+      });
+      setHistory(result.transactions || []);
+      setTotalCount(result.total || 0);
+      setCurrentPage(result.page || 0);
+    } catch (err) {
+      console.error("[useHistory] loadFiltered error:", err);
+      setHistory([]);
+      setTotalCount(0);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [fFrom, fTo, shiftIdFilter, sortOrder, pageSize]);
 
+  // Initial load (backward compatible - loads first page)
+  const loadInitial = useCallback((savedTrx) => {
+    // If data is passed directly (e.g., from initial load), use it
+    if (savedTrx && savedTrx.length) {
+      const list = savedTrx;
+      setHistory(list.slice(0, pageSize));
+      setTotalCount(list.length);
+      setCurrentPage(0);
+    } else {
+      // Otherwise load from backend with current filters
+      loadFiltered(0);
+    }
+  }, [loadFiltered, pageSize]);
+
+  // Load more (next page)
+  const loadMore = useCallback(() => {
+    if (!isLoading && (currentPage + 1) * pageSize < totalCount) {
+      loadFiltered(currentPage + 1);
+    }
+  }, [currentPage, pageSize, totalCount, isLoading, loadFiltered]);
+
+  // Refresh current page (after filter changes, delete, etc.)
+  const refresh = useCallback(() => {
+    loadFiltered(currentPage);
+  }, [currentPage, loadFiltered]);
+
+  // Auto-load when filters change
+  useEffect(() => {
+    loadFiltered(0, { fFrom, fTo, shiftId: shiftIdFilter, sort: sortOrder });
+  }, [fFrom, fTo, shiftIdFilter, sortOrder, loadFiltered]);
+
+  // Memoized sorted history (already sorted by backend, but keep for safety)
   const sortedHistory = useMemo(() => [...history].sort((a, b) => {
     const ta = new Date(a.timestamp).getTime() || 0;
     const tb = new Date(b.timestamp).getTime() || 0;
-    return tb - ta;
-  }), [history]);
+    return sortOrder === "asc" ? ta - tb : tb - ta;
+  }), [history, sortOrder]);
 
-  // memo: target utama fix lag — 300+ item, jangan filter+reduce ulang tiap render
-  const filteredHistory = useMemo(() => sortedHistory.filter(t => {
-    if (!fFrom && !fTo) return true;
-    const d = new Date(t.timestamp);
-    if (fFrom && d < new Date(fFrom)) return false;
-    if (fTo && d > new Date(fTo + "T23:59:59")) return false;
-    return true;
-  }), [sortedHistory, fFrom, fTo]);
-
-  const histByDay = useMemo(() => filteredHistory.reduce((acc, t) => {
+  // Group by day for day-view
+  const histByDay = useMemo(() => sortedHistory.reduce((acc, t) => {
     const k = `${t.hari}, ${t.tgl} ${t.bln} ${t.thn}`;
     if (!acc[k]) acc[k] = [];
     acc[k].push(t);
     return acc;
-  }, {}), [filteredHistory]);
+  }, {}), [sortedHistory]);
 
-  // ── Shift-based filtering & grouping
-  // filtered by shift ID (null = all)
-  const filteredByShift = useMemo(() => {
-    if (!shiftIdFilter) return filteredHistory;
-    return filteredHistory.filter(t => t.shiftId === shiftIdFilter);
-  }, [filteredHistory, shiftIdFilter]);
-
-  // Group trx by shift ID — used when viewMode === "shift"
-  // Returns { [shiftLabel]: { shift, trxs } }
+  // ── Shift-based filtering & grouping (client-side on current page)
+  // Note: shift filtering is done server-side via shiftIdFilter
+  // This groups the current page by shift for shift-view mode
   const histByShift = useMemo(() => {
-    const base = shiftIdFilter ? filteredByShift : filteredHistory;
+    const base = sortedHistory; // Already filtered by shiftId if set
     const map = {};
     base.forEach(t => {
       if (!t.shiftId) {
@@ -86,36 +126,53 @@ function useHistory({ toast_, addUndo, getNow }) {
       map[k].trxs.push(t);
     });
     return map;
-  }, [filteredHistory, filteredByShift, shiftIdFilter]);
+  }, [sortedHistory]);
 
-  // deps kosong aman: pakai functional update setHistory(h=>...), tidak
-  // baca `history` langsung dari closure.
-  const appendHistory = useCallback((trx) => setHistory(h => [trx, ...h]), []);
+  // For CSV export - we need all filtered transactions, not just current page
+  // We'll fetch all (or a large batch) when CSV is requested
+  const filteredHistoryForExport = useMemo(() => sortedHistory, [sortedHistory]);
 
-  // PENTING: membaca history LANGSUNG dari closure untuk snapshot undo.
-  // Wajib [history, addUndo].
+  // Append new transaction (optimistic update)
+  const appendHistory = useCallback((trx) => {
+    setHistory(h => [trx, ...h].slice(0, pageSize));
+    setTotalCount(c => c + 1);
+  }, [pageSize]);
+
+  // Delete transaction
   const deleteTrx = useCallback(async (id) => {
     const snap = [...history];
-    await api.deleteTrx(id); setHistory(h => h.filter(t => t.id !== id));
-    addUndo("Hapus Transaksi", async () => { await api.restoreTrx(snap); setHistory(snap); });
-  }, [history, addUndo]);
+    const snapTotal = totalCount;
+    await api.deleteTrx(id);
+    setHistory(h => h.filter(t => t.id !== id));
+    setTotalCount(c => c - 1);
+    addUndo("Hapus Transaksi", async () => { 
+      await api.restoreTrx(snap); 
+      setHistory(snap); 
+      setTotalCount(snapTotal);
+    });
+  }, [history, totalCount, addUndo]);
 
-  // PENTING: sama seperti deleteTrx, baca history langsung. Wajib [history, addUndo].
+  // Clear all transactions
   const clearAllTrx = useCallback(async () => {
     const snap = [...history];
-    await api.clearTrx(); setHistory([]);
-    addUndo("Hapus Semua Riwayat", async () => { await api.restoreTrx(snap); setHistory(snap); });
-  }, [history, addUndo]);
+    const snapTotal = totalCount;
+    await api.clearTrx();
+    setHistory([]);
+    setTotalCount(0);
+    addUndo("Hapus Semua Riwayat", async () => { 
+      await api.restoreTrx(snap); 
+      setHistory(snap); 
+      setTotalCount(snapTotal);
+    });
+  }, [history, totalCount, addUndo]);
 
-  // ── CSV (generic — dipakai Riwayat & Laporan)
-  // PENTING: memanggil getNow. Wajib [getNow] (getNow stabil — module-level
-  // function di App.jsx, tapi tetap disertakan untuk exhaustive-deps).
+  // CSV timestamp
   const at = useCallback(() => {
     const t = getNow();
     return `${t.hari} ${t.tgl}-${t.bln}-${t.thn} ${t.jam}:${t.mnt}:${t.dtk}`;
   }, [getNow]);
 
-  // PENTING: memanggil getNow dan toast_. Wajib [getNow, toast_].
+  // CSV export
   const doCSV = useCallback(async (filename, content) => {
     const t = getNow();
     const fn = `${filename}_${t.tgl}-${t.blnNum}-${t.thn}.csv`;
@@ -123,13 +180,92 @@ function useHistory({ toast_, addUndo, getNow }) {
     if (res?.ok) toast_(`${filename} disimpan`, "ok"); else toast_("Dibatalkan", "err");
   }, [getNow, toast_]);
 
+  // Load all for export (fetch all pages)
+  const loadAllForExport = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const result = await api.loadTrxFiltered({
+        fFrom,
+        fTo,
+        shiftId: shiftIdFilter,
+        page: 0,
+        pageSize: 10000, // Large page size to get all
+        sort: sortOrder
+      });
+      return result.transactions || [];
+    } catch (err) {
+      console.error("[useHistory] loadAllForExport error:", err);
+      return [];
+    } finally {
+      setIsLoading(false);
+    }
+  }, [fFrom, fTo, shiftIdFilter, sortOrder]);
+
+  const loadAllForReport = useCallback(async (shiftId) => {
+    try {
+      const pageSizeForReport = 10000;
+      const transactions = [];
+      let page = 0;
+      let total = 0;
+      do {
+        const result = await api.loadTrxFiltered({
+          page,
+          pageSize: pageSizeForReport,
+          shiftId: shiftId || undefined,
+          sort: sortOrder,
+        });
+        transactions.push(...(result.transactions || []));
+        total = Number(result.total || transactions.length);
+        page += 1;
+        if (!result.transactions?.length) break;
+      } while (transactions.length < total);
+      return transactions;
+    } catch (err) {
+      console.error("[useHistory] loadAllForReport error:", err);
+      return [];
+    }
+  }, [sortOrder]);
+
+  // Toggle sort order
+  const toggleSort = useCallback(() => {
+    setSortOrder(prev => prev === "asc" ? "desc" : "asc");
+  }, []);
+
   return {
-    history, fFrom, fTo, expandedDays,
-    filteredHistory, histByDay,
-    viewMode, shiftIdFilter, histByShift,
-    generateTrxId, setFFrom, setFTo, setExpandedDays,
-    setViewMode, setShiftIdFilter,
-    loadInitial, appendHistory, deleteTrx, clearAllTrx, at, doCSV,
+    // Data
+    history,              // current page transactions
+    filteredHistory: filteredHistoryForExport, // for backward compat (used in CSV)
+    histByDay,
+    histByShift,
+    
+    // Pagination
+    totalCount,
+    currentPage,
+    pageSize,
+    isLoading,
+    hasMore: (currentPage + 1) * pageSize < totalCount,
+    loadMore,
+    refresh,
+    
+    // Filters
+    fFrom, fTo, setFFrom, setFTo,
+    shiftIdFilter, setShiftIdFilter,
+    viewMode, setViewMode,
+    sortOrder, toggleSort,
+    
+    // UI state
+    expandedDays, setExpandedDays,
+    
+    // Actions
+    generateTrxId,
+    loadInitial,
+    appendHistory,
+    deleteTrx,
+    clearAllTrx,
+    at,
+    doCSV,
+    loadAllForExport,
+    loadAllForReport,
   };
 }
 

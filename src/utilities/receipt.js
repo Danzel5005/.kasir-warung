@@ -20,6 +20,26 @@ const fmt   = (n) => `Rp ${Number(n||0).toLocaleString("id-ID")}`;
 const fmtNum = (n) => Number(n||0).toLocaleString("id-ID");
 const DEFAULT_WARUNG = "Warung";
 
+// Paper width (mm) for @page size — configurable from Printer settings.
+// Clamped to a sane thermal-printer range; invalid values fall back to 80mm.
+const DEFAULT_PAPER_WIDTH_MM = 80;
+const MIN_PAPER_WIDTH_MM = 30;
+const MAX_PAPER_WIDTH_MM = 210;
+const normalizePaperWidth = (w) => {
+  const n = Math.round(Number(w));
+  if (!Number.isFinite(n)) return DEFAULT_PAPER_WIDTH_MM;
+  return Math.min(MAX_PAPER_WIDTH_MM, Math.max(MIN_PAPER_WIDTH_MM, n));
+};
+
+// Shared print CSS so @page size always matches the configured paper width
+const buildPrintCSS = (paperWidthMm) => {
+  const w = normalizePaperWidth(paperWidthMm);
+  return `
+    @page{size:${w}mm auto;margin:0mm;}
+    body{width:${w}mm;padding:2mm;}
+  `;
+};
+
 // Helper function to format drink additionals (cupsize/sugar/temperature)
 const formatAdditionals = (additionals) => {
   if (!additionals) return "";
@@ -63,12 +83,12 @@ const getQrisImage = (metodeBayar, qrisImages) => {
   return qrisImages[metodeBayar] || null;
 };
 
-// Get category display name (resolves key to label if cats provided, case-sensitive)
+// Get category display name (resolves persisted key/id to the current label)
 const getCategoryName = (cat, cats) => {
-  if (!cat) return "";
+  if (!cat) return "Lainnya";
   if (cats && cats.length) {
-    const found = cats.find(c => c.key === cat);
-    if (found) return found.label;
+    const found = cats.find(c => String(c.key ?? c.id) === String(cat));
+    if (found) return found.label || found.name || cat;
   }
   return cat;
 };
@@ -101,10 +121,11 @@ const buildCategoryTotals = (items, cats = []) => {
   return { taggedCategories, untaggedCategories };
 };
 
-function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName, cats = [], warungAddress = "", warungPhone = "", paymentMethods = []) {
+function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName, cats = [], warungAddress = "", warungPhone = "", paymentMethods = [], paperWidthMm = DEFAULT_PAPER_WIDTH_MM) {
   // Use stored tax/service from transaction (no recalculation)
   const pajak = trx.pajak || 0;
   const service = trx.service || 0;
+  const discount = trx.discount || 0;
   const total = trx.total || trx.subtotal;
   // Use stored label from transaction, fallback to lookup, NEVER show raw key
   const metodeLabel = trx.metodeBayarLabel 
@@ -136,6 +157,9 @@ function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName,
     .map(([catKey, qty]) => `<div class="cat-line"><span>TOTAL (${getCategoryName(catKey, cats)}) :</span><span>${qty}</span></div>`)
     .join("");
 
+  // Calculate total quantity of all items for subtotal
+  const totalQty = trx.items.reduce((sum, item) => sum + (item.qty || 0), 0);
+
   return `<!DOCTYPE html>
   <html>
     <head>
@@ -145,11 +169,10 @@ function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName,
       --bg:#eceae2; --header-tag:#c0392b; --body-tag:#1f6f50; --footer-tag:#2f5aa8;
         }
     *{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-weight:700;}
-    body{font-family:'Courier New', ui-monospace, Menlo, monospace;font-size:12px;width:80mm;padding:3mm;color:var(--ink);background:var(--bg);font-weight:700;}
-   
+    body{font-family:'Courier New', ui-monospace, Menlo, monospace;font-size:12px;width:${paperWidthMm}mm;padding:3mm;color:var(--ink);background:var(--bg);font-weight:700;}
+
     @media print{
-      @page{size:80mm auto;margin:0mm;} 
-      body{width:80mm;padding:2mm;}
+${buildPrintCSS(paperWidthMm)}
         }
     .receipt{background:var(--paper);padding:6px 8px 2px;position:relative;}
     .section{position:relative;padding:6px 0;}
@@ -193,15 +216,19 @@ function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName,
         ${rows}
         <div class="totals">
           <div class="kv"><span class="k">SubTotal</span><span class="v">${fmt(trx.subtotal)}</span></div>
+          ${discount > 0 ? `<div class="kv"><span class="k">Diskon</span><span class="v">-${fmt(discount)}</span></div>` : ""}
+          ${pajak > 0 ? `<div class="kv"><span class="k">Pajak</span><span class="v">${fmt(pajak)}</span></div>` : ""}
+          ${service > 0 ? `<div class="kv"><span class="k">Service</span><span class="v">${fmt(service)}</span></div>` : ""}
           <div class="kv grand bold"><span class="k">TOTAL</span><span class="v">${fmt(total)}</span></div>
           ${trx.metodeBayar==="cash"?`<div class="kv"><span class="k">Bayar</span><span class="v">${fmt(trx.bayar)}</span></div><div class="kv"><span class="k">Kembalian</span><span class="v">${fmt(trx.kembalian)}</span></div>`:""}
         </div>
-        <div class="payment-note">${trx.metodeBayar==="cash"?"LUNAS":"SILAKAN SCAN QRIS DI BAWAH"}</div>
+        <div class="payment-note">${trx.metodeBayar==="cash"?"LUNAS":"____"}</div>
         ${qrisImage?`<img src="${qrisImage}" class="qris-img" alt="QRIS" />`:""}
       </div>
 
       <!-- FOOTER -->
       <div class="section footer">
+        <div class="cat-line"><span>SUBTOTAL ITEMS :</span><span>${totalQty}</span></div>
         ${Object.keys(untaggedCategories).length ? `<div class="footer-list">${renderCatTotals(untaggedCategories)}</div>` : ""}
         ${Object.keys(taggedCategories).length ? `<div class="footer-list"><div class="bold">TAGGED</div>${renderCatTotals(taggedCategories)}</div>` : ""}
         <div class="footer-note">Barang yang sudah dibeli tidak bisa<br/>dikembalikan<br/>Terimakasih</div>
@@ -210,9 +237,9 @@ function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName,
   </body></html>`;
 }
 
-function buildPreviewHTML(receiptAdditionalValues, items, logo, receiptAdditionals, warungName, cats = [], warungAddress = "", warungPhone = "") {
+function buildPreviewHTML(receiptAdditionalValues, items, logo, receiptAdditionals, warungName, cats = [], warungAddress = "", warungPhone = "", paperWidthMm = DEFAULT_PAPER_WIDTH_MM, pricingConfig = {}) {
   const subtotal = items.reduce((s, i) => s + i.harga * i.qty, 0);
-  const { pajak, service, total } = calcPrice(subtotal);
+  const { pajak, service, discount, total } = calcPrice(subtotal, { ...pricingConfig, items });
   const t = getNow();
   const addFields = buildAdditionalFields(receiptAdditionalValues, receiptAdditionals);
   const storeName = warungName || DEFAULT_WARUNG;
@@ -237,16 +264,18 @@ function buildPreviewHTML(receiptAdditionalValues, items, logo, receiptAdditiona
     .map(([catKey, qty]) => `<div class="cat-line"><span>TOTAL (${getCategoryName(catKey, cats)}) :</span><span>${qty}</span></div>`)
     .join("");
 
+  // Calculate total quantity of all items for subtotal
+  const totalQty = items.reduce((sum, item) => sum + (item.qty || 0), 0);
+
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     :root{
       --paper:#fdfdf9; --ink:#1c1c1c; --muted:#1c1c1c; --line:#1c1c1c;
       --bg:#eceae2; --header-tag:#c0392b; --body-tag:#1f6f50; --footer-tag:#2f5aa8;
     }
     *{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-weight:700;}
-    body{font-family:'Courier New', ui-monospace, Menlo, monospace;font-size:12px;width:80mm;padding:3mm;color:var(--ink);background:var(--bg);font-weight:700;}
+    body{font-family:'Courier New', ui-monospace, Menlo, monospace;font-size:12px;width:${paperWidthMm}mm;padding:3mm;color:var(--ink);background:var(--bg);font-weight:700;}
     @media print{
-      @page{size:80mm auto;margin:0mm;} 
-      body{width:80mm;padding:2mm;}
+${buildPrintCSS(paperWidthMm)}
     }
     .receipt{background:var(--paper);padding:6px 8px 2px;position:relative;}
     .section{position:relative;padding:6px 0;}
@@ -281,10 +310,14 @@ function buildPreviewHTML(receiptAdditionalValues, items, logo, receiptAdditiona
         ${rows}
         <div class="totals">
           <div class="kv"><span class="k">SubTotal</span><span class="v">${fmt(subtotal)}</span></div>
+          ${discount > 0 ? `<div class="kv"><span class="k">Diskon</span><span class="v">-${fmt(discount)}</span></div>` : ""}
+          ${pajak > 0 ? `<div class="kv"><span class="k">Pajak</span><span class="v">${fmt(pajak)}</span></div>` : ""}
+          ${service > 0 ? `<div class="kv"><span class="k">Service</span><span class="v">${fmt(service)}</span></div>` : ""}
           <div class="kv grand bold"><span class="k">TOTAL</span><span class="v">${fmt(total)}</span></div>
         </div>
       </div>
       <div class="section footer">
+        <div class="cat-line"><span>SUBTOTAL ITEMS :</span><span>${totalQty}</span></div>
         ${Object.keys(untaggedCategories).length ? `<div class="footer-list">${renderCatTotals(untaggedCategories)}</div>` : ""}
         ${Object.keys(taggedCategories).length ? `<div class="footer-list"><div class="bold">TAGGED</div>${renderCatTotals(taggedCategories)}</div>` : ""}
         <div class="footer-note">Belum Lunas</div>
@@ -293,4 +326,4 @@ function buildPreviewHTML(receiptAdditionalValues, items, logo, receiptAdditiona
   </body></html>`;
 }
 
-export {buildReceiptHTML, buildPreviewHTML, fmt, fmtNum, DEFAULT_WARUNG};
+export {buildReceiptHTML, buildPreviewHTML, fmt, fmtNum, DEFAULT_WARUNG, DEFAULT_PAPER_WIDTH_MM, getCategoryName};

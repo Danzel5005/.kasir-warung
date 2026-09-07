@@ -1,12 +1,16 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
-contextBridge.exposeInMainWorld("kasirAPI", {
+const kasirAPI = {
   // Transactions
   loadTrx:     ()      => ipcRenderer.invoke("trx-load"),
   saveTrx:     (t)     => ipcRenderer.invoke("trx-save", t),
   deleteTrx:   (id)    => ipcRenderer.invoke("trx-delete", id),
   restoreTrx:  (list)  => ipcRenderer.invoke("trx-restore", list),
   clearTrx:    ()      => ipcRenderer.invoke("trx-clear"),
+  // New: Filtered & paginated transactions
+  loadTrxFiltered: (filters) => ipcRenderer.invoke("trx-load-filtered", filters),
+  getTrxDailyStats: (filters) => ipcRenderer.invoke("trx-get-daily-stats", filters),
+  getTrxShiftIds: () => ipcRenderer.invoke("trx-get-shift-ids"),
   // Open Bills
   loadBills:    ()      => ipcRenderer.invoke("bills-load"),
   saveBills:    (list)  => ipcRenderer.invoke("bills-save", list),
@@ -35,6 +39,7 @@ contextBridge.exposeInMainWorld("kasirAPI", {
   saveCSV:     (data)  => ipcRenderer.invoke("csv-save", data),
   // Printer
   getPrinters:   ()    => ipcRenderer.invoke("get-printers"),
+  printReceiptEscPos: (data) => ipcRenderer.invoke("print-receipt-escpos", data),
   printReceipt:  (data)=> ipcRenderer.invoke("print-receipt", data),
   // Shifts
   loadShifts:  ()      => ipcRenderer.invoke("shifts-load"),
@@ -46,5 +51,12 @@ contextBridge.exposeInMainWorld("kasirAPI", {
   // Info
   getDataPath:  ()      => ipcRenderer.invoke("get-data-path"),
   processPayment: (data) => ipcRenderer.invoke("process-payment", data),
+  onBarcodeScanned: (callback) => {
+    const listener = (_event, code) => callback(code);
+    ipcRenderer.on("barcode-scanned", listener);
+    return () => ipcRenderer.removeListener("barcode-scanned", listener);
+  },
+};
 
-});
+contextBridge.exposeInMainWorld("kasirAPI", kasirAPI);
+contextBridge.exposeInMainWorld("api", kasirAPI);

@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { calcPrice } from "../../utilities/calculations.js";
 import { fmt } from "../../utilities/receipt.js";
 import { METODE_LABELS} from "../../constants/payments.js";
-import { METODE_COLORS,G, OR, W, BD, MT } from "../../constants/colors.js";
-import { row, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/theme.js";
+import { METODE_COLORS, G, OR, W, BD, MT, row, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/design.js";
 
 export default function ReceiptModal({ receipt, logo, printReceipt, setReceipt, receiptAdditionals, qrisImages, paymentMethods = [] }) {
   const [isPrinting, setIsPrinting] = useState(false);
@@ -60,10 +59,7 @@ export default function ReceiptModal({ receipt, logo, printReceipt, setReceipt, 
 
         {/* Header */}
         <div style={{ padding:"20px 17px", flex:"0 0 auto", textAlign:"center" }}>
-          {logo
-            ? <img src={logo} alt="logo" style={{ width:42, height:42, objectFit:"cover", borderRadius:RADIUS.md, marginBottom:5 }}/> 
-            : <div style={{ width:42, height:42, background:G, borderRadius:RADIUS.md, display:"flex", alignItems:"center", justifyContent:"center", fontSize:TYPOGRAPHY.small.fontSize, fontWeight:700, color:W, margin:"0 auto 5px" }}>YKK</div> 
-          }
+          {logo && <img src={logo} alt="logo" style={{ width:42, height:42, objectFit:"cover", borderRadius:RADIUS.md, marginBottom:5 }}/>}
           <div style={{ fontWeight:700, fontSize:TYPOGRAPHY.body.fontSize, color:G }}>
             {receipt.warungName || "Warung"}
           </div>
@@ -137,6 +133,9 @@ export default function ReceiptModal({ receipt, logo, printReceipt, setReceipt, 
           )}
 
           <div style={{ ...row, fontSize:TYPOGRAPHY.label.fontSize, color:MT }}><span>Subtotal</span><span>{fmt(receipt.subtotal)}</span></div>
+          {(receipt.discount || 0) > 0 && <div style={{ ...row, fontSize:TYPOGRAPHY.label.fontSize, color:G }}><span>Diskon</span><span>-{fmt(receipt.discount)}</span></div>}
+          {(receipt.pajak || 0) > 0 && <div style={{ ...row, fontSize:TYPOGRAPHY.label.fontSize, color:MT }}><span>Pajak</span><span>{fmt(receipt.pajak)}</span></div>}
+          {(receipt.service || 0) > 0 && <div style={{ ...row, fontSize:TYPOGRAPHY.label.fontSize, color:MT }}><span>Service</span><span>{fmt(receipt.service)}</span></div>}
           <div style={{ ...row, fontSize:TYPOGRAPHY.body.fontSize, fontWeight:700, marginTop:3 }}>
             <span>TOTAL</span><span style={{ color:OR }}>{fmt(receipt.total)}</span>
           </div>
