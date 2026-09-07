@@ -29,32 +29,58 @@ function createPrintingService({ app, ipcMain, BrowserWindow, dialog, dataDir, e
     if (!wins.length) return [];
     try { return await wins[0].webContents.getPrintersAsync(); } catch { return []; }
   });
-  ipcMain.handle("print-receipt", (_e, { html, printerName, paperWidthMm }) => new Promise((resolve) => {
+  ipcMain.handle("print-receipt", async (_e, { html, printerName, paperWidthMm }) => {
     ensureDir();
     const paperW = normalizePaperWidthMm(paperWidthMm);
     const forceA4 = /pdf/i.test(printerName || "");
+    const selectedName = printerName || "";
+
+    // Cek printer jika bukan PDF virtual printer
+    if (!forceA4 && selectedName) {
+      try {
+        const wins = BrowserWindow.getAllWindows();
+        if (wins.length) {
+          const printers = await wins[0].webContents.getPrintersAsync();
+          const found = printers.some(p => p.name === selectedName || p.displayName === selectedName);
+          if (!found) {
+            return { ok: false, error: `Printer tidak ditemukan 404: "${selectedName}" tidak terhubung. Pastikan printer terhubung dan driver terinstall.` };
+          }
+        }
+      } catch {
+        // Jika gagal cek printer, lanjutkan saja (print akan gagal nanti dengan error asli)
+      }
+    }
+
     const win = new BrowserWindow({ width: Math.ceil((PAGE_WIDTH_MM / 25.4) * 96), height: Math.ceil((PAGE_HEIGHT_MM / 25.4) * 96), show: false, webPreferences: { nodeIntegration: false, contextIsolation: true } });
     const printFile = path.join(dataDir, "receipt-print.html");
     fs.writeFileSync(printFile, injectReceiptPrintCSS(html, paperW, forceA4), "utf-8");
     win.loadFile(printFile);
-    win.webContents.once("did-finish-load", () => setTimeout(async () => {
-      if (forceA4) {
-        try {
-          const pdfBuffer = await win.webContents.printToPDF({ printBackground: true, preferCSSPageSize: true, scale: 1, margins: { top: 0, bottom: 0, left: 0, right: (PAGE_WIDTH_MM - paperW) / 25.4 } });
-          const { filePath, canceled } = await dialog.showSaveDialog(win, { title: "Simpan Struk sebagai PDF", defaultPath: path.join(app.getPath("desktop"), "receipt.pdf"), filters: [{ name: "PDF Files", extensions: ["pdf"] }] });
-          win.close();
-          if (canceled || !filePath) return resolve({ ok: false, error: "Dibatalkan" });
-          fs.writeFileSync(filePath, pdfBuffer);
-          return resolve({ ok: true, filePath });
-        } catch (err) { win.close(); return resolve({ ok: false, error: err.message }); }
-      }
-      win.webContents.print({ silent: true, printBackground: true, deviceName: printerName || "", margins: { marginType: "none" }, pageSize: { width: paperW * 1000, height: 1000 * 1000 }, scaleFactor: 100 }, (success, errType) => {
-        setTimeout(() => win.close(), 500);
-        resolve({ ok: success, error: errType || null });
-      });
-    }, 250));
-    win.webContents.once("did-fail-load", (_event, _code, description) => { setTimeout(() => win.close(), 500); resolve({ ok: false, error: description || "Gagal memuat halaman cetak resi" }); });
-  }));
+
+    return new Promise((resolve) => {
+      win.webContents.once("did-finish-load", () => setTimeout(async () => {
+        if (forceA4) {
+          try {
+            const pdfBuffer = await win.webContents.printToPDF({ printBackground: true, preferCSSPageSize: true, scale: 1, margins: { top: 0, bottom: 0, left: 0, right: (PAGE_WIDTH_MM - paperW) / 25.4 } });
+            const { filePath, canceled } = await dialog.showSaveDialog(win, { title: "Simpan Struk sebagai PDF", defaultPath: path.join(app.getPath("desktop"), "receipt.pdf"), filters: [{ name: "PDF Files", extensions: ["pdf"] }] });
+            win.close();
+            if (canceled || !filePath) return resolve({ ok: false, error: "Dibatalkan" });
+            fs.writeFileSync(filePath, pdfBuffer);
+            return resolve({ ok: true, filePath });
+          } catch (err) { win.close(); return resolve({ ok: false, error: err.message }); }
+        }
+        win.webContents.print({ silent: true, printBackground: true, deviceName: selectedName, margins: { marginType: "none" }, pageSize: { width: paperW * 1000, height: 1000 * 1000 }, scaleFactor: 100 }, (success, errType) => {
+          setTimeout(() => win.close(), 500);
+          // Jika print gagal karena printer tidak ditemukan, beri error yang jelas
+          if (!success && errType && (errType.includes("Invalid printer") || errType.includes("Print job failed") || errType.includes("printer not found") || errType.toLowerCase().includes("printer"))) {
+            resolve({ ok: false, error: `Printer tidak ditemukan 404: "${selectedName}" tidak terhubung. Pastikan printer terhubung dan driver terinstall.` });
+          } else {
+            resolve({ ok: success, error: errType || null });
+          }
+        });
+      }, 250));
+      win.webContents.once("did-fail-load", (_event, _code, description) => { setTimeout(() => win.close(), 500); resolve({ ok: false, error: description || "Gagal memuat halaman cetak resi" }); });
+    });
+  });
 
   const charsPerLineForWidth = (width) => width <= 58 ? 32 : width >= 80 ? 42 : Math.round(32 + ((width - 58) / 22) * 10);
   const fmtRp = (number) => `Rp ${Number(number || 0).toLocaleString("id-ID")}`;
