@@ -110,12 +110,12 @@ function createPrintingService({ app, ipcMain, BrowserWindow, dialog, dataDir, e
       const paperW = normalizePaperWidthMm(paperWidthMm);
       if (!selectedName || /pdf/i.test(selectedName)) return { ok: false, error: "Printer yang dipilih bukan printer thermal. Pilih printer thermal fisik atau gunakan printer sistem/PDF." };
       const printer = new ThermalPrinter({ type: PrinterTypes.EPSON, interface: selectedName === "auto" ? "printer:auto" : `printer:${selectedName}`, ...(nodePrinterDriver ? { driver: nodePrinterDriver } : {}), width: charsPerLineForWidth(paperW), removeSpecialCharacters: false, options: { timeout: 5000 } });
-      if (!await printer.isPrinterConnected()) return { ok: false, error: `Printer thermal tidak terdeteksi/terhubung: ${selectedName}` };
+      if (!await printer.isPrinterConnected()) return { ok: false, error: `Printer tidak ditemukan 404: "${selectedName}" tidak terhubung. Pastikan printer terhubung dan driver terinstall.` };
       buildEscPosReceipt(printer, trx, warungName, warungAddress, warungPhone, operatorName, [...cats, ...(rJSON(files.cats) || [])]);
       await executeEscPosInChunks(printer, printer.Interface.getPrinterName());
       console.log("[ESC/POS] Print successful to:", selectedName);
       return { ok: true };
-    } catch (err) { const message = err?.message || String(err); console.error("[ESC/POS] Print failed for:", selectedName, message); return { ok: false, error: message }; }
+    } catch (err) { const message = err?.message || String(err); console.error("[ESC/POS] Print failed for:", selectedName, message); const looksHardware = /not found|not connected|timeout|offline|printer|device/i.test(message); return { ok: false, error: looksHardware ? `Printer tidak ditemukan 404: "${selectedName}" tidak terhubung. Pastikan printer terhubung dan driver terinstall.` : message }; }
   });
 }
 
