@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { calcPrice } from "../../utilities/calculations.js";
-import { fmt } from "../../utilities/receipt.js";
+import { fmt, getCashPaymentNote } from "../../utilities/receipt.js";
 import { METODE_LABELS} from "../../constants/payments.js";
 import { METODE_COLORS, G, OR, W, BD, MT, row, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/design.js";
 
 export default function ReceiptModal({ receipt, logo, printReceipt, setReceipt, receiptAdditionals, qrisImages, paymentMethods = [] }) {
   const [isPrinting, setIsPrinting] = useState(false);
   const [progress, setProgress] = useState(0);
+  const cashPaymentNote = receipt.metodeBayar === "cash" ? getCashPaymentNote(receipt.bayar, receipt.total) : "";
 
   useEffect(() => {
     if (!isPrinting) return undefined;
@@ -139,6 +140,10 @@ export default function ReceiptModal({ receipt, logo, printReceipt, setReceipt, 
           <div style={{ ...row, fontSize:TYPOGRAPHY.body.fontSize, fontWeight:700, marginTop:3 }}>
             <span>TOTAL</span><span style={{ color:OR }}>{fmt(receipt.total)}</span>
           </div>
+          {receipt.metodeBayar === "cash" && <div style={{ ...row, fontSize:TYPOGRAPHY.small.fontSize, color:cashPaymentNote ? OR : G, fontWeight:700, marginTop:4 }}>
+            <span>{cashPaymentNote || "LUNAS"}</span>
+            {!cashPaymentNote && <span>{fmt(receipt.bayar)}</span>}
+          </div>}
           <div style={{ borderTop:"1px dashed #ccc", margin:"7px 0" }}/>
 
           {/* QRIS Image for QRIS payments (also at bottom) */}

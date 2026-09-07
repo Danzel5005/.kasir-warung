@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fmt, fmtNum, buildReceiptHTML, buildPreviewHTML, DEFAULT_WARUNG, DEFAULT_PAPER_WIDTH_MM } from "./receipt.js";
+import { fmt, fmtNum, getCashPaymentNote, buildReceiptHTML, buildPreviewHTML, DEFAULT_WARUNG, DEFAULT_PAPER_WIDTH_MM } from "./receipt.js";
 
 describe("receipt.js - Receipt utilities and HTML builders", () => {
   describe("fmt and fmtNum Formatting Helpers", () => {
@@ -24,6 +24,12 @@ describe("receipt.js - Receipt utilities and HTML builders", () => {
       expect(fmtNum(0)).toBe("0");
       expect(fmtNum(null)).toBe("0");
       expect(fmtNum(undefined)).toBe("0");
+    });
+
+    it("should describe cash change and underpayment", () => {
+      expect(getCashPaymentNote(100000, 58300)).toBe("Kembalian Rp. 41.700");
+      expect(getCashPaymentNote(50000, 58300)).toBe("Kurang Bayar Rp. 8.300");
+      expect(getCashPaymentNote(58300, 58300)).toBe("");
     });
   });
 
@@ -73,6 +79,13 @@ describe("receipt.js - Receipt utilities and HTML builders", () => {
       expect(html).not.toContain("<span class=\"k\">Kembalian</span>");
       expect(html).not.toContain(">LUNAS<"); // LUNAS only shown for cash
       expect(html).toContain("<div class=\"payment-note\">____</div>");
+    });
+
+    it("should print an underpayment note instead of a negative change", () => {
+      const html = buildReceiptHTML({ ...mockTrxCash, subtotal: 58300, total: 58300, bayar: 50000, kembalian: -8300 }, null, [], {});
+      expect(html).toContain("Kurang Bayar Rp. 8.300");
+      expect((html.match(/Kurang Bayar Rp\. 8\.300/g) || [])).toHaveLength(1);
+      expect(html).not.toContain("Kembalian Rp. -8.300");
     });
 
     it("should render QRIS image when provided", () => {
@@ -137,6 +150,12 @@ describe("receipt.js - Receipt utilities and HTML builders", () => {
       const items = [{ nama: "Teh", harga: 5000, qty: 1, kategori: "Minuman" }];
       const html = buildPreviewHTML({}, items, null, [], "Warung Test", [], "", "", 58);
       expect(html).toContain("@page{size:58mm auto;margin:0mm;}");
+    });
+
+    it("should show the cash note in preview when a payment has been entered", () => {
+      const items = [{ nama: "Teh", harga: 58300, qty: 1, kategori: "Minuman" }];
+      const html = buildPreviewHTML({}, items, null, [], "Warung Test", [], "", "", 80, {}, 50000, "cash");
+      expect(html).toContain("Kurang Bayar Rp. 8.300");
     });
   });
 });

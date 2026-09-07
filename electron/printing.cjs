@@ -84,6 +84,12 @@ function createPrintingService({ app, ipcMain, BrowserWindow, dialog, dataDir, e
 
   const charsPerLineForWidth = (width) => width <= 58 ? 32 : width >= 80 ? 42 : Math.round(32 + ((width - 58) / 22) * 10);
   const fmtRp = (number) => `Rp ${Number(number || 0).toLocaleString("id-ID")}`;
+  const cashPaymentNote = (paid, total) => {
+    const difference = Number(paid || 0) - Number(total || 0);
+    if (difference > 0) return `Kembalian Rp. ${Math.abs(difference).toLocaleString("id-ID")}`;
+    if (difference < 0) return `Kurang Bayar Rp. ${Math.abs(difference).toLocaleString("id-ID")}`;
+    return "";
+  };
   const kvLine = (printer, label, value) => printer.leftRight(label, value);
   const buildEscPosReceipt = (printer, trx, warungName, warungAddress, warungPhone, operatorName, cats = []) => {
     const storeName = warungName || trx.warungName || "Warung";
@@ -94,7 +100,7 @@ function createPrintingService({ app, ipcMain, BrowserWindow, dialog, dataDir, e
     kvLine(printer, "NO TRX", trx.id); kvLine(printer, "KASIR", operatorName || trx.operator || "Kasir"); kvLine(printer, "METODE", trx.metodeBayarLabel || trx.metodeBayar || ""); printer.drawLine();
     trx.items.forEach((item) => { kvLine(printer, `${item.qty}x ${getCategoryLabel(item.kategori, cats)} ${item.nama}`, fmtRp(item.harga * item.qty)); printer.println(`   ${fmtRp(item.harga)}`); });
     printer.drawLine(); kvLine(printer, "SubTotal", fmtRp(trx.subtotal)); printer.bold(true); kvLine(printer, "TOTAL", fmtRp(trx.total || trx.subtotal)); printer.bold(false);
-    if (trx.metodeBayar === "cash") { kvLine(printer, "Bayar", fmtRp(trx.bayar)); kvLine(printer, "Kembalian", fmtRp(trx.kembalian)); }
+    if (trx.metodeBayar === "cash") { kvLine(printer, "Bayar", fmtRp(trx.bayar)); printer.println(cashPaymentNote(trx.bayar, trx.total) || "LUNAS"); }
     printer.drawLine(); printer.alignCenter(); printer.println("Barang yang sudah dibeli tidak bisa"); printer.println("dikembalikan"); printer.println("Terimakasih"); printer.cut();
   };
   const printDirect = (driver, printerName, data) => new Promise((resolve, reject) => driver.printDirect({ data, printer: printerName, type: "RAW", docname: false, success: resolve, error: reject }));

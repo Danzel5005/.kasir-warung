@@ -18,6 +18,12 @@ function getNow() {
 
 const fmt   = (n) => `Rp ${Number(n||0).toLocaleString("id-ID")}`;
 const fmtNum = (n) => Number(n||0).toLocaleString("id-ID");
+const getCashPaymentNote = (paid, total) => {
+  const difference = Number(paid || 0) - Number(total || 0);
+  if (difference > 0) return `Kembalian Rp. ${fmtNum(difference)}`;
+  if (difference < 0) return `Kurang Bayar Rp. ${fmtNum(Math.abs(difference))}`;
+  return "";
+};
 const DEFAULT_WARUNG = "Warung";
 
 // Paper width (mm) for @page size — configurable from Printer settings.
@@ -133,6 +139,7 @@ function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName,
     ?? globalThis.METODE_LABELS?.[trx.metodeBayar] 
     ?? trx.metodeBayar.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   const qrisImage = getQrisImage(trx.metodeBayar, qrisImages);
+  const cashPaymentNote = trx.metodeBayar === "cash" ? getCashPaymentNote(trx.bayar, total) : "";
   const addFields = buildAdditionalFields(trx, receiptAdditionals);
   const storeName = warungName || trx.warungName || DEFAULT_WARUNG; // [11] dynamic custom name
   const operatorName = trx.operator || "Kasir"; // [2] dynamic operator name from transaction
@@ -220,9 +227,9 @@ ${buildPrintCSS(paperWidthMm)}
           ${pajak > 0 ? `<div class="kv"><span class="k">Pajak</span><span class="v">${fmt(pajak)}</span></div>` : ""}
           ${service > 0 ? `<div class="kv"><span class="k">Service</span><span class="v">${fmt(service)}</span></div>` : ""}
           <div class="kv grand bold"><span class="k">TOTAL</span><span class="v">${fmt(total)}</span></div>
-          ${trx.metodeBayar==="cash"?`<div class="kv"><span class="k">Bayar</span><span class="v">${fmt(trx.bayar)}</span></div><div class="kv"><span class="k">Kembalian</span><span class="v">${fmt(trx.kembalian)}</span></div>`:""}
+          ${trx.metodeBayar==="cash"?`<div class="kv"><span class="k">Bayar</span><span class="v">${fmt(trx.bayar)}</span></div>`:""}
         </div>
-        <div class="payment-note">${trx.metodeBayar==="cash"?"LUNAS":"____"}</div>
+        <div class="payment-note">${trx.metodeBayar==="cash" ? (cashPaymentNote || "LUNAS") : "____"}</div>
         ${qrisImage?`<img src="${qrisImage}" class="qris-img" alt="QRIS" />`:""}
       </div>
 
@@ -237,9 +244,10 @@ ${buildPrintCSS(paperWidthMm)}
   </body></html>`;
 }
 
-function buildPreviewHTML(receiptAdditionalValues, items, logo, receiptAdditionals, warungName, cats = [], warungAddress = "", warungPhone = "", paperWidthMm = DEFAULT_PAPER_WIDTH_MM, pricingConfig = {}) {
+function buildPreviewHTML(receiptAdditionalValues, items, logo, receiptAdditionals, warungName, cats = [], warungAddress = "", warungPhone = "", paperWidthMm = DEFAULT_PAPER_WIDTH_MM, pricingConfig = {}, paid = 0, metode = "cash") {
   const subtotal = items.reduce((s, i) => s + i.harga * i.qty, 0);
   const { pajak, service, discount, total } = calcPrice(subtotal, { ...pricingConfig, items });
+  const cashPaymentNote = metode === "cash" && Number(paid || 0) > 0 ? getCashPaymentNote(paid, total) : "";
   const t = getNow();
   const addFields = buildAdditionalFields(receiptAdditionalValues, receiptAdditionals);
   const storeName = warungName || DEFAULT_WARUNG;
@@ -314,6 +322,7 @@ ${buildPrintCSS(paperWidthMm)}
           ${pajak > 0 ? `<div class="kv"><span class="k">Pajak</span><span class="v">${fmt(pajak)}</span></div>` : ""}
           ${service > 0 ? `<div class="kv"><span class="k">Service</span><span class="v">${fmt(service)}</span></div>` : ""}
           <div class="kv grand bold"><span class="k">TOTAL</span><span class="v">${fmt(total)}</span></div>
+          ${cashPaymentNote ? `<div class="payment-note">${cashPaymentNote}</div>` : ""}
         </div>
       </div>
       <div class="section footer">
@@ -326,4 +335,4 @@ ${buildPrintCSS(paperWidthMm)}
   </body></html>`;
 }
 
-export {buildReceiptHTML, buildPreviewHTML, fmt, fmtNum, DEFAULT_WARUNG, DEFAULT_PAPER_WIDTH_MM, getCategoryName};
+export {buildReceiptHTML, buildPreviewHTML, fmt, fmtNum, getCashPaymentNote, DEFAULT_WARUNG, DEFAULT_PAPER_WIDTH_MM, getCategoryName};

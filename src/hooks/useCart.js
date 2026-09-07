@@ -58,7 +58,7 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
   }, [receiptAdditionalValues]);
 
   // Use checkRequiredAdditionals to validate all required receipt additionals (not just tableNum)
-  const canPay    = items.length > 0 && checkRequiredAdditionals(receiptAdditionals) && (metode !== "cash" || paidNum >= total);
+  const canPay    = items.length > 0 && checkRequiredAdditionals(receiptAdditionals) && (metode !== "cash" || paidNum > 0 || total === 0);
 
   // PENTING: pakai functional update setCart(c=>...), TIDAK baca `cart`
   // langsung dari closure — pattern paling stabil. Tapi memanggil toast_,
@@ -127,7 +127,7 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
   const getCanPay = useCallback((additionals) => {
     if (items.length === 0) return false;
     if (!checkRequiredAdditionals(additionals)) return false;
-    return metode !== "cash" || paidNum >= total;
+    return metode !== "cash" || paidNum > 0 || total === 0;
   }, [items, checkRequiredAdditionals, metode, paidNum, total]);
   // saveOpenBill & loadBillToCart tinggal di sini (bukan useBills) karena
   // mereka menulis langsung ke state cart/activeBill yang dimiliki hook ini.
