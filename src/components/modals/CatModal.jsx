@@ -37,7 +37,7 @@ export default function CatModal({ menuH }) {
         </div>
 
         {/* List kategori */}
-        <div style={{ marginBottom:12 }}>
+        <div style={{ maxHeight:"min(55vh, 420px)", overflowY:"auto", marginBottom:12, paddingRight:4 }}>
           {menuH.cats.map(c => (
             <div key={c.key} style={{ ...row, padding:"8px 10px", background:LT, borderRadius:RADIUS.md, marginBottom:5, gap:6 }}>
               {editingCatKey === c.key ? (
