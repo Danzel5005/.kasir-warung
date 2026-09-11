@@ -23,7 +23,10 @@ function useAuth({ getNow, toast_ }) {
     const allShifts = savedShifts || [];
     setShifts(allShifts);
     const openShift = allShifts.find(s => s.status === "open");
-    if (openShift) setActiveShift(openShift);
+    if (openShift) {
+      setActiveShift(openShift);
+      setSelectedShiftId(openShift.id);
+    }
     // Load users: jika storage kosong, pakai default
     const userList = savedUsers && savedUsers.length ? savedUsers : DEFAULT_USERS;
     setUsers(userList);
@@ -34,7 +37,7 @@ function useAuth({ getNow, toast_ }) {
   // hari ini (shiftNum) akan selalu dihitung dari snapshot shifts kosong.
   const doLogin = useCallback(async () => {
     const u = users.find(u => u.username === loginForm.username.trim() && u.password === loginForm.password);
-    if (!u) { setLoginForm(f => ({ ...f, error: "Username atau password salah" })); return; }
+    if (!u) { setLoginForm(f => ({ ...f, error: "Username atau password salah" })); return false; }
     const t = getNow();
     const todayKey = `${t.tgl}-${t.blnNum}-${t.thn}`;
     const todayShifts = shifts.filter(s => s.dateKey === todayKey);
@@ -51,6 +54,8 @@ function useAuth({ getNow, toast_ }) {
       operator: u.nama,
       username: u.username,
       status: "open",
+      openingCash: 0,
+      expenses: [],
     };
     const next = [...shifts, shift];
     await api.saveShifts(next);
@@ -60,7 +65,24 @@ function useAuth({ getNow, toast_ }) {
     // Simpan user yang login saat ini (untuk cek hak admin saat kelola pengguna)
     setCurrentUser(u);
     setLoginForm({ username: "", password: "", error: "" });
+    return true;
   }, [loginForm, users, shifts, getNow]);
+
+  const updateShift = useCallback(async (shiftId, patch, sourceShifts = shifts) => {
+    if (!shiftId) return false;
+
+    const source = Array.isArray(sourceShifts) ? sourceShifts : [];
+    const next = source.map(s => s.id === shiftId ? { ...s, ...patch } : s);
+    const updatedShift = next.find(s => s.id === shiftId) || (activeShift && activeShift.id === shiftId ? { ...activeShift, ...patch } : null);
+    if (!updatedShift) return false;
+
+    const result = await api.saveShifts(next);
+    if (result?.ok === false) return false;
+    setShifts(next);
+    setActiveShift(updatedShift);
+    setSelectedShiftId(shiftId);
+    return true;
+  }, [activeShift, shifts]);
 
   // onShiftClosed: {clearCart} — dipass dari App.jsx SAAT DIPANGGIL
   // (argumen panggilan, bukan closure dependency), jadi TIDAK masuk deps array.
@@ -124,7 +146,7 @@ function useAuth({ getNow, toast_ }) {
   return {
     activeShift, shifts, loginForm, closingShift, selectedShiftId, users, currentUser,
     setLoginForm, setClosingShift, setSelectedShiftId,
-    loadInitial, doLogin, confirmCloseShift,
+    loadInitial, doLogin, updateShift, confirmCloseShift,
     addUser, deleteUser,
   };
 }

@@ -1,0 +1,10 @@
+## Yang sudah saya lihat langsung di kode dan berpotensi jadi bottleneck
+- [1] Semua transaksi di-load penuh ke renderer, lalu difilter di JavaScript — useHistory.js menandakan ini secara eksplisit (komentar "target utama fix lag — 300+ item"). Filter tanggal, sort, dan grouping per hari dilakukan dengan filter/sort/reduce di sisi React, bukan lewat query SQL. Ini bekerja baik untuk ratusan transaksi, tapi setelah 5 tahun beroperasi (bisa puluhan ribu baris), akan mulai terasa lag — apalagi kalau dijalankan di PC kasir dengan spek rendah.
+- [2] Kolom data di SQLite berisi JSON blob (TEXT), bukan kolom terstruktur — artinya SQLite hanya dipakai sebagai penyimpan key-value, filter/agregasi tetap harus di-JSON.parse() semua baris dulu di JS. Index yang ada (idx_trx_created) cuma bantu urutan waktu, bukan pencarian by item/kategori/kasir.
+- [3] Tidak ada pagination — kalau UI riwayat transaksi menampilkan semua data sekaligus, render list bisa berat seiring data bertambah.
+- [4] Perbaikan paling berdampak: pindahkan filter/agregasi ke query SQL langsung (WHERE, GROUP BY) dan tambah pagination di UI riwayat.
+# Faktor lain yang mempengaruhi performa jangka panjang
+- Ukuran file kasir.db dan JSON backup yang terus tumbuh di folder userData, bisa memperlambat startup app kalau tidak ada strategi arsip/purge data lama.
+- Electron overhead — tiap instance app menjalankan Chromium + Node sendiri, jadi RAM usage lebih besar dari aplikasi native biasa; di PC kasir yang low-spec ini bisa terasa.
+- Base64 image di JSON (logo, QR QRIS) — kalau disimpan berulang di tiap objek transaksi/settings, bisa membengkakkan ukuran data tanpa perlu.
+- IPC round-trip antara renderer↔main process — kalau tiap aksi kecil (klik menu, update cart) memicu IPC call ke file/db, itu nambah latency dibanding state lokal murni.

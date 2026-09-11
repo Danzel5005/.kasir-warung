@@ -1,17 +1,15 @@
-import { memo, useState } from "react";
+import { memo, useState, useCallback } from "react";
 import { csvByDay, TRX_HEADER, trxRow } from "../utilities/csvbuild.js";
 import { fmt } from "../utilities/receipt.js";
 import { METODE_LABELS } from "../constants/payments.js";
-import { G, OR, W, LT, BD, TX, MT } from "../constants/colors.js";
-import { inp, row } from "../constants/styles.js";
+import { G, OR, W, LT, BD, TX, MT, METODE_COLORS, inp, row } from "../constants/design.js";
 import { Tag } from "../components/Tag.jsx";
-import { METODE_COLORS } from "../constants/colors.js";
 
 // ViewRiwayat — riwayat transaksi dengan filter tanggal, collapse-by-day,
-// view per shift, dan CSV download.
+// view per shift, pagination, dan CSV download.
 function ViewRiwayat({
   fFrom, setFFrom, fTo, setFTo,           // historyH
-  filteredHistory, history, histByDay,     // historyH
+  history, histByDay,                     // historyH (current page data)
   expandedDays, setExpandedDays,           // historyH
   doCSV, at,                               // historyH
   setConfirmDel,                           // App.jsx local
@@ -23,6 +21,8 @@ function ViewRiwayat({
   shifts,                                  // authH
   paymentMethods = [],                     // settingsH - for custom payment method labels
   menuH = null,                            // menuH - for category labels
+  // Pagination
+  totalCount, currentPage, pageSize, isLoading, hasMore, loadMore, refresh, loadAllForExport, sortOrder, toggleSort,
 }) {
   const [showAllShifts, setShowAllShifts] = useState(false);
   const [expandedShifts, setExpandedShifts] = useState(null);
@@ -107,6 +107,21 @@ function ViewRiwayat({
     </div>
   );
 
+  // ── Handle CSV export with all data (not just current page)
+  const handleCSVExport = useCallback(async () => {
+    const allTrx = await loadAllForExport();
+    if (!allTrx.length) return;
+    doCSV("Transaksi", csvByDay(allTrx, TRX_HEADER, (t, at) => trxRow(t, at, menuH?.cats || [], paymentMethods), at()));
+  }, [loadAllForExport, doCSV, menuH, paymentMethods]);
+
+  // ── Infinite scroll handler
+  const handleScroll = useCallback((e) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    if (scrollHeight - scrollTop - clientHeight < 200 && hasMore && !isLoading) {
+      loadMore();
+    }
+  }, [hasMore, isLoading, loadMore]);
+
   return (
     <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
       {/* ── Filter bar ── */}
@@ -138,22 +153,30 @@ function ViewRiwayat({
           {(fFrom || fTo) &&
             <button onClick={() => { setFFrom(""); setFTo(""); }}
               style={{ fontSize:10, color:"#e84040", background:"none", border:"none", cursor:"pointer" }}>Reset</button>}
-          <button onClick={() => doCSV("Transaksi", csvByDay(filteredHistory, TRX_HEADER, (t, at) => trxRow(t, at, menuH?.cats || [], paymentMethods), at()))}
-            disabled={!filteredHistory.length}
-            style={{ padding:"4px 9px", background:filteredHistory.length ? "#e8f5ee" : LT,
-              color:filteredHistory.length ? G : MT, border:`1px solid ${filteredHistory.length ? "#b8ddc8" : BD}`,
-              borderRadius:5, cursor:filteredHistory.length ? "pointer" : "not-allowed",
+          
+          {/* Sort toggle */}
+          <button onClick={toggleSort}
+            style={{ padding:"4px 9px", background:W, border:`1px solid ${BD}`, borderRadius:5,
+              color:TX, cursor:"pointer", fontFamily:"inherit", fontSize:10, fontWeight:600 }}>
+            {sortOrder === "desc" ? "⬇ Terbaru" : "⬆ Terlama"}
+          </button>
+          
+          <button onClick={handleCSVExport}
+            disabled={!totalCount}
+            style={{ padding:"4px 9px", background:totalCount ? "#e8f5ee" : LT,
+              color:totalCount ? G : MT, border:`1px solid ${totalCount ? "#b8ddc8" : BD}`,
+              borderRadius:5, cursor:totalCount ? "pointer" : "not-allowed",
               fontFamily:"inherit", fontSize:10, fontWeight:600 }}>Unduh CSV</button>
-          <button onClick={() => history.length && setConfirmDel({type:"all"})}
-            disabled={!history.length}
-            style={{ padding:"4px 9px", background:history.length ? "#fef0f0" : LT,
-              color:history.length ? "#e84040" : MT, border:`1px solid ${history.length ? "#f5a8a8" : BD}`,
-              borderRadius:5, cursor:history.length ? "pointer" : "not-allowed",
+          <button onClick={() => totalCount && setConfirmDel({type:"all"})}
+            disabled={!totalCount}
+            style={{ padding:"4px 9px", background:totalCount ? "#fef0f0" : LT,
+              color:totalCount ? "#e84040" : MT, border:`1px solid ${totalCount ? "#f5a8a8" : BD}`,
+              borderRadius:5, cursor:totalCount ? "pointer" : "not-allowed",
               fontFamily:"inherit", fontSize:10, fontWeight:600 }}>Hapus Semua</button>
         </div>
         <div style={{ width:"100%", fontSize:10, color:MT }}>
-          {filteredHistory.length} transaksi · Total: <b style={{ color:G }}>{fmt(filteredHistory.reduce((s,t) => s + t.total, 0))}</b>
-          {' · '}{filteredHistory.reduce((s,t) => s + (t.pax||0), 0)} pax total
+          {totalCount} transaksi total · Menampilkan halaman {currentPage + 1} ({history.length} item) · Total: <b style={{ color:G }}>{fmt(history.reduce((s,t) => s + t.total, 0))}</b>
+          {' · '}{history.reduce((s,t) => s + (t.pax||0), 0)} pax halaman ini
         </div>
       </div>
 
@@ -179,10 +202,10 @@ function ViewRiwayat({
       )}
 
       {/* ── Transaction list ── */}
-      <div style={{ flex:1, overflowY:"auto", padding:"10px 16px" }}>
+      <div style={{ flex:1, overflowY:"auto", padding:"10px 16px" }} onScroll={handleScroll}>
         {viewMode === "day" && (
           // ── VIEW BY DAY ──
-          !Object.keys(histByDay).length
+          !Object.keys(histByDay).length && !isLoading
             ? <div style={{ textAlign:"center", color:MT, marginTop:70, fontSize:13 }}>Tidak ada transaksi</div>
             : Object.entries(histByDay).map(([dayLabel, dayTrx], dayIdx) => {
                 const dayTotal = dayTrx.reduce((s,t) => s + t.total, 0);
@@ -210,7 +233,7 @@ function ViewRiwayat({
 
         {viewMode === "shift" && (
           // ── VIEW BY SHIFT ──
-          !shiftKeys.length
+          !shiftKeys.length && !isLoading
             ? <div style={{ textAlign:"center", color:MT, marginTop:70, fontSize:13 }}>Tidak ada transaksi</div>
             : displayedShiftKeys.map((shiftKey, idx) => {
                 const group = histByShift[shiftKey];
@@ -236,6 +259,20 @@ function ViewRiwayat({
                   </div>
                 );
               })
+        )}
+
+        {/* Loading indicator */}
+        {isLoading && (
+          <div style={{ textAlign:"center", padding:"20px", color:MT }}>
+            <div style={{ display:"inline-block", width:20, height:20, border:"2px solid", borderColor:`${G} transparent`, borderRadius:"50%", animation:"spin 1s linear infinite" }} />
+            <style>{"@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}"}</style>
+            <span style={{ display:"block", marginTop:8, fontSize:12 }}>Memuat...</span>
+          </div>
+        )}
+
+        {/* Load more trigger (invisible div at bottom) */}
+        {hasMore && !isLoading && (
+          <div style={{ height: 1 }} />
         )}
 
         {/* ── "Lihat semua" collapsible for shifts > 5 ── */}

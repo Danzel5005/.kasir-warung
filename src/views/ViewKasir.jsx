@@ -1,7 +1,6 @@
 import { memo, useState } from "react";
 import { fmt } from "../utilities/receipt.js";
-import { G, OR, W, LT, BD, TX, MT } from "../constants/colors.js";
-import { inp, row } from "../constants/styles.js";
+import { G, OR, W, LT, BD, TX, MT, inp, row } from "../constants/design.js";
 import StockBadge from "../components/StockBadge.jsx";
 import AdditionalsModal from "../components/modals/AdditionalsModal.jsx";
 
@@ -13,7 +12,7 @@ function ViewKasir({
   // dari cartH
   cart, drawerOpen, setDrawerOpen,
   receiptAdditionalValues, receiptAdditionals, updateReceiptAdditionalValue,
-  items, subtotal, service, pajak, total, activeBill,
+  items, subtotal, service, pajak, discount, total, activeBill,
   addToCart, decCart, delCart, clearCart,
   // App.jsx wrapper functions (sudah di-useCallback di App.jsx)
   saveOpenBill, printPreview, printingPreview, setPayModal,
@@ -79,7 +78,7 @@ function ViewKasir({
         <div style={{padding:"8px 12px",background:W,borderBottom:`1px solid ${BD}`,flexShrink:0}}>
           <div style={{display:"flex",alignItems:"center",gap:8,background:LT,border:`1px solid ${BD}`,borderRadius:7,padding:"6px 10px"}}>
             <span style={{color:MT,fontSize:13}}>&#128269;</span>
-            <input ref={searchRef} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cari menu... (tekan / untuk fokus)" style={{border:"none",background:"transparent",outline:"none",fontSize:12,fontFamily:"inherit",width:"100%"}}/>
+            <input ref={searchRef} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cari menu / Menu ID... (tekan / untuk fokus)" style={{border:"none",background:"transparent",outline:"none",fontSize:12,fontFamily:"inherit",width:"100%"}}/>
             {search&&<button onClick={()=>setSearch("")} style={{border:"none",background:"none",cursor:"pointer",color:MT,fontSize:12}}>&#10005;</button>}
           </div>
         </div>
@@ -94,8 +93,6 @@ function ViewKasir({
               const habis = item.stok === 0;
               return(
                 <div key={item.id} onClick={()=>!habis&&handleItemClick(item)} style={{background:W,border:`1px solid ${qty>0?"#a8d5b8":BD}`,borderRadius:9,overflow:"hidden",boxShadow:qty>0?"0 0 0 2px #a8d5b8":"0 1px 3px rgba(0,0,0,0.05)",cursor:habis?"not-allowed":"pointer",opacity:habis?0.55:1,transition:"all 0.12s"}}>
-                  {item.foto?<img src={item.foto} alt={item.nama} style={{width:"100%",height:95,objectFit:"cover"}}/>
-                  :<div style={{height:68,background:"linear-gradient(135deg,#e8f5ee,#d4ead8)",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{fontSize:10,color:"#5a8a6a",fontWeight:600,textAlign:"center",padding:"0 8px"}}>{item.nama}</span></div>}
                   <div style={{padding:"7px 9px 9px"}}>
                     <div style={{...row,gap:4,marginBottom:2}}><span style={{fontSize:11,fontWeight:700,lineHeight:1.3}}>{item.nama}</span><StockBadge stok={item.stok}/></div>
                     {item.desc&&<div style={{fontSize:9,color:MT,marginBottom:4}}>{item.desc}</div>}
@@ -185,7 +182,7 @@ function ViewKasir({
               <div key={`${cartKey}_${idx}`} style={{padding:"7px 12px",borderBottom:`1px solid ${LT}`,background:item.additionals?"#f9faf9":W}}>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 60px 46px 60px 20px",gap:3,alignItems:"center",marginBottom:item.additionals?4:0}}>
                   <div style={{display:"flex",alignItems:"center",gap:6}}>
-                    {item.foto?<img src={item.foto} alt="" style={{width:26,height:26,borderRadius:4,objectFit:"cover",flexShrink:0}}/>:<div style={{width:26,height:26,background:"#e8f5ee",borderRadius:4,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{fontSize:7,color:"#5a8a6a",fontWeight:600}}>YKK</span></div>}
+                    <div style={{width:26,height:26,background:"#e8f5ee",borderRadius:4,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{fontSize:7,color:"#5a8a6a",fontWeight:600}}>YKK</span></div>
                     <span style={{fontSize:10,fontWeight:600,lineHeight:1.3}}>{item.nama}</span>
                   </div>
                   <div style={{fontSize:10,color:MT,textAlign:"center"}}>{fmt(item.harga)}</div>
@@ -211,6 +208,7 @@ function ViewKasir({
         {items.length>0&&(
           <div style={{padding:"10px 13px",borderTop:`1px solid ${BD}`}}>
             <div style={{...row,fontSize:11,color:MT,marginBottom:3}}><span>Subtotal</span><span style={{fontWeight:600,color:TX}}>{fmt(subtotal)}</span></div>
+            {discount > 0 && <div style={{...row,fontSize:11,color:G,marginBottom:3}}><span>Diskon</span><span style={{fontWeight:600}}>-{fmt(discount)}</span></div>}
             <div style={{...row,borderTop:`1px solid ${BD}`,paddingTop:7,marginBottom:9}}>
               <span style={{fontSize:14,fontWeight:700}}>Total</span>
               <span style={{fontSize:15,fontWeight:700,color:OR}}>{fmt(total)}</span>

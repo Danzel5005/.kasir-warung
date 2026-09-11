@@ -1,6 +1,5 @@
-import { fmt } from "../../utilities/receipt.js";
-import { G, OR, W, LT, BD, TX, MT } from "../../constants/colors.js";
-import { row, inp, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/theme.js";
+import { fmt, getCashPaymentNote } from "../../utilities/receipt.js";
+import { G, OR, W, LT, BD, TX, MT, row, inp, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/design.js";
 
 export default function PayModal({ cartH, processPayment, setPayModal, paymentMethods = [], receiptAdditionals = [] }) {
   // Group payment methods by category
@@ -31,6 +30,11 @@ export default function PayModal({ cartH, processPayment, setPayModal, paymentMe
     if (isSelected) return categoryConfig[category]?.color || TX;
     return TX;
   };
+
+  const hasCashPayment = cartH.paid !== "" || cartH.total === 0;
+  const cashPaymentNote = hasCashPayment ? getCashPaymentNote(cartH.paidNum, cartH.total) : "";
+  const cashPaymentLabel = cashPaymentNote || "Lunas";
+  const cashPaymentColor = cashPaymentNote?.startsWith("Kurang") ? COLOR_PALETTE.danger : G;
 
   return (
     <div
@@ -135,10 +139,10 @@ export default function PayModal({ cartH, processPayment, setPayModal, paymentMe
               autoFocus
               style={{ ...inp, fontSize:TYPOGRAPHY.body.fontSize, marginBottom:8, border:`2px solid ${cartH.paidNum >= cartH.total ? "#a8d5b8" : BD}` }}
             />
-            {cartH.paidNum >= cartH.total && (
-              <div style={{ background:COLOR_PALETTE.primaryLight, border:"1px solid #a8d5b8", borderRadius:RADIUS.md, padding:"7px 10px", marginBottom:8, ...row, fontSize:TYPOGRAPHY.small.fontSize, color:G }}>
-                <span>Kembalian</span>
-                <span style={{ fontWeight:700 }}>{fmt(cartH.kembalian)}</span>
+            {hasCashPayment && (
+              <div style={{ background:cashPaymentNote?.startsWith("Kurang") ? COLOR_PALETTE.dangerLight : COLOR_PALETTE.primaryLight, border:`1px solid ${cashPaymentNote?.startsWith("Kurang") ? COLOR_PALETTE.danger : "#a8d5b8"}`, borderRadius:RADIUS.md, padding:"7px 10px", marginBottom:8, ...row, fontSize:TYPOGRAPHY.small.fontSize, color:cashPaymentColor }}>
+                <span>{cashPaymentLabel}</span>
+                {!cashPaymentNote && <span style={{ fontWeight:700 }}>{fmt(cartH.paidNum)}</span>}
               </div>
             )}
           </>)}

@@ -1,8 +1,8 @@
-import { memo } from "react";
+import { memo, useEffect, useState } from "react";
 import { csvByDay, TRX_HEADER, trxRow, csvLaporan, csvSalesRate, csvPerMenu, csvMetodeBayar, csvStok } from "../utilities/csvbuild.js";
 import { fmt, fmtNum } from "../utilities/receipt.js";
 import { METODE_LABELS } from "../constants/payments.js";
-import { G, OR, W, LT, BD, TX, MT, METODE_COLORS } from "../constants/colors.js";
+import { G, OR, W, LT, BD, TX, MT, METODE_COLORS } from "../constants/design.js";
 
 // ViewLaporan — laporan keuangan & penjualan per shift, dengan CSV export.
 function ViewLaporan({
@@ -11,15 +11,30 @@ function ViewLaporan({
   history,                                // historyH
   menu,                                   // menuH.menu (array)
   menuH,                                  // menuH (hook object with cats)
-  doCSV, at,                              // historyH
+  doCSV, at, loadAllForReport,            // historyH
   paymentMethods,                         // settingsH
+  expenseCategories = [],
+  openingCash = 0,
+  totalExpenses = 0,
+  onOpenExpenseModal,
+  onOpenCashModal,
 }) {
-  const shiftTrx = selectedShiftId==="all"
-    ? history
-    : selectedShiftId
-      ? history.filter(t=>t.shiftId===selectedShiftId)
-      : history.filter(t=>t.shiftId===activeShift?.id);
-  const selShift = shifts.find(s=>s.id===selectedShiftId);
+  const selShift = shifts.find(s=>s.id===selectedShiftId) || activeShift;
+  const reportShiftId = selectedShiftId === "all" ? undefined : selectedShiftId || activeShift?.id;
+  const [shiftTrx, setShiftTrx] = useState([]);
+  const [isReportLoading, setIsReportLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsReportLoading(true);
+    loadAllForReport(reportShiftId).then((transactions) => {
+      if (cancelled) return;
+      setShiftTrx(transactions);
+      setIsReportLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [loadAllForReport, reportShiftId]);
+
   const shiftLabel = selectedShiftId==="all"
     ? "Semua Shift"
     : selShift
@@ -31,11 +46,117 @@ function ViewLaporan({
   const sub=shiftTrx.reduce((s,t)=>s+t.subtotal,0);
   const laba=rev-mod;
   const hasModal=shiftTrx.some(t=>t.items.some(i=>i.modal>0));
+  const selectedShiftList = selectedShiftId === "all"
+    ? shifts
+    : selShift
+      ? [selShift]
+      : activeShift
+        ? [activeShift]
+        : [];
+  const reportOpeningCash = selectedShiftList.reduce((sum, shift) => sum + Number(shift?.openingCash || 0), 0) || Number(openingCash || 0);
+  const reportTotalExpenses = selectedShiftList.reduce((sum, shift) => sum + Number((shift?.expenses || []).reduce((inner, item) => inner + Number(item.jumlah || 0), 0)), 0) || Number(totalExpenses || 0);
+  const netProfit = laba - reportTotalExpenses;
+  // Saldo kas shift mencakup kas awal, pendapatan, dan pengeluaran shift.
+  const cashBalance = reportOpeningCash + rev - reportTotalExpenses;
+  const [detailType, setDetailType] = useState(null);
+  const [selectedExpenseCategory, setSelectedExpenseCategory] = useState(null);
+  const [selectedIncomeMethod, setSelectedIncomeMethod] = useState(null);
+
+  const getExpenseCategoryLabel = (key) => {
+    const normalizedKey = String(key || "lainnya").trim();
+    const found = expenseCategories.find((cat) => String(cat.key || "").trim() === normalizedKey);
+    return found?.label || normalizedKey;
+  };
+
+  const resolvePaymentMethodLabel = (trx) => {
+    const key = String(trx?.metodeBayar || "cash").trim();
+    const transactionLabel = String(trx?.metodeBayarLabel || "").trim();
+    if (transactionLabel) return transactionLabel;
+
+    const methodFromSettings = paymentMethods.find((m) => String(m.key || "").trim() === key);
+    if (methodFromSettings?.label) return methodFromSettings.label;
+
+    try {
+      const savedSettings = JSON.parse(localStorage.getItem("ykk_settings") || "{}");
+      const savedMethod = (savedSettings?.paymentMethods || []).find((m) => String(m.key || "").trim() === key);
+      if (savedMethod?.label) return savedMethod.label;
+    } catch (_) {
+      // ignore missing localStorage in non-browser/test contexts
+    }
+
+    const defaults = {
+      cash: "Tunai",
+      "debit-bca": "Debit BCA",
+      "debit-bni": "Debit BNI",
+      "qris-bca": "QRIS BCA",
+      "qris-bni": "QRIS BNI",
+      "transfer-bca": "Debit BCA",
+      qris: "QRIS BCA",
+    };
+
+    return defaults[key] || key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  };
+
+  const incomeBreakdown = shiftTrx.length
+    ? shiftTrx.reduce((acc, trx) => {
+        const key = String(trx?.metodeBayar || "cash").trim();
+        const label = resolvePaymentMethodLabel(trx);
+        const existing = acc.find((entry) => entry.key === key || entry.label === label);
+        const total = Number(trx.total || 0);
+
+        if (existing) {
+          existing.total += total;
+          existing.count += 1;
+          existing.items.push(trx);
+          return acc;
+        }
+
+        acc.push({ key, label, total, count: 1, items: [trx] });
+        return acc;
+      }, []).filter((item) => item.total > 0)
+    : [{ key: "none", label: "Tidak ada metode bayar", total: rev, count: shiftTrx.length, items: shiftTrx }];
+
+  const expenseEntries = selectedShiftList.flatMap((shift) => (shift?.expenses || []).map((item) => {
+    const categoryKey = String(item?.kategori || item?.category || "lainnya");
+    return {
+      ...item,
+      categoryKey,
+      categoryLabel: getExpenseCategoryLabel(categoryKey),
+      shiftLabel: shift?.shiftNum ? `Shift ${shift.shiftNum}` : "Shift aktif",
+      operator: shift?.operator || "-",
+    };
+  }));
+
+  const expenseBreakdown = expenseEntries.reduce((acc, item) => {
+    const key = item?.categoryKey || "lainnya";
+    const label = item?.categoryLabel || getExpenseCategoryLabel(key);
+    const jumlah = Number(item?.jumlah || 0);
+    const existing = acc.find((entry) => entry.key === key);
+    if (existing) {
+      existing.total += jumlah;
+      existing.items.push(item);
+    } else {
+      acc.push({ key, label, total: jumlah, count: 1, items: [item] });
+    }
+    return acc;
+  }, []).filter((item) => item.total > 0);
 
   return (
     <div style={{flex:1,overflowY:"auto",padding:"16px 20px"}}>
-      <div style={{fontSize:14,fontWeight:700,color:G,marginBottom:3}}>Laporan Keuangan & Penjualan</div>
-      <div style={{fontSize:11,color:MT,marginBottom:12}}>CSV diunduh terpisah per hari. Isi harga modal di Kelola Menu untuk laporan laba/rugi.</div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:12}}>
+        <div>
+          <div style={{fontSize:14,fontWeight:700,color:G,marginBottom:3}}>Laporan Keuangan & Penjualan</div>
+          <div style={{fontSize:11,color:MT}}>CSV diunduh terpisah per hari. Isi harga modal di Kelola Menu untuk laporan laba/rugi.</div>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",justifyContent:"flex-end"}}>
+          <button onClick={onOpenCashModal} style={{padding:"8px 12px",background:"#e8f5ee",color:G,border:`1px solid #a8d5b8`,borderRadius:8,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700}}>
+            Total Kas Shift ini: {fmt(cashBalance)}
+          </button>
+          <button onClick={onOpenExpenseModal} style={{padding:"8px 12px",background:W,color:G,border:`1px solid ${BD}`,borderRadius:8,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700}}>
+            Masukan Pengeluaran
+          </button>
+        </div>
+      </div>
 
       {/* ── Selector Shift ── */}
       <div style={{background:W,border:`1px solid ${BD}`,borderRadius:10,padding:"12px 14px",marginBottom:18}}>
@@ -54,20 +175,122 @@ function ViewLaporan({
         </div>
       </div>
 
-      <div style={{fontSize:11,fontWeight:700,color:G,marginBottom:10}}>📊 {shiftLabel} — {shiftTrx.length} transaksi</div>
+      <div style={{fontSize:11,fontWeight:700,color:G,marginBottom:10}}>📊 {shiftLabel} — {isReportLoading ? "memuat..." : `${shiftTrx.length} transaksi`}</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))",gap:10,marginBottom:20}}>
         {[
-          {l:"Total Pendapatan",v:fmt(rev),c:G,s:`dari ${shiftTrx.length} trx`},
-          {l:"Total Modal",v:hasModal?fmt(mod):"Belum diinput",c:"#b87a00",s:hasModal?`dari sub ${fmt(sub)}`:"-"},
-          {l:"Estimasi Laba",v:hasModal?fmt(laba):"Belum diinput",c:laba>=0?G:"#e84040",s:hasModal?`margin ${sub>0?((laba/sub)*100).toFixed(1):0}%`:"-"},
-        ].map((s,i)=>(
-          <div key={i} style={{background:W,border:`1px solid ${BD}`,borderRadius:9,padding:"12px 14px",boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
-            <div style={{fontSize:10,color:MT,marginBottom:4}}>{s.l}</div>
-            <div style={{fontSize:15,fontWeight:700,color:s.c}}>{s.v}</div>
-            <div style={{fontSize:9,color:MT,marginTop:2}}>{s.s}</div>
-          </div>
-        ))}
+          {l:"Total Pendapatan",v:fmt(rev),c:G,s:`dari ${shiftTrx.length} trx`,key:"income"},
+          {l:"Total Pengeluaran",v:fmt(reportTotalExpenses),c:"#e84040",s:`${(selShift?.expenses || []).length || 0} catatan`,key:"expense"},
+          {l:"Total Modal",v:hasModal?fmt(mod):"Belum diinput",c:"#b87a00",s:hasModal?`dari sub ${fmt(sub)}`:"-",key:"modal"},
+          {l:"Laba Bersih",v:fmt(netProfit),c:netProfit>=0?G:"#e84040",s:hasModal?`margin ${sub>0?((netProfit/(sub||1))*100).toFixed(1):0}%`:"-",key:"profit"},
+        ].map((s,i)=>{
+          const cardStyle = {background:W,border:`1px solid ${BD}`,borderRadius:9,padding:"12px 14px",boxShadow:"0 1px 4px rgba(0,0,0,0.04)",textAlign:"left",fontFamily:"inherit",cursor:"default",width:"100%",height:"100%"};
+          const content = (
+            <>
+              <div style={{fontSize:10,color:MT,marginBottom:4}}>{s.l}</div>
+              <div style={{fontSize:15,fontWeight:700,color:s.c}}>{s.v}</div>
+              <div style={{fontSize:9,color:MT,marginTop:2}}>{s.s}</div>
+            </>
+          );
+
+          if (s.key === "income" || s.key === "expense") {
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setDetailType(detailType === s.key ? null : s.key)}
+                style={{...cardStyle, cursor:"pointer"}}
+              >
+                {content}
+              </button>
+            );
+          }
+
+          return (
+            <div key={i} style={cardStyle}>
+              {content}
+            </div>
+          );
+        })}
       </div>
+
+      {detailType && (
+        <div style={{background:W,border:`1px solid ${BD}`,borderRadius:10,padding:"12px 14px",marginBottom:20}}>
+          <div style={{fontSize:11,fontWeight:700,color:TX,marginBottom:8}}>
+            {detailType === "income" ? "Rincian Total Pendapatan" : "Rincian Total Pengeluaran"}
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:8}}>
+            {(detailType === "income" ? incomeBreakdown : expenseBreakdown).length ? (
+              (detailType === "income" ? incomeBreakdown : expenseBreakdown).map((item, index) => {
+                const card = (
+                  <div style={{background:detailType === "income" ? "#eef8f0" : "#fff1f1", border:`1px solid ${detailType === "income" ? "#cfead6" : "#f5c5c5"}`, borderRadius:8, padding:"10px 12px"}}>
+                    <div style={{fontSize:10,color:MT,marginBottom:4}}>{item.label}</div>
+                    <div style={{fontSize:13,fontWeight:700,color:detailType === "income" ? G : "#e84040"}}>{fmt(item.total)}</div>
+                    <div style={{fontSize:9,color:MT,marginTop:2}}>{item.count || 0} {detailType === "income" ? "transaksi" : "catatan"}</div>
+                  </div>
+                );
+
+                if (detailType === "expense") {
+                  return (
+                    <button key={index} type="button" onClick={() => setSelectedExpenseCategory({ key: item.key, label: item.label })} style={{background:"transparent", border:"none", padding:0, textAlign:"left", cursor:"pointer", fontFamily:"inherit"}}>
+                      {card}
+                    </button>
+                  );
+                }
+
+                return (
+                  <button key={index} type="button" onClick={() => setSelectedIncomeMethod(item.label)} style={{background:"transparent", border:"none", padding:0, textAlign:"left", cursor:"pointer", fontFamily:"inherit"}}>
+                    {card}
+                  </button>
+                );
+              })
+            ) : (
+              <div style={{fontSize:10,color:MT,gridColumn:"1/-1"}}>
+                {detailType === "income" ? "Belum ada pendapatan untuk shift ini." : "Belum ada pengeluaran untuk shift ini."}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {selectedExpenseCategory && (
+        <div onClick={() => setSelectedExpenseCategory(null)} style={{position:"fixed", inset:0, background:"rgba(17,24,39,0.28)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:50, padding:16}}>
+          <div onClick={(e) => e.stopPropagation()} style={{width:"min(420px, 92vw)", background:W, border:`1px solid ${BD}`, borderRadius:12, boxShadow:"0 18px 50px rgba(0,0,0,0.18)", padding:"14px 16px"}}>
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10}}>
+              <div style={{fontSize:12,fontWeight:700,color:TX}}>{selectedExpenseCategory.label}</div>
+              <button type="button" onClick={() => setSelectedExpenseCategory(null)} style={{background:"transparent", border:"none", color:MT, cursor:"pointer", fontSize:16, fontWeight:700, fontFamily:"inherit"}}>×</button>
+            </div>
+            <div style={{display:"grid", gap:8, maxHeight:260, overflowY:"auto"}}>
+              {(expenseEntries.filter((item) => (item.categoryKey || "lainnya") === selectedExpenseCategory.key) || []).map((entry, idx) => (
+                <div key={`${entry.id || idx}-${entry.createdAt || idx}`} style={{background:"#fff7f7", border:`1px solid #f3d0d0`, borderRadius:8, padding:"10px 12px"}}>
+                  <div style={{fontSize:9,color:MT,marginBottom:4}}>{entry.shiftLabel} · {entry.operator}</div>
+                  <div style={{fontSize:12,fontWeight:700,color:TX}}>{entry.deskripsi || "Catatan pengeluaran"}</div>
+                  <div style={{fontSize:11,color:"#e84040", fontWeight:700, marginTop:4}}>{fmt(Number(entry.jumlah || 0))}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedIncomeMethod && (
+        <div onClick={() => setSelectedIncomeMethod(null)} style={{position:"fixed", inset:0, background:"rgba(17,24,39,0.28)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:50, padding:16}}>
+          <div onClick={(e) => e.stopPropagation()} style={{width:"min(420px, 92vw)", background:W, border:`1px solid ${BD}`, borderRadius:12, boxShadow:"0 18px 50px rgba(0,0,0,0.18)", padding:"14px 16px"}}>
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10}}>
+              <div style={{fontSize:12,fontWeight:700,color:TX}}>{selectedIncomeMethod}</div>
+              <button type="button" onClick={() => setSelectedIncomeMethod(null)} style={{background:"transparent", border:"none", color:MT, cursor:"pointer", fontSize:16, fontWeight:700, fontFamily:"inherit"}}>×</button>
+            </div>
+            <div style={{display:"grid", gap:8, maxHeight:260, overflowY:"auto"}}>
+              {(incomeBreakdown.find((item) => item.label === selectedIncomeMethod)?.items || []).map((trx, idx) => (
+                <div key={`${trx.id || idx}-${trx.createdAt || idx}`} style={{background:"#eef8f0", border:`1px solid #cfead6`, borderRadius:8, padding:"10px 12px"}}>
+                  <div style={{fontSize:9,color:MT,marginBottom:4}}>{trx.hari || "-"} · {trx.tgl || "-"} {trx.bln || "-"} {trx.thn || ""}</div>
+                  <div style={{fontSize:12,fontWeight:700,color:TX}}>{resolvePaymentMethodLabel(trx)}</div>
+                  <div style={{fontSize:11,color:G, fontWeight:700, marginTop:4}}>{fmt(Number(trx.total || 0))}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Breakdown per metode - dynamic from settings */}
       <div style={{marginBottom:20}}>
@@ -97,7 +320,7 @@ function ViewLaporan({
             desc:"Ringkasan per hari: pendapatan, modal, laba/rugi.",
             btn:"Unduh CSV Laporan Keuangan",
               fn:()=>doCSV(`Laporan_Keuangan_${selectedShiftId==="all"?"Semua":`Shift${selShift?.shiftNum||""}` }`,
-              csvLaporan(shiftTrx,at()))},
+              csvLaporan(shiftTrx,at(), { openingCash: reportOpeningCash, totalExpenses: reportTotalExpenses }))},
           {title:"Sales Rate",
             desc:"Top 10 terlaku, top 10 paling sedikit, dan semua menu yang belum terjual sama sekali.",
             btn:"Unduh CSV Sales Rate",

@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { LT, BD, MT } from "../constants/colors.js";
-import { RADIUS, TYPOGRAPHY } from "../constants/theme.js";
+import { LT, BD, MT, RADIUS, TYPOGRAPHY } from "../constants/design.js";
 
 const HARI  = ["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
 const BULAN = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
