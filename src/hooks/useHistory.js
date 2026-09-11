@@ -4,7 +4,7 @@ import { api } from "../utilities/utils.js";
 // useHistory — transaksi history dengan server-side filtering & pagination untuk skalabilitas
 // collapse-by-day UI state, delete + undo, dan CSV download generic.
 // Juga mendukung view mode per shift (shiftIdFilter).
-function useHistory({ toast_, addUndo, getNow }) {
+function useHistory({ toast_, addUndo, getNow, authH }) {
   // ── State untuk pagination & filtering
   const [history, setHistory] = useState([]);       // current page transactions
   const [totalCount, setTotalCount] = useState(0);  // total matching transactions
@@ -140,6 +140,11 @@ function useHistory({ toast_, addUndo, getNow }) {
 
   // Delete transaction
   const deleteTrx = useCallback(async (id) => {
+    // Only admin can delete transactions
+    if (!authH.currentUser?.role === "admin") {
+      toast_("Hanya admin yang dapat menghapus riwayat transaksi", "err");
+      return;
+    }
     const snap = [...history];
     const snapTotal = totalCount;
     await api.deleteTrx(id);

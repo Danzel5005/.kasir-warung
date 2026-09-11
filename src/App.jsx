@@ -18,6 +18,7 @@ import { useCart } from "./hooks/useCart.js";
 import { useHistory } from "./hooks/useHistory.js";
 import { useBarcodeScanner } from "./hooks/useBarcodeScanner.js";
 import { row } from "./constants/design.js";
+import { isAdminUser } from "./utilities/users.js";
 
 import ViewOpenBill from "./views/ViewOpenBill.jsx";
 import ViewKasir from "./views/ViewKasir.jsx";
@@ -577,7 +578,7 @@ const executeConfirmDel = useCallback(() => {
 
         {/* Nav */}
         <div style={{display:"flex",gap:2,marginLeft:8}}>
-          {[{key:"menu",label:"Kasir",hotkey:"K"},{key:"bills",label:`Open Bill (${billsH.bills.filter(b=>b.status==="open").length})`,hotkey:"O"},{key:"history",label:`Riwayat (${historyH.history.length})`,hotkey:"R"},{key:"laporan",label:"Laporan",hotkey:"L"},{key:"kelola",label:"Menu",hotkey:"M"}].map(b=>(
+          {[{key:"menu",label:"Kasir",hotkey:"K"},{key:"bills",label:`Open Bill (${billsH.bills.filter(b=>b.status==="open").length})`,hotkey:"O"},{key:"history",label:`Riwayat (${historyH.history.length})`,hotkey:"R"},{key:"laporan",label:"Laporan",hotkey:"L"},{key:"kelola",label:"Menu",hotkey:"M"}].filter(b => authH.currentUser?.role === "admin" || ["menu","history","laporan"].includes(b.key)).map(b=>(
             <button key={b.key} onClick={()=>setView(b.key)} title={`Hotkey: ${b.hotkey}`} style={{padding:"4px 11px",borderRadius:5,border:"none",cursor:"pointer",fontFamily:"inherit",fontSize:11,fontWeight:600,background:view===b.key?G:"transparent",color:view===b.key?W:MT,transition:"all 0.15s"}}>
               {b.label}
             </button>
