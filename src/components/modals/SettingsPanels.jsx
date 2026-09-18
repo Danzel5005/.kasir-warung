@@ -3,6 +3,35 @@ import { G, W, BD, MT, LT, TX, row, inp, RADIUS, TYPOGRAPHY, COLOR_PALETTE } fro
 import { isAdmin } from "../../utilities/permissions.js";
 import BackupRestorePanel from "../BackupRestorePanel.jsx";
 
+function PasswordInput({ value, onChange, placeholder, style }) {
+  const [show, setShow] = useState(false);
+  const hide = () => setShow(false);
+  return <div style={{ position: "relative", width: "100%" }}>
+    <input
+      type={show ? "text" : "password"}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      style={{ ...style, paddingRight: 36 }}
+    />
+    <button
+      type="button"
+      onMouseDown={() => setShow(true)}
+      onMouseUp={hide}
+      onMouseLeave={hide}
+      onTouchStart={(event) => { event.preventDefault(); setShow(true); }}
+      onTouchEnd={hide}
+      onTouchCancel={hide}
+      aria-label={show ? "Sembunyikan password" : "Tampilkan password"}
+      style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center", justifyContent: "center", color: MT }}
+    >
+      {show
+        ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>}
+    </button>
+  </div>;
+}
+
 // BackupSettingsTab — thin wrapper so the settings modal can render the
 // standalone BackupRestorePanel through the same `{ settingsH, menu, cats }`
 // prop contract as every other tab.
@@ -130,9 +159,9 @@ function SelfPasswordPanel({ authH }) {
   return <div style={{ paddingTop: 12, borderTop: `1px solid ${BD}`, marginBottom: 12 }}>
     <div style={{ fontSize: TYPOGRAPHY.label.fontSize, fontWeight: 700, color: G, marginBottom: 8 }}>Ganti Password Saya</div>
     <div style={{ display: "grid", gap: 7 }}>
-      <input type="password" value={draft.current} onChange={(event) => setDraft({ ...draft, current: event.target.value })} placeholder="Password saat ini" style={inp} />
-      <input type="password" value={draft.next} onChange={(event) => setDraft({ ...draft, next: event.target.value })} placeholder="Password baru (minimal 4 karakter)" style={inp} />
-      <input type="password" value={draft.confirmation} onChange={(event) => setDraft({ ...draft, confirmation: event.target.value })} placeholder="Ulangi password baru" style={inp} />
+      <PasswordInput value={draft.current} onChange={(event) => setDraft({ ...draft, current: event.target.value })} placeholder="Password saat ini" style={inp} />
+      <PasswordInput value={draft.next} onChange={(event) => setDraft({ ...draft, next: event.target.value })} placeholder="Password baru (minimal 4 karakter)" style={inp} />
+      <PasswordInput value={draft.confirmation} onChange={(event) => setDraft({ ...draft, confirmation: event.target.value })} placeholder="Ulangi password baru" style={inp} />
       <button onClick={async () => { if (await authH.changeOwnPassword(draft.current, draft.next, draft.confirmation)) setDraft({ current: "", next: "", confirmation: "" }); }} disabled={!valid} style={{ padding: "8px 14px", background: valid ? G : "#aaa", color: W, border: "none", borderRadius: RADIUS.md, cursor: valid ? "pointer" : "not-allowed", fontFamily: "inherit", fontSize: TYPOGRAPHY.small.fontSize, fontWeight: 700 }}>Simpan Password Saya</button>
     </div>
   </div>;
