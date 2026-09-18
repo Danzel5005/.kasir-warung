@@ -11,6 +11,8 @@
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
+    "preelectron:dev": "node electron/free-port.cjs",
+    "preelectron:plain": "node electron/free-port.cjs",
     "build": "vite build",
     "test": "vitest run",
     "test:watch": "vitest",

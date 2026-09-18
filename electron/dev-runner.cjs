@@ -129,6 +129,7 @@ function watchDir(dir) {
     // Watch the source files that the main process actually loads.
     if (!/\.(cjs|js|json)$/i.test(entry.name)) continue;
     if (entry.name === "dev-runner.cjs") continue; // don't restart on our own edits
+    if (entry.name === "free-port.cjs") continue; // runs before vite; not part of main
     if (entry.name === "license-secret.cjs") continue; // secrets: never a dev edit
 
     try {

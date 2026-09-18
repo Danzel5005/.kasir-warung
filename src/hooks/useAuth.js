@@ -1,6 +1,33 @@
 import { useState, useCallback } from "react";
 import { DEFAULT_USERS, isAdminUser } from "../utilities/users.js";
-import { api } from "../utilities/utils.js";
+import { LS, api } from "../utilities/utils.js";
+
+// SESSION_KEY — menyimpan identitas user yang sedang login (hanya username).
+//
+// PENTING: `currentUser` sebelumnya hanya hidup di React state. Saat renderer
+// reload (dev restart / HMR / relaunch), `activeShift` ter-restore dari
+// shifts.json TAPI `currentUser` kembali null — sehingga app masuk ke UI kasir
+// dengan currentUser null, dan isAdmin(null) === false. Akibatnya admin
+// kehilangan seluruh hak admin ("sama seperti non-admin") sampai login ulang.
+//
+// Kita simpan hanya USERNAME (bukan objek user / password) supaya password
+// tidak pernah ditulis ke storage. Role SELALU di-resolve ulang dari daftar
+// users terbaru saat restore — jadi akun yang dihapus/diturunkan haknya tidak
+// bisa "hidup kembali" sebagai admin dari sesi lama.
+const SESSION_KEY = "ykk_session_user";
+
+// resolveSessionUser — keputusan murni: user mana (kalau ada) yang boleh
+// dipulihkan sebagai sesi login.
+//
+// Diekspor agar bisa diuji tanpa me-render hook (env test = node).
+// Aturan:
+//  - tanpa shift terbuka  -> null (sesi memang berakhir saat shift ditutup)
+//  - shift terbuka        -> user harus SUDAH ADA di daftar users terbaru
+//                            (akun dihapus / diganti tidak terpulihkan)
+export function resolveSessionUser({ hasOpenShift, sessionUsername, users }) {
+  if (!hasOpenShift || !sessionUsername) return null;
+  return (users || []).find(u => u.username === sessionUsername) || null;
+}
 
 // useAuth — login & shift lifecycle.
 // Constraint: tidak import useBills/useCart langsung. Saat shift ditutup,
@@ -30,6 +57,24 @@ function useAuth({ getNow, toast_ }) {
     // Load users: jika storage kosong, pakai default
     const userList = savedUsers && savedUsers.length ? savedUsers : DEFAULT_USERS;
     setUsers(userList);
+
+    // Restore sesi login. Hanya dipulihkan bila shift masih terbuka — kalau
+    // shift sudah ditutup, user memang diminta login lagi (lihat showLoginScreen
+    // di App.jsx). Role/identitas di-resolve ulang dari userList terbaru, jadi
+    // akun yang sudah dihapus atau bukan admin lagi tidak ikut terpulihkan.
+    if (openShift) {
+      const restored = resolveSessionUser({
+        hasOpenShift: true,
+        sessionUsername: LS(SESSION_KEY),
+        users: userList,
+      });
+      if (restored) {
+        setCurrentUser(restored);
+      } else {
+        // Sesi lama tidak valid (akun dihapus / storage dibersihkan).
+        LS(SESSION_KEY, null);
+      }
+    }
   }, []);
 
   // PENTING: membaca loginForm, users, dan shifts LANGSUNG dari closure. Wajib
@@ -64,6 +109,8 @@ function useAuth({ getNow, toast_ }) {
     setSelectedShiftId(shift.id);
     // Simpan user yang login saat ini (untuk cek hak admin saat kelola pengguna)
     setCurrentUser(u);
+    // Persist identitas sesi supaya hak admin tetap ada setelah reload/restart.
+    LS(SESSION_KEY, u.username);
     setLoginForm({ username: "", password: "", error: "" });
     return true;
   }, [loginForm, users, shifts, getNow]);
@@ -99,6 +146,10 @@ function useAuth({ getNow, toast_ }) {
     setActiveShift(null);
     setClosingShift(false);
     setSelectedShiftId(null);
+    // Shift ditutup = sesi berakhir. Bersihkan currentUser + session tersimpan
+    // supaya user harus login lagi (dan tidak "bangun" sebagai admin lama).
+    setCurrentUser(null);
+    LS(SESSION_KEY, null);
     // HAPUS: clearBills() — open bill TIDAK dihapus otomatis
     // Open bill hanya dihapus melalui proses bayar (processPayment) yang memanggil removeBillLocal
     clearCart();
