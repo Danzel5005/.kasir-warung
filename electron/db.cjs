@@ -107,6 +107,25 @@ function createDatabaseService({ ipcMain, files, ensureDir, rJSON, atomicWrite, 
       try { db.prepare("DELETE FROM transactions WHERE id = ?").run(id); return { ok: true }; }
       catch (err) { console.error("[trx-delete] Error:", err.message); return { ok: false, error: err.message }; }
     });
+    ipcMain.handle("trx-void", (_e, id, { reason, actor, note } = {}) => {
+      const patch = { status: "voided", voidedAt: new Date().toISOString(), voidedBy: actor || null, voidReason: reason || null, voidNote: note || "" };
+      if (!db) {
+        const all = rJSON(files.trx) || [];
+        const updated = all.map(t => String(t.id) === String(id) ? { ...t, ...patch } : t);
+        atomicWrite(files.trx, updated);
+        return { ok: true };
+      }
+      try {
+        const row = db.prepare("SELECT data FROM transactions WHERE id = ?").get(id);
+        if (!row) return { ok: false, error: "Transaksi tidak ditemukan" };
+        const merged = { ...JSON.parse(row.data), ...patch };
+        db.prepare("UPDATE transactions SET data = ? WHERE id = ?").run(JSON.stringify(merged), id);
+        return { ok: true };
+      } catch (err) {
+        console.error("[trx-void] Error:", err.message);
+        return { ok: false, error: err.message };
+      }
+    });
     ipcMain.handle("trx-restore", (_e, list) => {
       if (!db) { atomicWrite(files.trx, list); return { ok: true }; }
       try { db.exec("DELETE FROM transactions"); const stmt = db.prepare("INSERT INTO transactions (id, data) VALUES (?, ?)"); db.transaction((items) => items.forEach((item) => stmt.run(item.id || null, JSON.stringify(item))))(list); return { ok: true }; }

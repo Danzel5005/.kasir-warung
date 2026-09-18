@@ -143,6 +143,13 @@ function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName,
   const addFields = buildAdditionalFields(trx, receiptAdditionals);
   const storeName = warungName || trx.warungName || DEFAULT_WARUNG; // [11] dynamic custom name
   const operatorName = trx.operator || "Kasir"; // [2] dynamic operator name from transaction
+  // GAP 5 — customer/member. Denormalized on the trx, so an old receipt keeps
+  // showing the name that was correct at the time of sale.
+  const customerName = (trx.customerNama || "").trim();
+  const customerPhone = (trx.customerTelepon || "").trim();
+  const customerLine = customerName
+    ? `<div class="kv"><span class="k">PELANGGAN</span><span class="v">${customerName}${customerPhone ? ` (${customerPhone})` : ""}</span></div>`
+    : "";
   const addressLine = warungAddress || trx.warungAddress || "";
   const phoneLine = warungPhone || trx.warungPhone || "";
   const { taggedCategories, untaggedCategories } = buildCategoryTotals(trx.items, cats);
@@ -215,6 +222,7 @@ ${buildPrintCSS(paperWidthMm)}
         <div class="kv"><span class="k">NO TRX</span><span class="v">${trx.id}</span></div>
         ${addFields}
         <div class="kv"><span class="k">KASIR</span><span class="v">${operatorName}</span></div>
+        ${customerLine}
         <div class="kv"><span class="k">METODE</span><span class="v">${metodeLabel}</span></div>
       </div>
 

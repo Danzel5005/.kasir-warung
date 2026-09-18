@@ -15,7 +15,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "postinstall": "npx @electron/rebuild -f -w node-hid",
-    "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && node electron/dev-runner.cjs\"",
+    "electron:plain": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
     "electron:build": "vite build && electron-builder --win"
   },
   "dependencies": {

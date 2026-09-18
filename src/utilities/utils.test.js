@@ -14,7 +14,61 @@ if (typeof globalThis.window === "undefined") {
   globalThis.window = globalThis;
 }
 
-import { LS, api } from "./utils.js";
+import { LS, api, isVoided, nonVoided, healVoidedTrx } from "./utils.js";
+
+describe("utils.js - Void helpers", () => {
+  describe("isVoided", () => {
+    it("detects the current status flag", () => {
+      expect(isVoided({ status: "voided" })).toBe(true);
+      expect(isVoided({ status: "paid" })).toBe(false);
+    });
+
+    it("detects the legacy voided boolean", () => {
+      expect(isVoided({ voided: true })).toBe(true);
+      expect(isVoided({ voided: false })).toBe(false);
+    });
+
+    it("is falsy for null/undefined", () => {
+      expect(isVoided(null)).toBe(false);
+      expect(isVoided(undefined)).toBe(false);
+    });
+  });
+
+  describe("nonVoided", () => {
+    it("strips voided transactions and keeps the rest", () => {
+      const list = [{ id: 1 }, { id: 2, status: "voided" }, { id: 3, voided: true }, { id: 4 }];
+      expect(nonVoided(list).map((t) => t.id)).toEqual([1, 4]);
+    });
+
+    it("returns an empty array for non-array input", () => {
+      expect(nonVoided(null)).toEqual([]);
+      expect(nonVoided(undefined)).toEqual([]);
+    });
+  });
+
+  describe("healVoidedTrx", () => {
+    it("leaves non-voided transactions untouched", () => {
+      const t = { id: 1, total: 5000 };
+      expect(healVoidedTrx(t)).toBe(t);
+    });
+
+    it("repairs a clobbered void row by restoring safe defaults", () => {
+      const healed = healVoidedTrx({ id: 9, status: "voided", voidReason: "error" });
+      expect(healed.voided).toBe(true);
+      expect(healed.total).toBe(0);
+      expect(healed.subtotal).toBe(0);
+      expect(healed.kembalian).toBe(0);
+      expect(healed.items).toEqual([]);
+      expect(healed.voidReason).toBe("error");
+    });
+
+    it("preserves real financial values on a voided row", () => {
+      const healed = healVoidedTrx({ id: 9, status: "voided", total: 25000, items: [{ qty: 2 }] });
+      expect(healed.total).toBe(25000);
+      expect(healed.items).toEqual([{ qty: 2 }]);
+    });
+  });
+});
 
 describe("utils.js - LocalStorage Helper (LS) & API Wrapper", () => {
   beforeEach(() => {

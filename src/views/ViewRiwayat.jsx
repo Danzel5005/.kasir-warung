@@ -5,6 +5,16 @@ import { METODE_LABELS } from "../constants/payments.js";
 import { G, OR, W, LT, BD, TX, MT, METODE_COLORS, inp, row } from "../constants/design.js";
 import { Tag } from "../components/Tag.jsx";
 
+// Human-readable labels for void reasons (kept in sync with useHistoryVoid.js).
+const VOID_REASON_LABELS = {
+  cancel: "Pembatalan pelanggan",
+  refund: "Pengembalian",
+  error: "Kesalahan input",
+  promotion: "Promo gratis",
+  other: "Lainnya",
+};
+const voidReasonLabel = (key) => (key ? VOID_REASON_LABELS[key] || key : "");
+
 // ViewRiwayat — riwayat transaksi dengan filter tanggal, collapse-by-day,
 // view per shift, pagination, dan CSV download.
 function ViewRiwayat({
@@ -14,6 +24,7 @@ function ViewRiwayat({
   doCSV, at,                               // historyH
   setConfirmDel,                           // App.jsx local
   canDelete = false,
+  canVoid = false,                         // App.jsx - admin-only void permission
   setReceipt,                              // App.jsx local
   // New: shift-based view
   viewMode, setViewMode,                   // historyH
@@ -24,7 +35,9 @@ function ViewRiwayat({
   menuH = null,                            // menuH - for category labels
   // Pagination
   totalCount, currentPage, pageSize, isLoading, hasMore, loadMore, refresh, loadAllForExport, sortOrder, toggleSort,
+  voidProps = {},                          // App.jsx - void transaction controls
 }) {
+  const { isVoiding = false, voidTrx = null, openVoidModal = null } = voidProps;
   const [showAllShifts, setShowAllShifts] = useState(false);
   const [expandedShifts, setExpandedShifts] = useState(null);
   const SHIFT_COLLAPSE_LIMIT = 5;
@@ -69,44 +82,62 @@ function ViewRiwayat({
   };
 
   // ── Helper to render a transaction row
-  const renderTrx = (t) => (
-    <div key={t.id} onClick={() => setReceipt(t)}
-      style={{ background:W, border:`1px solid ${BD}`, borderRadius:8, padding:"9px 12px", marginBottom:5, cursor:"pointer", transition:"border 0.15s"}}
-      onMouseEnter={e => e.currentTarget.style.borderColor="#a8d5b8"}
-      onMouseLeave={e => e.currentTarget.style.borderColor=BD}
-    >
-      <div style={{ ...row, marginBottom:5 }}>
-        <div style={{ display:"flex", gap:5, flexWrap:"wrap", alignItems:"center" }}>
-          <Tag label={`TRX #${t.id}`} bg="#e8f5ee" tc={G}/>
-          <Tag label={t.metodeBayarLabel ?? paymentMethods.find(m => m.key === t.metodeBayar)?.label ?? METODE_LABELS[t.metodeBayar] ?? t.metodeBayar.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-            bg={(METODE_COLORS[t.metodeBayar] || {bg:"#f0f0f0"}).bg}
-            tc={(METODE_COLORS[t.metodeBayar] || {tc:MT}).tc}/>
+  const renderTrx = (t) => {
+    const isVoid = t.status === "voided" || t.voided === true;
+    const reasonLabel = voidReasonLabel(t.voidReason);
+    const metodeLabel = t.metodeBayarLabel ?? paymentMethods.find(m => m.key === t.metodeBayar)?.label ?? METODE_LABELS[t.metodeBayar] ?? String(t.metodeBayar || "-").replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    return (
+      <div key={t.id} onClick={() => setReceipt(t)}
+        style={{ background:isVoid ? "#fafafa" : W, border:`1px solid ${isVoid ? "#e0d0d0" : BD}`, borderRadius:8, padding:"9px 12px", marginBottom:5, cursor:"pointer", transition:"border 0.15s", opacity:isVoid ? 0.75 : 1 }}
+        onMouseEnter={e => e.currentTarget.style.borderColor=isVoid ? "#d8b8b8" : "#a8d5b8"}
+        onMouseLeave={e => e.currentTarget.style.borderColor=isVoid ? "#e0d0d0" : BD}
+      >
+        <div style={{ ...row, marginBottom:5 }}>
+          <div style={{ display:"flex", gap:5, flexWrap:"wrap", alignItems:"center" }}>
+            <Tag label={`TRX #${t.id}`} bg={isVoid ? "#f0e8e8" : "#e8f5ee"} tc={isVoid ? "#b03030" : G}/>
+            <Tag label={metodeLabel}
+              bg={(METODE_COLORS[t.metodeBayar] || {bg:"#f0f0f0"}).bg}
+              tc={(METODE_COLORS[t.metodeBayar] || {tc:MT}).tc}/>
+            {isVoid && <Tag label={`VOID${reasonLabel ? ` · ${reasonLabel}` : ""}`} bg="#fdecec" tc="#c02020"/>}
+          </div>
+          <div style={{ display:"flex", gap:7, alignItems:"center" }}>
+            <span style={{ fontSize:9, color:MT }}>{t.jam}:{t.mnt}:{t.dtk}</span>
+            {!isVoid && <span style={{ fontSize:9, color:MT, fontStyle:"italic" }}>klik untuk lihat resi</span>}
+            {!isVoid && canVoid && voidTrx && (
+              <button title="Void transaksi ini"
+                onClick={e => { e.stopPropagation(); openVoidModal?.(t.id); }}
+                style={{ background:"none", border:"none", cursor:"pointer", color:"#c02020", fontSize:10, fontWeight:700, padding:"0 2px" }}>
+                Void
+              </button>
+            )}
+            {canDelete && <button onClick={e => { e.stopPropagation(); setConfirmDel({type:"trx", id:t.id}); }}
+              style={{ background:"none", border:"none", cursor:"pointer", color:"#4b4b4b", fontSize:24, padding:0 }}>
+              &times;
+            </button>}
+          </div>
         </div>
-        <div style={{ display:"flex", gap:7, alignItems:"center" }}>
-          <span style={{ fontSize:9, color:MT }}>{t.jam}:{t.mnt}:{t.dtk}</span>
-          <span style={{ fontSize:9, color:MT, fontStyle:"italic" }}>klik untuk lihat resi</span>
-          {canDelete && <button onClick={e => { e.stopPropagation(); setConfirmDel({type:"trx", id:t.id}); }}
-            style={{ background:"none", border:"none", cursor:"pointer", color:"#4b4b4b", fontSize:24, padding:0 }}>
-            &times;
-          </button>}
+        <div style={{ fontSize:10, color:MT, marginBottom:4 }}>
+          {t.items.length ? t.items.map(i => `${i.qty}x ${i.nama}`).join(" · ") : <span style={{ fontStyle:"italic" }}>Rincian item tidak tersedia</span>}
         </div>
-      </div>
-      <div style={{ fontSize:10, color:MT, marginBottom:4 }}>
-        {t.items.map(i => `${i.qty}x ${i.nama}`).join(" · ")}
-      </div>
-      <div style={{ display:"flex", gap:10, fontSize:10, flexWrap:"wrap" }}>
-        <span>Sub: <b>{fmt(t.subtotal)}</b></span>
-        <span style={{ color:G, fontWeight:700 }}>Total: {fmt(t.total)}</span>
-        {t.metodeBayar === "cash" && <span style={{ color:"#2a8a2a" }}>Kembalian: {fmt(t.kembalian)}</span>}
-      </div>
-      {/* Show shift info if in day mode but trx has shift data */}
-      {viewMode === "day" && t.shiftNum && (
-        <div style={{ fontSize:8, color:MT, marginTop:4, fontStyle:"italic" }}>
-          Shift {t.shiftNum}
+        <div style={{ display:"flex", gap:10, fontSize:10, flexWrap:"wrap" }}>
+          <span>Sub: <b>{fmt(t.subtotal)}</b></span>
+          <span style={{ color:isVoid ? MT : G, fontWeight:700, textDecoration:isVoid ? "line-through" : "none" }}>Total: {fmt(t.total)}</span>
+          {t.metodeBayar === "cash" && !isVoid && <span style={{ color:"#2a8a2a" }}>Kembalian: {fmt(t.kembalian)}</span>}
         </div>
-      )}
-    </div>
-  );
+        {isVoid && (
+          <div style={{ fontSize:9, color:"#b03030", marginTop:4, fontStyle:"italic" }}>
+            Dibatalkan{t.voidedAt ? ` · ${new Date(t.voidedAt).toLocaleString("id-ID")}` : ""}{t.voidedBy ? ` oleh ${t.voidedBy}` : ""}{t.voidNote ? ` · "${t.voidNote}"` : ""}
+          </div>
+        )}
+        {/* Show shift info if in day mode but trx has shift data */}
+        {viewMode === "day" && t.shiftNum && (
+          <div style={{ fontSize:8, color:MT, marginTop:4, fontStyle:"italic" }}>
+            Shift {t.shiftNum}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // ── Handle CSV export with all data (not just current page)
   const handleCSVExport = useCallback(async () => {

@@ -7,6 +7,7 @@ import {
   QrisSettingsTab,
   ReceiptSettingsTab,
   PricingSettingsTab,
+  BackupSettingsTab,
   UsersSettingsTab,
 } from "./SettingsPanels.jsx";
 
@@ -17,6 +18,7 @@ const SETTINGS_TABS = [
   ["qris", "QRIS"],
   ["receipt", "Resi"],
   ["pricing", "Harga"],
+  ["backup", "Backup"],
   ["users", "Kelola Pengguna"],
 ];
 
@@ -33,6 +35,7 @@ function SettingsPanel({ tab, settingsH, authH, menu, cats }) {
     case "qris": return <QrisSettingsTab {...panelProps} />;
     case "receipt": return <ReceiptSettingsTab {...panelProps} />;
     case "pricing": return <PricingSettingsTab {...panelProps} />;
+    case "backup": return <BackupSettingsTab {...panelProps} />;
     case "users": return <UsersSettingsTab authH={authH} />;
     default: return null;
   }

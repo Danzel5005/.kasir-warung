@@ -1,14 +1,45 @@
+import { safeIpc } from "./ipc-guard.js";
+
 const LS = (k,v) => v===undefined ? JSON.parse(localStorage.getItem(k)||"null") : localStorage.setItem(k,JSON.stringify(v));
+
+// healVoidedTrx — repairs transactions whose payload was clobbered by the old
+// trx-void handler (which overwrote the whole JSON with only void metadata).
+// Such rows carry status:"voided" but lost total/items; we rebuild the minimal
+// shape so reports and the history view never choke on them.
+const healVoidedTrx = (t) => {
+  if (!t || t.status !== "voided") return t;
+  return {
+    ...t,
+    voided: true,
+    total: Number.isFinite(t.total) ? t.total : 0,
+    subtotal: Number.isFinite(t.subtotal) ? t.subtotal : 0,
+    kembalian: Number.isFinite(t.kembalian) ? t.kembalian : 0,
+    items: Array.isArray(t.items) ? t.items : [],
+  };
+};
+
+// mergeVoidStatus — merges a void patch onto an existing transaction without
+// discarding the original sale data.
+const mergeVoidStatus = (t, patch) => (String(t.id) === String(patch.id) ? { ...t, ...patch.data } : t);
+
+// isVoided — single source of truth for "this sale was cancelled".
+// Accepts both the current `status` flag and the legacy `voided` boolean.
+const isVoided = (t) => !!t && (t.status === "voided" || t.voided === true);
+
+// nonVoided — filter helper for any sales total that must exclude voids.
+const nonVoided = (list) => (Array.isArray(list) ? list.filter((t) => !isVoided(t)) : []);
+
 const api = {
-  async loadTrx()         { return window.kasirAPI ? await window.kasirAPI.loadTrx()         : (LS("ykk_trx")||[]); },
+  async loadTrx()         { return window.kasirAPI ? (await window.kasirAPI.loadTrx() || []).map(healVoidedTrx) : (LS("ykk_trx")||[]).map(healVoidedTrx); },
   async saveTrx(t)        { if(window.kasirAPI) return window.kasirAPI.saveTrx(t); const a=LS("ykk_trx")||[]; a.push(t); LS("ykk_trx",a); },
   async deleteTrx(id)     { if(window.kasirAPI) return window.kasirAPI.deleteTrx(id); LS("ykk_trx",(LS("ykk_trx")||[]).filter(t=>t.id!==id)); },
   async restoreTrx(list)  { if(window.kasirAPI) return window.kasirAPI.restoreTrx(list); LS("ykk_trx",list); },
   async clearTrx()        { if(window.kasirAPI) return window.kasirAPI.clearTrx(); LS("ykk_trx",[]); },
   async voidTrx(id, { reason, actor, note }) {
     if(window.kasirAPI) return window.kasirAPI.voidTrx(id, { reason, actor, note });
-    const all = LS("ykk_trx") || [];
-    const updated = all.map(t => t.id === id ? { ...t, status: "voided", voidedAt: new Date().toISOString(), voidedBy: actor, voidReason: reason, voidNote: note } : t);
+    const all = (LS("ykk_trx") || []).map(healVoidedTrx);
+    const patch = { status: "voided", voided: true, voidedAt: new Date().toISOString(), voidedBy: actor || null, voidReason: reason || null, voidNote: note || "" };
+    const updated = all.map(t => mergeVoidStatus(t, { id, data: patch }));
     LS("ykk_trx", updated);
     return { ok: true };
   },
@@ -17,7 +48,7 @@ const api = {
   async loadTrxFiltered({ fFrom, fTo, shiftId, page = 0, pageSize = 100, sort = "desc" }) {
     if (window.kasirAPI) return window.kasirAPI.loadTrxFiltered({ fFrom, fTo, shiftId, page, pageSize, sort });
     // Fallback to localStorage filtering
-    const all = LS("ykk_trx") || [];
+    const all = (LS("ykk_trx") || []).map(healVoidedTrx);
     let filtered = all.filter(t => {
       const d = new Date(t.timestamp);
       if (fFrom && d < new Date(fFrom)) return false;
@@ -83,6 +114,16 @@ const api = {
     const blob=new Blob(["\uFEFF"+data.content],{type:"text/csv;charset=utf-8;"}); const url=URL.createObjectURL(blob);
     const a=document.createElement("a"); a.href=url; a.download=data.filename; a.click(); URL.revokeObjectURL(url); return {ok:true};
   },
+  // Backup & Restore — hanya tersedia di aplikasi desktop (butuh akses folder data)
+  isDesktop()             { return !!window.kasirAPI; },
+  async backupStats()     { return window.kasirAPI?.backupStats ? safeIpc("Backup stats", () => window.kasirAPI.backupStats()) : { ok:false, error:"Hanya tersedia di aplikasi desktop" }; },
+  async backupCreate(t)   { return window.kasirAPI?.backupCreate ? safeIpc("Backup", () => window.kasirAPI.backupCreate(t)) : { ok:false, error:"Hanya tersedia di aplikasi desktop" }; },
+  async backupPreview(c)  { return window.kasirAPI?.backupPreview ? safeIpc("Pratinjau backup", () => window.kasirAPI.backupPreview(c)) : { ok:false, error:"Hanya tersedia di aplikasi desktop" }; },
+  async backupSummary(c)  { return window.kasirAPI?.backupSummary ? safeIpc("Ringkasan backup", () => window.kasirAPI.backupSummary(c)) : { ok:false, error:"Hanya tersedia di aplikasi desktop" }; },
+  async backupRestore(c)  { return window.kasirAPI?.backupRestore ? safeIpc("Pemulihan data", () => window.kasirAPI.backupRestore(c)) : { ok:false, error:"Hanya tersedia di aplikasi desktop" }; },
+  async backupListInternal() { return window.kasirAPI?.backupListInternal ? safeIpc("Daftar backup internal", () => window.kasirAPI.backupListInternal(), { fallback:{ backups:[] } }) : { ok:false, backups:[] }; },
+  async backupOpenFolder(){ return window.kasirAPI?.backupOpenFolder ? safeIpc("Buka folder data", () => window.kasirAPI.backupOpenFolder()) : { ok:false, error:"Hanya tersedia di aplikasi desktop" }; },
+  async backupRelaunch()  { return window.kasirAPI?.backupRelaunch ? safeIpc("Muat ulang aplikasi", () => window.kasirAPI.backupRelaunch()) : { ok:false, error:"Hanya tersedia di aplikasi desktop" }; },
   async getPrinters()     { return window.kasirAPI ? await window.kasirAPI.getPrinters()      : []; },
   async printReceipt(d)   { return window.kasirAPI ? await window.kasirAPI.printReceipt(d)    : {ok:false,error:"Hanya tersedia di aplikasi desktop"}; },
   async loadShifts()      { return window.kasirAPI ? await window.kasirAPI.loadShifts?.()     : (LS("ykk_shifts")||[]); },
@@ -107,4 +148,4 @@ const api = {
   async deleteQris(key)   { if(window.kasirAPI?.deleteQris) return window.kasirAPI.deleteQris(key); const m=LS("ykk_qris")||{}; delete m[key]; LS("ykk_qris",m); },
 };
 
-export {LS ,api};
+export { LS, api, isVoided, nonVoided, healVoidedTrx };

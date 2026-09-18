@@ -3,6 +3,7 @@ import { csvByDay, TRX_HEADER, trxRow, csvLaporan, csvSalesRate, csvPerMenu, csv
 import { fmt, fmtNum } from "../utilities/receipt.js";
 import { METODE_LABELS } from "../constants/payments.js";
 import { G, OR, W, LT, BD, TX, MT, METODE_COLORS } from "../constants/design.js";
+import { isVoided } from "../utilities/utils.js";
 
 // ViewLaporan — laporan keuangan & penjualan per shift, dengan CSV export.
 function ViewLaporan({
@@ -29,7 +30,9 @@ function ViewLaporan({
     setIsReportLoading(true);
     loadAllForReport(reportShiftId).then((transactions) => {
       if (cancelled) return;
-      setShiftTrx(transactions);
+      // Voids are excluded from every financial total below, but counted so the
+      // report can disclose how many sales were cancelled in the period.
+      setShiftTrx((transactions || []).filter((t) => !isVoided(t)));
       setIsReportLoading(false);
     });
     return () => { cancelled = true; };

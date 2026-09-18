@@ -252,6 +252,7 @@ const processPayment = useCallback(async ({
   billIdToClose,
   paymentMethods = [],
   menu, // Pass current menu for open bill payment (no stock deduction)
+  customer = null, // Selected customer/member snapshot (denormalized into trx)
 }) => {
   const t = getNow();
   const { pajak: p, service: s, discount: d, total: tot } = calcPrice(subtotal, { ...pricingConfig, items });
@@ -292,6 +293,12 @@ const processPayment = useCallback(async ({
     kembalian: metode === "cash" ? kembalian : 0,
     shiftId: activeShift?.id || null, shiftNum: activeShift?.shiftNum || null,
     operator: activeShift?.operator || "Kasir", // [2] nama pengguna yang login
+    // Customer is DENORMALIZED (name/phone copied, not just id) so that the
+    // receipt of an old transaction stays readable even after the customer
+    // record is renamed or deleted.
+    customerId: customer?.id || null,
+    customerNama: customer?.name || "",
+    customerTelepon: customer?.phone || "",
     ...receiptAdditionalData, // Include receipt additional fields
   };
   // Check if we're paying an existing open bill (stock was already deducted when bill was created)

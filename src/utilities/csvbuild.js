@@ -55,14 +55,17 @@ function csvByDay(trxs, header, rowFn, at) {
   return sections.join("\n");
 }
 
-const TRX_HEADER = "No.Trx,Hari,Tanggal,Jam,Metode,Nama Item,Kategori,Qty,Harga Jual,Modal,Subtotal Jual,Subtotal Modal,Laba Item,Subtotal Trx,Total Trx,Bayar,Kembalian,Waktu Unduh";
+const TRX_HEADER = "No.Trx,Hari,Tanggal,Jam,Metode,Nama Item,Kategori,Qty,Harga Jual,Modal,Subtotal Jual,Subtotal Modal,Laba Item,Subtotal Trx,Total Trx,Bayar,Kembalian,Status,Alasan Void,Waktu Unduh";
 function trxRow(t, at, categories = [], paymentMethods = []) {
   const {total}=calcPrice(t.subtotal);
+  const isVoid = t.status === "voided" || t.voided === true;
+  const statusLabel = isVoid ? "VOID" : "LUNAS";
+  const voidReason = isVoid ? (t.voidReason || "") : "";
   return t.items.map(item=>{
     const subJ=item.harga*item.qty; const subM=(item.modal||0)*item.qty;
     const metodeLabel = getPaymentMethodLabel(t.metodeBayar || "cash", paymentMethods, t.metodeBayarLabel);
     const catLabel = getCategoryLabel(item.kategori, categories);
-    return [t.id,t.hari,`${t.tgl} ${t.bln} ${t.thn}`,`${t.jam}:${t.mnt}:${t.dtk}`,metodeLabel,`"${item.nama}"`,catLabel,item.qty,item.harga,item.modal||0,subJ,subM,subJ-subM,t.subtotal,total,t.bayar||0,t.kembalian||0,at].join(",");
+    return [t.id,t.hari,`${t.tgl} ${t.bln} ${t.thn}`,`${t.jam}:${t.mnt}:${t.dtk}`,metodeLabel,`"${item.nama}"`,catLabel,item.qty,item.harga,item.modal||0,subJ,subM,subJ-subM,t.subtotal,total,t.bayar||0,t.kembalian||0,statusLabel,voidReason,at].join(",");
   });
 }
 
@@ -215,4 +218,14 @@ return ["=== DETAIL PER HARI ===", h, ...rows, "=== RINGKASAN TOTAL ===", h, ...
 
 
 
-export {csvByDay,TRX_HEADER, LAP_HEADER, csvLaporan, csvSalesRate, csvPerMenu, csvMetodeBayar, csvStok, trxRow};
+// Restock Report CSV — daftar belanja untuk item yang habis / stok menipis.
+function csvRestock(restockRows = [], at) {
+  const h = "Nama Menu,Kategori,Stok Saat Ini,Status,Saran Restock (Qty),Waktu Unduh";
+  const rows = restockRows.map((r) => {
+    const status = r.level === "out" ? "HABIS" : "STOK MENIPIS";
+    return [`"${r.nama}"`, r.kategori || "", r.stok, status, r.suggestQty, at].join(",");
+  });
+  return [h, ...rows].join("\n");
+}
+
+export {csvByDay,TRX_HEADER, LAP_HEADER, csvLaporan, csvSalesRate, csvPerMenu, csvMetodeBayar, csvStok, csvRestock, trxRow};

@@ -40,6 +40,15 @@ const kasirAPI = {
   saveSettings: (d)    => ipcRenderer.invoke("settings-save", d),
   // CSV
   saveCSV:     (data)  => ipcRenderer.invoke("csv-save", data),
+  // Backup & Restore
+  backupStats:  ()      => ipcRenderer.invoke("backup-stats"),
+  backupCreate: (target) => ipcRenderer.invoke("backup-create", target),
+  backupPreview: (candidate) => ipcRenderer.invoke("backup-preview", candidate),
+  backupSummary: (candidate) => ipcRenderer.invoke("backup-summary", candidate),
+  backupRestore: (candidate) => ipcRenderer.invoke("backup-restore", candidate),
+  backupListInternal: () => ipcRenderer.invoke("backup-list-internal"),
+  backupOpenFolder: () => ipcRenderer.invoke("backup-open-folder"),
+  backupRelaunch: () => ipcRenderer.invoke("backup-relaunch"),
   // Printer
   getPrinters:   ()    => ipcRenderer.invoke("get-printers"),
   printReceiptEscPos: (data) => ipcRenderer.invoke("print-receipt-escpos", data),

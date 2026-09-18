@@ -119,6 +119,40 @@ describe("receipt.js - Receipt utilities and HTML builders", () => {
       const html = buildReceiptHTML(mockTrxCash, null, [], {}, null, [], "", "", [], "abc");
       expect(html).toContain("@page{size:80mm auto;margin:0mm;}");
     });
+
+    it("should omit the PELANGGAN row when the transaction has no customer", () => {
+      const html = buildReceiptHTML(mockTrxCash, null, [], {});
+      expect(html).not.toContain("PELANGGAN");
+      expect(html).toContain("KASIR"); // the neighbouring rows are still present
+      expect(html).toContain("METODE");
+    });
+
+    it("should render the customer name and phone when attached", () => {
+      const html = buildReceiptHTML(
+        { ...mockTrxCash, customerId: "cust_1", customerNama: "Budi Santoso", customerTelepon: "08123456789" },
+        null, [], {}
+      );
+      expect(html).toContain("PELANGGAN");
+      expect(html).toContain("Budi Santoso (08123456789)");
+      // PELANGGAN must sit between KASIR and METODE
+      expect(html.indexOf("KASIR")).toBeLessThan(html.indexOf("PELANGGAN"));
+      expect(html.indexOf("PELANGGAN")).toBeLessThan(html.indexOf("METODE"));
+    });
+
+    it("should render the customer without parentheses when no phone is stored", () => {
+      const html = buildReceiptHTML(
+        { ...mockTrxCash, customerNama: "Siti", customerTelepon: "" },
+        null, [], {}
+      );
+      expect(html).toContain("PELANGGAN");
+      expect(html).toContain(">Siti<");
+      expect(html).not.toContain("Siti (");
+    });
+
+    it("should ignore whitespace-only customer names", () => {
+      const html = buildReceiptHTML({ ...mockTrxCash, customerNama: "   " }, null, [], {});
+      expect(html).not.toContain("PELANGGAN");
+    });
   });
 
   describe("buildPreviewHTML", () => {

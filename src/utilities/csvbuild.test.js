@@ -9,6 +9,7 @@ import {
   csvPerMenu,
   csvMetodeBayar,
   csvStok,
+  csvRestock,
 } from "./csvbuild.js";
 import { calcPrice } from "./calculations.js";
 import { resolveShiftTarget } from "./shiftState.js";
@@ -323,6 +324,43 @@ describe("csvbuild.js - CSV Generator Utilities", () => {
       ];
       const csv = csvStok(menuWithCatKey, categories, timeDownload);
       expect(csv).toContain("Minuman Premium");
+    });
+  });
+
+  describe("csvRestock", () => {
+    it("should emit the restock header even for an empty list", () => {
+      const csv = csvRestock([], timeDownload);
+      expect(csv).toContain("Nama Menu");
+      expect(csv).toContain("Saran Restock");
+      expect(csv.split("\n")).toHaveLength(1);
+    });
+
+    it("should mark out-of-stock rows as HABIS and low rows as STOK MENIPIS", () => {
+      const rows = [
+        { id: 1, nama: "Kopi Hitam", kategori: "kopi", stok: 0, level: "out", suggestQty: 15 },
+        { id: 2, nama: "Teh Manis", kategori: "teh", stok: 3, level: "low", suggestQty: 12 },
+      ];
+      const csv = csvRestock(rows, timeDownload);
+      const lines = csv.split("\n");
+      expect(lines).toHaveLength(3);
+      expect(lines[1]).toContain("HABIS");
+      expect(lines[1]).toContain("15");
+      expect(lines[2]).toContain("STOK MENIPIS");
+      expect(lines[2]).toContain("12");
+    });
+
+    it("should quote names so commas do not break the CSV columns", () => {
+      const rows = [
+        { id: 1, nama: "Kopi, Susu", kategori: "kopi", stok: 1, level: "low", suggestQty: 14 },
+      ];
+      const csv = csvRestock(rows, timeDownload);
+      expect(csv).toContain('"Kopi, Susu"');
+    });
+
+    it("should tolerate a missing category", () => {
+      const rows = [{ id: 9, nama: "Air Mineral", stok: 0, level: "out", suggestQty: 15 }];
+      const csv = csvRestock(rows, timeDownload);
+      expect(csv).not.toContain("undefined");
     });
   });
 });

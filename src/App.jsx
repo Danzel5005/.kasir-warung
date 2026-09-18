@@ -122,13 +122,17 @@ function KasirWorkspace() {
   // ── Hooks: panggil semua di sini, App.jsx jadi satu-satunya tempat yang
   // tahu seluruh data flow antar domain. Tidak ada hook yang import hook lain.
   const toastH    = useToast();
-  const voidH     = useHistoryVoid({ toast_: toastH.toast_, addUndo: toastH.addUndo });
+  // historyRefreshRef breaks the declaration-order cycle: voidH is declared
+  // before historyH, but must be able to trigger a history reload after voiding.
+  const historyRefreshRef = useRef(null);
+  const voidH     = useHistoryVoid({ toast_: toastH.toast_, addUndo: toastH.addUndo, onVoided: () => historyRefreshRef.current?.() });
   const licenseH  = useLicense();
   const authH     = useAuth({ getNow, toast_: toastH.toast_ });
   const menuH     = useMenu({ toast_: toastH.toast_, addUndo: toastH.addUndo });
   const billsH    = useBills({ toast_: toastH.toast_, addUndo: toastH.addUndo });
   const cartH     = useCart({ toast_: toastH.toast_, getNow, receiptAdditionals: [] });
   const historyH  = useHistory({ toast_: toastH.toast_, addUndo: toastH.addUndo, getNow, authH });
+  historyRefreshRef.current = historyH.refresh;
   const customersH = useCustomers({ toast_: toastH.toast_ });
   // settingsH needs cartH to be defined first for onChange callback
   const settingsH = useSettings({ 
@@ -323,17 +327,22 @@ function KasirWorkspace() {
     activeShift: authH.activeShift,
     computeStockDeduction: menuH.computeStockDeduction,
     commitMenu: menuH.setMenu,
-    appendHistory: (trx) => { historyH.appendHistory(trx); setReceipt(trx); setPayModal(false); cartH.setDrawerOpen(false); cartH.clearCart(); },
+    // clearCart() also clears the customer selection — a finished sale must not
+    // leak the member of the previous customer into the next order.
+    appendHistory: (trx) => { historyH.appendHistory(trx); setReceipt(trx); setPayModal(false); cartH.setDrawerOpen(false); cartH.clearCart(); customersH.setSelectedCustomerId(null); },
     removeBillLocal: billsH.removeBillLocal,
     billIdToClose: cartH.activeBill?.id,     // Use activeBill directly instead of ref
     paymentMethods: settingsH.settings.paymentMethods || [], // NEW: payment methods for label resolution
     menu: menuH.menu, // Pass current menu for open bill payment (no stock deduction)
+    customer: customersH.selectedCustomer, // GAP 5: denormalized into trx for receipt
   }), [
     cartH.processPayment, historyH.generateTrxId, authH.activeShift,
     menuH.computeStockDeduction, menuH.setMenu, historyH.appendHistory,
     cartH.setDrawerOpen, cartH.clearCart, billsH.removeBillLocal,
     settingsH.settings.paymentMethods, // NEW deps
     menuH.menu, // Add menu to deps
+    customersH.selectedCustomer, // GAP 5
+    customersH.setSelectedCustomerId, // GAP 5
   ]);
 
   // confirmCloseShift butuh clearCart saja — clearBills DIHAPUS
@@ -671,6 +680,7 @@ const executeConfirmDel = useCallback(() => {
             doCSV={historyH.doCSV} at={historyH.at}
             setConfirmDel={setConfirmDel}
             canDelete={isAdmin(authH.currentUser)}
+            canVoid={isAdmin(authH.currentUser)}
             setReceipt={setReceipt}
             // New: shift-based view
             viewMode={historyH.viewMode} setViewMode={historyH.setViewMode}
@@ -683,7 +693,8 @@ const executeConfirmDel = useCallback(() => {
             totalCount={historyH.totalCount} currentPage={historyH.currentPage} pageSize={historyH.pageSize}
             isLoading={historyH.isLoading} hasMore={historyH.hasMore} loadMore={historyH.loadMore}
             refresh={historyH.refresh} loadAllForExport={historyH.loadAllForExport}
-            sortOrder={historyH.sortOrder} toggleSort={historyH.toggleSort} voidProps={{ isVoiding: voidH.isVoiding, voidTrx: voidH.voidTrx, openVoidModal: voidH.openVoidModal }} />
+            sortOrder={historyH.sortOrder} toggleSort={historyH.toggleSort}
+            voidProps={{ isVoiding: voidH.isVoiding, voidTrx: voidH.voidTrx, openVoidModal: voidH.openVoidModal }} />
         )}
 
         {/* ══════ LAPORAN VIEW ════════════════════════════════════════════ */}
@@ -710,6 +721,8 @@ const executeConfirmDel = useCallback(() => {
             setCatModal={menuH.setCatModal} openAdd={menuH.openAdd} openEdit={menuH.openEdit}
             setConfirmDel={setConfirmDel}
             search={menuH.search} setSearch={menuH.setSearch}
+            lowStockThreshold={Number(settingsH.settings.lowStockThreshold) > 0 ? Number(settingsH.settings.lowStockThreshold) : undefined}
+            toast_={toastH.toast_}
           />
         )}
       </div>
@@ -727,7 +740,18 @@ const executeConfirmDel = useCallback(() => {
         )}
         
         {/* VOID MODAL */}
-        {voidH && voidH.isVoiding && <VoidModal {...{ ...voidH, setVoidTargetId: (id) => typeof id === "function" ? id(voidH.setVoidTargetId) : voidH.setVoidTargetId(id) }} />}
+        {voidH?.voidModal && voidH.voidTargetId && (
+          <VoidModal
+            voidTargetId={voidH.voidTargetId}
+            voidReason={voidH.voidReason}
+            setVoidReason={voidH.setVoidReason}
+            voidNote={voidH.voidNote}
+            setVoidNote={voidH.setVoidNote}
+            isVoiding={voidH.isVoiding}
+            onClose={voidH.closeVoidModal}
+            onConfirm={() => voidH.voidTrx(voidH.voidTargetId, voidH.voidReason, authH.currentUser?.username)}
+          />
+        )}
 
       {/* ══ MODAL: RESI (klik transaksi atau setelah bayar) ════════════════ */}
       {receipt && (

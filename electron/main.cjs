@@ -1,23 +1,9 @@
-  ipcMain.handle("trx-void", (_e, id, { reason, actor, note }) => {
-    if (!db) { 
-      const all = rJSON(FILES.trx) || [];
-      const updated = all.map(t => t.id === id ? { ...t, status: "voided", voidedAt: new Date().toISOString(), voidedBy: actor, voidReason: reason, voidNote: note } : t);
-      atomicWrite(FILES.trx, updated);
-      return { ok: true };
-    }
-    try {
-      db.prepare(`UPDATE transactions SET data = ? WHERE id = ?`).run(JSON.stringify({ status: "voided", voidedAt: new Date().toISOString(), voidedBy: actor, voidReason: reason, voidNote: note }), id);
-      return { ok: true };
-    } catch (err) {
-      console.error("[trx-void] Error:", err.message);
-      return { ok: false, error: err.message };
-    }
-  });
 const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const { createLicenseService, getHardwareId } = require("./license.cjs");
 const { createBackupService } = require("./backup.cjs");
+const { createBackupRestoreService } = require("./backup-restore.cjs");
 const { createDatabaseService } = require("./db.cjs");
 const { createPrintingService } = require("./printing.cjs");
 
@@ -48,6 +34,7 @@ const FILES = {
 const backup = createBackupService({ dataDir: DATA_DIR, files: FILES });
 const license = createLicenseService(app);
 const database = createDatabaseService({ ipcMain, files: FILES, ensureDir: backup.ensureDir, rJSON: backup.rJSON, atomicWrite: backup.atomicWrite, walAppend: backup.walAppend, walClear: backup.walClear });
+const backupRestore = createBackupRestoreService({ app, ipcMain, dialog, files: FILES, ensureDir: backup.ensureDir, rJSON: backup.rJSON, closeDB: database.closeDB, initDB: database.initDB, migrateJSONToSQLite: database.migrateJSONToSQLite });
 
 function registerFileHandlers() {
   ipcMain.handle("bills-load", () => backup.rJSON(FILES.bills) || []);
@@ -107,6 +94,7 @@ function startRawScannerFallback(win) {
 
 registerFileHandlers();
 database.registerHandlers();
+backupRestore.registerHandlers();
 registerLicenseHandlers();
 createPrintingService({ app, ipcMain, BrowserWindow, dialog, dataDir: DATA_DIR, ensureDir: backup.ensureDir, rJSON: backup.rJSON, files: FILES, nodePrinterDriver: NodePrinterDriver });
 

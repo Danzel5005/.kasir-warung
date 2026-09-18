@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { api } from "../utilities/utils.js";
+import { api, nonVoided } from "../utilities/utils.js";
 import { isAdmin } from "../utilities/permissions.js";
 
 // useHistory — transaksi history dengan server-side filtering & pagination untuk skalabilitas
@@ -202,7 +202,10 @@ function useHistory({ toast_, addUndo, getNow, authH }) {
         pageSize: 10000, // Large page size to get all
         sort: sortOrder
       });
-      return result.transactions || [];
+      // Exclude voided sales from every CSV export. A voided trx is kept in the
+      // DB for audit but must never contribute to exported totals, sales-rate,
+      // per-menu or per-metode figures.
+      return nonVoided(result.transactions || []);
     } catch (err) {
       console.error("[useHistory] loadAllForExport error:", err);
       return [];

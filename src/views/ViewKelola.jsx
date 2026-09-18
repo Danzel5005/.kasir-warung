@@ -2,6 +2,10 @@ import { memo, useMemo } from "react";
 import { fmt } from "../utilities/receipt.js";
 import { G, W, BD, MT, row, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../constants/design.js";
 import StockBadge from "../components/StockBadge.jsx";
+import StockAlertPanel from "../components/StockAlertPanel.jsx";
+import { csvRestock } from "../utilities/csvbuild.js";
+import { api } from "../utilities/utils.js";
+import { DEFAULT_LOW_STOCK_THRESHOLD } from "../utilities/stock.js";
 
 // ViewKelola — kelola menu, kategori (CRUD).
 function ViewKelola({
@@ -9,6 +13,8 @@ function ViewKelola({
   setCatModal, openAdd, openEdit,       // menuH
   setConfirmDel,                        // App.jsx local
   search, setSearch,                    // search from menuH
+  lowStockThreshold = DEFAULT_LOW_STOCK_THRESHOLD,
+  toast_ = null,                        // optional feedback hook
 }) {
   // Group items by their actual category (kategori field), not just categories in cats array
   // This ensures ALL items show even if their category is missing from cats
@@ -46,6 +52,23 @@ function ViewKelola({
     });
   }, [groupedItems]);
 
+  // Export the low-stock restock list as CSV (Windows-friendly, BOM added by saveCSV).
+  const exportRestock = (restockRows) => {
+    if (!restockRows || restockRows.length === 0) return;
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    const stamp = `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()}`;
+    const now = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    const filename = `Daftar_Restock_${stamp}.csv`;
+    api.saveCSV({ filename, content: csvRestock(restockRows, now) })
+      .then((res) => {
+        if (!toast_) return;
+        if (res?.ok) toast_("Daftar Restock disimpan", "ok");
+        else if (res !== undefined) toast_("Dibatalkan", "err");
+      })
+      .catch(() => { if (toast_) toast_("Gagal menyimpan CSV", "err"); });
+  };
+
   return (
     <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
       <div style={{padding:"9px 16px",background:W,borderBottom:`1px solid ${BD}`,...row,flexShrink:0}}>
@@ -74,6 +97,16 @@ function ViewKelola({
          </button>)}
         </div>
       </div>
+      {menu.length > 0 && (
+        <div style={{padding:"10px 16px 0",flexShrink:0}}>
+          <StockAlertPanel
+            menu={menu}
+            threshold={lowStockThreshold}
+            onOpenItem={openEdit}
+            onExportCSV={exportRestock}
+          />
+        </div>
+      )}
       <div style={{flex:1,overflowY:"auto",padding:"10px 16px"}}>
         {catKeys.map(catKey => {
           const items_ = groupedItems[catKey];
@@ -84,7 +117,7 @@ function ViewKelola({
                 {items_.map(item=>
                   <div key={item.id} style={{background:W,border:`1px solid ${BD}`,borderRadius:RADIUS.md,overflow:"hidden",boxShadow:"0 1px 3px rgba(0,0,0,0.04)"}}>
                     <div style={{padding:"6px 9px"}}>
-                      <div style={{...row,marginBottom:1}}><span style={{fontSize:TYPOGRAPHY.small.fontSize,fontWeight:700}}>{item.nama}</span><StockBadge stok={item.stok}/></div>
+                      <div style={{...row,marginBottom:1}}><span style={{fontSize:TYPOGRAPHY.small.fontSize,fontWeight:700}}>{item.nama}</span><StockBadge stok={item.stok} threshold={lowStockThreshold}/></div>
                       {item.desc&&<div style={{fontSize:TYPOGRAPHY.label.fontSize,color:MT,marginBottom:2}}>{item.desc}</div>}
                       <div style={{fontSize:TYPOGRAPHY.small.fontSize,fontWeight:700,color:G}}>{fmt(item.harga)}</div>
                       <div style={{fontSize:TYPOGRAPHY.label.fontSize,color:MT}}>Modal: {item.modal?fmt(item.modal):<span style={{color:"#e8a040"}}>Belum diisi</span>}</div>
