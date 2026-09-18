@@ -16,10 +16,27 @@ Dokumen ini mengikuti struktur dan perilaku kode yang ada di repository. Versi a
 - Diskon bertingkat berdasarkan kuantitas item.
 - Pajak dan service yang dapat diaktifkan serta dikonfigurasi dari Settings.
 - Field tambahan checkout dan struk yang dapat dibuat, diubah, diwajibkan, disembunyikan, atau dihapus.
+- Data pelanggan atau member yang dipilih dari pemilih pelanggan, lalu disimpan pada transaksi dan ditampilkan di struk.
 - Open bill untuk menyimpan pesanan yang belum dibayar, melanjutkan pesanan, menambah atau menghapus item, membayar, serta membatalkan dengan pengembalian stok.
 - Pembayaran tunai, QRIS, metode debit, transfer, dan metode custom yang dikelola dari Settings.
 - Perhitungan kembalian untuk pembayaran tunai.
 - Pencegahan pemotongan stok ganda ketika open bill dibayar.
+- Void transaksi oleh admin dengan alasan, catatan, waktu, dan operator pencatat void.
+
+### Pelanggan dan member
+
+- Pemilih pelanggan pada layar kasir untuk mengaitkan transaksi ke pelanggan atau member.
+- Data pelanggan disimpan pada transaksi dalam bentuk salinan (`customerId`, `customerNama`, `customerTelepon`) sehingga riwayat dan struk lama tetap terbaca meskipun pelanggan kemudian diubah namanya atau dihapus.
+- Nama pelanggan, atau nama beserta telepon jika tersedia, ditampilkan pada baris `PELANGGAN` di struk dan pada jalur thermal ESC/POS.
+- Pelanggan yang dipilih otomatis dilepas setelah transaksi selesai agar tidak terbawa ke transaksi berikutnya.
+
+### Pembatalan transaksi (void)
+
+- Void hanya tersedia bagi pengguna dengan peran admin.
+- Modal void meminta alasan dari daftar yang tersedia dan catatan tambahan.
+- Transaksi void menyimpan status, alasan, catatan, waktu, dan operator yang melakukan void, lalu ditampilkan sebagai baris dengan label `VOID` pada Riwayat.
+- Transaksi void dikeluarkan dari seluruh total laporan keuangan dan dari seluruh ekspor CSV, termasuk laporan keuangan, sales rate, rangkuman per item, dan rincian transaksi.
+- Ekspor transaksi menambahkan kolom `Status` dan `Alasan Void`.
 
 ### Minuman dan kategori
 
@@ -34,6 +51,7 @@ Pilihan tambahan tidak mengubah harga dan item dengan pilihan berbeda menjadi ba
 ### Riwayat, laporan, dan ekspor
 
 - Riwayat transaksi dengan filter tanggal, filter shift, pengurutan, pagination, dan tampilan per hari atau per shift.
+- Tampilan per shift dapat dipilih melalui pemilih shift dan dikelompokkan per shift. Ketika terdapat lebih dari lima shift, daftar ditampilkan secara ringkas dengan opsi menampilkan semua shift.
 - Detail transaksi dan penghapusan transaksi individual.
 - Penghapusan seluruh transaksi dengan buffer undo selama 9 detik.
 - Laporan keuangan per shift atau seluruh shift: pendapatan, modal, laba/rugi, dan margin.
@@ -41,8 +59,23 @@ Pilihan tambahan tidak mengubah harga dan item dengan pilihan berbeda menjadi ba
 - Rangkuman per item: kuantitas, pendapatan, modal, laba, dan margin.
 - Laporan stok.
 - Rincian transaksi.
-- Ringkasan berdasarkan metode pembayaran.
+- Ringkasan pendapatan berdasarkan metode pembayaran mengikuti metode bayar yang dikonfigurasi di Settings.
 - Ekspor laporan ke CSV melalui dialog penyimpanan Windows.
+
+### Peringatan stok menipis
+
+- Panel peringatan stok pada halaman Kelola Menu yang memisahkan item habis (`stok` sama dengan 0) dan item menipis.
+- Ambang batas stok menipis diatur dari Settings pada tab Harga dan dibatasi ke rentang 1 sampai 999, dengan default 5.
+- Item dengan stok tanpa batas (`stok` bernilai `null`) tidak pernah memicu peringatan. Nilai `NaN` dan `Infinity` tidak diperlakukan sebagai stok yang valid.
+- Saran jumlah pembelian ulang untuk tiap item yang perlu diisi kembali.
+- Ekspor daftar pengisian ulang ke CSV.
+- Kecepatan penjualan per item dihitung dari transaksi, dengan transaksi void dikecualikan agar saran pengisian mencerminkan permintaan nyata.
+
+### Pengguna
+
+- Pengelolaan pengguna dari Settings pada tab Kelola Pengguna, termasuk menambah pengguna dan menghapus pengguna.
+- Akun `admin` dan pengguna yang sedang aktif tidak dapat dihapus.
+- Setiap pengguna dapat mengubah password miliknya sendiri dari Settings.
 
 ### Struk dan printer
 
@@ -51,22 +84,44 @@ Pilihan tambahan tidak mengubah harga dan item dengan pilihan berbeda menjadi ba
 - Printer sistem atau printer PDF melalui API print Electron.
 - Lebar kertas yang dapat diatur. Kode printer membatasi nilai ke rentang 30 sampai 210 mm, dengan default 80 mm.
 - Kompatibilitas format 58 mm dan 80 mm melalui jumlah karakter per baris yang disesuaikan.
-- Isi struk dapat mencakup logo, nama warung, alamat, telepon, waktu, nomor transaksi, kasir, metode pembayaran, item, tambahan minuman, subtotal, pajak, service, diskon, total, pembayaran, kembalian, gambar QRIS, dan catatan footer.
+- Isi struk dapat mencakup logo, nama warung, alamat, telepon, waktu, nomor transaksi, kasir, pelanggan, metode pembayaran, item, tambahan minuman, subtotal, pajak, service, diskon, total, pembayaran, kembalian, gambar QRIS, dan catatan footer.
+- Nama warung pada struk mengikuti nilai yang diisi pengguna di Settings, bukan label umum.
+- Baris pelanggan hanya muncul ketika nama pelanggan tersedia, dan menampilkan nama beserta telepon jika nomor telepon ada.
+- Gambar QRIS yang diunggah pengguna pada pengaturan QRIS tampil pada struk ketika pembayaran memakai metode QRIS.
+- Pajak dan service hanya muncul pada struk ketika diaktifkan di Settings.
 - Printer dipilih dari Settings. Printer PDF tidak diproses sebagai printer thermal ESC/POS.
 
 ### Settings
 
-Settings mencakup:
+Settings ditampilkan sebagai modal dengan tab berikut:
 
-- Nama warung, alamat, dan nomor telepon.
-- Logo.
-- Printer dan lebar kertas struk.
-- Metode pembayaran beserta kategori cash, QRIS, atau custom.
-- Gambar QRIS untuk metode yang sesuai.
-- Field tambahan checkout dan struk.
-- Diskon bertingkat.
-- Pajak dan service.
-- Kategori pengeluaran shift.
+| Tab | Isi |
+| --- | --- |
+| `Printer` | Daftar printer, pemilihan printer, dan lebar kertas struk. |
+| `Nama Warung` | Nama warung, alamat, dan nomor telepon yang tampil di struk. |
+| `Metode Bayar` | Metode pembayaran beserta kategori cash, QRIS, atau custom. |
+| `QRIS` | Gambar QRIS per metode pembayaran yang sesuai. |
+| `Resi` | Field struk dan tambahan checkout, status wajib isi, serta pajak dan service. |
+| `Harga` | Diskon bertingkat, pajak dan service, serta ambang batas stok menipis. |
+| `Backup` | Backup, restore, dan pemeriksaan data. |
+| `Kelola Pengguna` | Menambah dan menghapus pengguna, serta mengubah password. |
+
+Catatan:
+
+- Nama warung memakai nilai yang diisi pengguna, sehingga struk menampilkan nama tempat usaha dan bukan label umum.
+- Metode pembayaran dapat ditambah dan dihapus, dengan minimal satu metode aktif.
+- Field struk dapat ditambah, diubah, diwajibkan, atau dihapus, termasuk field bawaan seperti nomor meja dan jumlah pax.
+- Diskon bertingkat dan kategori pengeluaran shift tetap dikelola dari Settings.
+
+### Backup dan restore
+
+- Backup dibuat dari panel pada tab Backup dan disimpan sebagai file JSON dengan format `kasir-warung-backup`.
+- Backup mencakup penyimpanan data utama, termasuk transaksi, shift, menu, kategori, open bill, settings, pengguna, logo, dan QRIS.
+- File backup dapat divalidasi dan diringkas sebelum dipulihkan.
+- Pemulihan menulis snapshot pengaman sebelum perubahan, menutup database, menulis ulang penyimpanan JSON, menghapus `kasir.db` beserta `-wal` dan `-shm`, lalu menjalankan ulang inisialisasi dan migrasi.
+- Snapshot internal dibuat otomatis dan dibatasi hingga 20 file terbaru.
+- Setelah pemulihan, aplikasi menyarankan restart.
+- Folder data dapat dibuka dari panel backup.
 
 ### Lisensi
 
@@ -158,11 +213,13 @@ Persyaratan RAM dan ruang di atas adalah batas operasional yang disarankan untuk
 | `preload.js` | Context bridge terisolasi yang mengekspos API `kasirAPI` dan alias `api` ke renderer. |
 | `db.cjs` | SQLite service, tabel transaksi/shift, query terfilter, pagination, penyimpanan, pembayaran atomik, dan migrasi data JSON lama. |
 | `backup.cjs` | Pembacaan JSON, atomic write, WAL recovery, dan backup transaksi harian dengan retensi 30 file. |
+| `backup-restore.cjs` | Layanan backup penuh dan restore: validasi file backup, ringkasan, snapshot pengaman, penggantian penyimpanan JSON, dan daftar snapshot internal. |
 | `printing.cjs` | Printer enumeration, print HTML/PDF, print thermal ESC/POS, normalisasi lebar kertas, dan format struk langsung. |
 | `print-manager.cjs` | Modul pendukung alur manajemen printing. |
 | `license.cjs` | Pembacaan hardware ID, validasi license key, aktivasi, dan penyimpanan lisensi. |
 | `license-secret.cjs` | Implementasi secret/generator kunci lisensi. Lindungi dari publikasi. |
 | `category-label.cjs` | Resolusi label kategori untuk output printer. |
+| `dev-runner.cjs` | Runner development yang memantau perubahan pada `electron/` dan me-restart main process secara otomatis. Tidak digunakan pada build produksi. |
 
 ### `src/`
 
@@ -171,12 +228,12 @@ Persyaratan RAM dan ruang di atas adalah batas operasional yang disarankan untuk
 | `App.jsx` | Koordinator aplikasi: lifecycle lisensi/login/shift, pemuatan data, navigasi, hotkey, pembayaran, printing, dan wiring antar-hook. |
 | `main.jsx` | Entry point React renderer. |
 | `assets/` | Ikon dan aset statis, termasuk ikon aplikasi. |
-| `components/` | Komponen UI bersama seperti detail bill, jam, loader, badge stok, dan tag. |
+| `components/` | Komponen UI bersama seperti detail bill, jam, loader, badge stok, panel peringatan stok, pemilih pelanggan, panel backup/restore, error boundary, dan tag. |
 | `components/modals/` | Modal item, kategori, additionals minuman, pembayaran, struk, printer, settings, pengguna, konfirmasi, dan tutup shift. |
-| `components/modals/settings/` | Tab Settings untuk printer, pembayaran, QRIS, receipt, dan pricing. |
+| `components/modals/SettingsPanels.jsx` | Implementasi panel tiap tab Settings: printer, warung, pembayaran, QRIS, receipt, pricing, backup, dan pengguna. |
 | `constants/` | Konfigurasi kategori, menu, pembayaran, additionals, receipt fields, dan design tokens. `design.js` adalah sumber token visual utama saat ini. |
-| `hooks/` | Domain state dan operasi untuk auth/shift, barcode, bills, cart, history, license, menu, settings, dan toast/undo. |
-| `utilities/` | Logika murni dan adapter untuk barcode, kalkulasi harga, kategori, CSV, i18n, printer, receipt, shift, user, dan IPC API. Banyak utilitas memiliki file test berdekatan. |
+| `hooks/` | Domain state dan operasi untuk auth/shift, barcode, bills, cart, customers, history, license, menu, settings, users, dan toast/undo. |
+| `utilities/` | Logika murni dan adapter untuk barcode, kalkulasi harga, kategori, CSV, i18n, printer, receipt, shift, stock, user, backup, ipc guard, dan IPC API. Banyak utilitas memiliki file test berdekatan. |
 | `views/` | Layar Kasir, Open Bill, Riwayat, Laporan, dan Kelola Menu/Kategori. |
 
 ### `updates/`
@@ -209,6 +266,7 @@ Lokasi aktual dapat dilihat dari aplikasi melalui API `getDataPath`.
 | `menu.json` | Daftar menu, harga, harga modal, stok, barcode, kategori, dan metadata menu. |
 | `categories.json` | Kategori menu dan tags, termasuk tag `Drinks`. |
 | `open-bills.json` | Open bill yang belum dibayar. |
+| `customers.json` | Daftar pelanggan atau member untuk pemilih pelanggan. |
 | `settings.json` | Identitas warung, printer, payment methods, QRIS, receipt fields, pricing, dan expense categories. |
 | `users.json` | Akun pengguna dan role. |
 | `logo.json` | Logo dalam bentuk data yang disimpan aplikasi. |
@@ -248,9 +306,16 @@ npm run dev
 # Vite dan Electron bersamaan; gunakan untuk menguji IPC, database, lisensi,
 # barcode, dan printer
 npm run electron:dev
+
+# Vite dan Electron tanpa supervisor restart; fallback untuk electron:dev
+npm run electron:plain
 ```
 
 `npm run dev` hanya menjalankan renderer. API Electron seperti SQLite, printer, scanner HID, dan lisensi tidak tersedia sepenuhnya di browser biasa.
+
+`npm run electron:dev` menjalankan Vite dan Electron melalui `electron/dev-runner.cjs`, yang memantau perubahan pada folder `electron/` dan me-restart main process secara otomatis. Main process Electron tidak ikut hot reload oleh Vite, sehingga restart otomatis ini diperlukan ketika mengubah file seperti `main.cjs`, `db.cjs`, atau `printing.cjs`.
+
+Pesan seperti `No handler registered for '<nama>'` pada renderer umumnya berarti main process yang sedang berjalan masih memuat kode lama. Restart aplikasi, bukan menelusuri source code renderer.
 
 ## Testing dan Pemeriksaan
 
@@ -265,7 +330,9 @@ npm run test:watch
 npm run build
 ```
 
-Test unit utama berada di `src/utilities/` dan mencakup barcode, kalkulasi, category management, CSP, CSV, printer, receipt, dan utilitas IPC. Skrip `test-db.js`, `test-printer.js`, dan `test-app-printer.js` adalah pemeriksaan manual/integrasi terpisah dari script `npm test`.
+Test unit utama berada di `src/utilities/` dan mencakup barcode, kalkulasi, category management, CSP, CSV, printer, receipt, stock, backup, ipc guard, dan utilitas IPC. Skrip `test-db.js`, `test-printer.js`, dan `test-app-printer.js` adalah pemeriksaan manual/integrasi terpisah dari script `npm test`.
+
+Perlu diperhatikan bahwa test unit tidak menjalankan Electron. Perubahan pada `electron/*.cjs` tidak ter-cover oleh `npm test`, sehingga bagian main process sebaiknya diverifikasi dengan `node --check` dan pengujian manual melalui `npm run electron:dev`.
 
 ## Build Installer Windows
 
@@ -291,14 +358,14 @@ File installer yang dihasilkan mengikuti versi `package.json`, sehingga nama fil
 
 ## Prosedur Update dan Release
 
-1. Backup direktori `%APPDATA%\kasir-warung\data\` pada komputer pengguna. Pastikan backup mencakup `kasir.db`, JSON konfigurasi, `open-bills.json`, dan folder `backups`.
+1. Backup direktori `%APPDATA%\kasir-warung\data\` pada komputer pengguna. Pastikan backup mencakup `kasir.db`, JSON konfigurasi, `open-bills.json`, `customers.json`, dan folder `backups`. Aplikasi juga menyediakan backup penuh melalui Settings pada tab Backup.
 2. Catat perubahan dan naikkan `version` di `package.json` sesuai jenis release.
 3. Perbarui source code secara lokal dan jangan menghapus file data pengguna.
 4. Jalankan `npm install` jika dependency berubah. `postinstall` akan melakukan Electron rebuild untuk `node-hid`.
 5. Jalankan `npm test`.
 6. Jalankan `npm run build` untuk memastikan renderer production berhasil dibundel.
 7. Jalankan `npm run electron:build` pada Windows x64 untuk membuat installer.
-8. Uji installer di komputer bersih: instalasi, startup, license screen, login, shift, tambah menu, transaksi, open bill, pembayaran, laporan, ekspor CSV, dan printing.
+8. Uji installer di komputer bersih: instalasi, startup, license screen, login, shift, tambah menu, transaksi, open bill, pembayaran, pelanggan, void transaksi, peringatan stok, laporan, ekspor CSV, backup dan restore, dan printing.
 9. Uji printer thermal pada lebar yang dipakai dan uji printer PDF secara terpisah.
 10. Simpan installer dan checksum internal sesuai prosedur distribusi. Jangan memasukkan license secret atau license key pelanggan ke repository.
 11. Saat upgrade pada komputer pengguna, tutup aplikasi lebih dahulu, pasang installer baru, lalu verifikasi data dan lisensi. Migrasi JSON ke SQLite dilakukan saat startup dan membuat salinan migrasi di `json-backups`.
@@ -337,6 +404,19 @@ File installer yang dihasilkan mengikuti versi `package.json`, sehingga nama fil
 
 Lisensi memang terikat hardware ID. Catat hardware ID yang tampil pada layar aktivasi dan gunakan proses reset atau penerbitan ulang lisensi yang dikelola pemilik sistem. Jangan menyalin file `.ykk_lic` dari komputer lain sebagai solusi.
 
+### Backup atau restore gagal
+
+- Pastikan file backup memiliki format `kasir-warung-backup` yang dikenali. Gunakan preview sebelum memulihkan.
+- Restore menulis ulang penyimpanan JSON, menghapus `kasir.db` beserta `-wal` dan `-shm`, lalu menjalankan ulang migrasi. Tutup aplikasi sebelum penggantian file secara manual.
+- Setelah restore, jalankan ulang aplikasi sesuai anjuran restart pada panel backup.
+- Snapshot pengaman dan snapshot internal dapat diperiksa dari folder data aplikasi.
+
+### Transaksi void tidak muncul atau hilang dari laporan
+
+- Void hanya dapat dilakukan oleh admin, dan transaksi yang sudah void tidak dapat diproses ulang.
+- Transaksi void tetap terlihat pada Riwayat dengan label `VOID`, tetapi sengaja dikeluarkan dari total laporan keuangan serta seluruh ekspor CSV.
+- Nilai laporan yang lebih kecil setelah void adalah perilaku yang benar, bukan kehilangan data.
+
 ## Hotkey Aplikasi
 
 Hotkey hanya diproses ketika fokus tidak berada di input, textarea, atau select:
@@ -355,6 +435,8 @@ Hotkey hanya diproses ketika fokus tidak berada di input, textarea, atau select:
 
 - Context isolation dan `nodeIntegration: false` digunakan pada window utama.
 - Renderer mengakses kemampuan native melalui preload bridge, bukan melalui akses Node.js langsung.
+- Panggilan IPC yang dilewatkan utilitas backup dibungkus `safeIpc` sehingga kegagalan handler dilaporkan sebagai hasil terstruktur, bukan promise yang tidak tertangani.
+- `ErrorBoundary` menangkap error render pada level React dan menampilkan layar pemulihan, bukan window kosong.
 - Jangan mengirim `electron/license-secret.cjs`, license key, file `.ykk_lic`, database produksi, atau data pelanggan ke repository publik.
 - Backup harus dilakukan sebelum upgrade, migrasi, pemindahan komputer, atau tindakan pemulihan.
 - `package.json` dan source code adalah sumber kebenaran untuk script, versi, dependensi, dan konfigurasi packaging.
