@@ -9,4 +9,17 @@ function resolveShiftTarget({ shifts = [], activeShift = null, selectedShiftId =
   return found || null;
 }
 
-export { resolveShiftTarget };
+// nextShiftNum — nomor shift berjalan GLOBAL, bukan per hari.
+// Shift pertama yang pernah dibuat = 1. Membuka shift baru di hari berikutnya
+// melanjutkan nomor sebelumnya (mis. jadi 2), bukan kembali ke 1.
+// Diambil dari shiftNum tertinggi yang sudah ada, lalu ditambah 1, supaya tetap
+// benar walau ada data lama / shift dihapus (tidak bisa menurunkan nomor).
+function nextShiftNum(shifts = []) {
+  const max = (shifts || []).reduce((acc, shift) => {
+    const n = Number(shift?.shiftNum);
+    return Number.isFinite(n) && n > acc ? n : acc;
+  }, 0);
+  return max + 1;
+}
+
+export { resolveShiftTarget, nextShiftNum };

@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { DEFAULT_USERS, isAdminUser } from "../utilities/users.js";
 import { LS, api } from "../utilities/utils.js";
+import { nextShiftNum } from "../utilities/shiftState.js";
 
 // SESSION_KEY — menyimpan identitas user yang sedang login (hanya username).
 //
@@ -79,14 +80,14 @@ function useAuth({ getNow, toast_ }) {
 
   // PENTING: membaca loginForm, users, dan shifts LANGSUNG dari closure. Wajib
   // [loginForm, users, shifts, getNow] di deps — tanpa shifts, nomor urut shift
-  // hari ini (shiftNum) akan selalu dihitung dari snapshot shifts kosong.
+  // berjalan (shiftNum) akan selalu dihitung dari snapshot shifts kosong.
   const doLogin = useCallback(async () => {
     const u = users.find(u => u.username === loginForm.username.trim() && u.password === loginForm.password);
     if (!u) { setLoginForm(f => ({ ...f, error: "Username atau password salah" })); return false; }
     const t = getNow();
     const todayKey = `${t.tgl}-${t.blnNum}-${t.thn}`;
-    const todayShifts = shifts.filter(s => s.dateKey === todayKey);
-    const shiftNum = todayShifts.length + 1;
+    // Nomor shift berjalan GLOBAL (lanjut antar hari), bukan per hari.
+    const shiftNum = nextShiftNum(shifts);
     const shift = {
       id: `shift_${Date.now()}`,
       shiftNum,

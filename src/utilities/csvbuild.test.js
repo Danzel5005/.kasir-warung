@@ -12,7 +12,7 @@ import {
   csvRestock,
 } from "./csvbuild.js";
 import { calcPrice } from "./calculations.js";
-import { resolveShiftTarget } from "./shiftState.js";
+import { resolveShiftTarget, nextShiftNum } from "./shiftState.js";
 
 describe("csvbuild.js - CSV Generator Utilities", () => {
   const timeDownload = "2025-01-15 10:00:00";
@@ -211,6 +211,35 @@ describe("csvbuild.js - CSV Generator Utilities", () => {
 
       expect(result.id).toBe("shift_new");
       expect(result.status).toBe("open");
+    });
+  });
+
+  describe("shift numbering (running, not per day)", () => {
+    it("should start at 1 when there is no shift yet", () => {
+      expect(nextShiftNum([])).toBe(1);
+    });
+
+    it("should continue across days instead of restarting at 1", () => {
+      const shifts = [
+        { id: "s1", shiftNum: 1, dateKey: "18-9-2026", status: "closed" },
+        { id: "s2", shiftNum: 2, dateKey: "18-9-2026", status: "closed" },
+      ];
+      // Shift pertama pada hari berikutnya harus jadi 3, bukan 1.
+      expect(nextShiftNum(shifts)).toBe(3);
+    });
+
+    it("should use the highest existing number so it never decreases", () => {
+      const shifts = [
+        { id: "s1", shiftNum: 1 },
+        { id: "s5", shiftNum: 5 },
+        { id: "s3", shiftNum: 3 },
+      ];
+      expect(nextShiftNum(shifts)).toBe(6);
+    });
+
+    it("should ignore shifts with missing or invalid numbers", () => {
+      const shifts = [{ id: "s1" }, { id: "s2", shiftNum: null }, { id: "s3", shiftNum: "abc" }];
+      expect(nextShiftNum(shifts)).toBe(1);
     });
   });
 
