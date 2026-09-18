@@ -205,12 +205,25 @@ function useAuth({ getNow, toast_ }) {
     }
     const targetUsername = String(username || "").trim();
     const password = String(newPassword || "").trim();
+    // Admin hanya boleh mengubah password akun LAIN (non-admin) dari daftar
+    // pengguna. Untuk akun sendiri, gunakan fitur "Ganti Password Saya" yang
+    // mewajibkan verifikasi password saat ini.
+    if (currentUser && targetUsername === currentUser.username) {
+      toast_('Gunakan fitur "Ganti Password Saya" untuk mengubah password akun Anda', "err");
+      return false;
+    }
     if (!targetUsername || password.length < 4) {
       toast_("Password minimal 4 karakter", "err");
       return false;
     }
     if (!users.some((user) => user.username === targetUsername)) {
       toast_("Akun tidak ditemukan", "err");
+      return false;
+    }
+    // Jangan gunakan jalur ini untuk menyetel ulang password admin.
+    const targetUser = users.find((user) => user.username === targetUsername);
+    if (isAdminUser(targetUser)) {
+      toast_("Password akun admin tidak dapat diubah dari daftar pengguna", "err");
       return false;
     }
     const next = users.map((user) => user.username === targetUsername ? { ...user, password } : user);
@@ -220,7 +233,6 @@ function useAuth({ getNow, toast_ }) {
       return false;
     }
     setUsers(next);
-    if (currentUser.username === targetUsername) setCurrentUser(next.find((user) => user.username === targetUsername));
     toast_(`Password akun "${targetUsername}" berhasil diubah`, "ok");
     return true;
   }, [currentUser, users, toast_]);
