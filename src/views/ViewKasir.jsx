@@ -12,6 +12,7 @@ function ViewKasir({
   // dari cartH
   cart, drawerOpen, setDrawerOpen,
   receiptAdditionalValues, receiptAdditionals, updateReceiptAdditionalValue,
+  customerPicker = null,
   items, subtotal, service, pajak, discount, total, activeBill,
   addToCart, decCart, delCart, clearCart,
   // App.jsx wrapper functions (sudah di-useCallback di App.jsx)
@@ -141,6 +142,7 @@ function ViewKasir({
 
         {/* Meja & Pax - Dynamic from receiptAdditionals */}
         <div style={{padding:"8px 12px",borderBottom:`1px solid ${BD}`,background:"#f9faf9"}}>
+          {customerPicker}
           {receiptAdditionals && receiptAdditionals
             .filter(f => f.category === "receipt" && f.visible !== false)
             .map((field) => (

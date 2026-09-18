@@ -108,17 +108,21 @@ function useAuth({ getNow, toast_ }) {
   // ── User management (admin only) ──
   // PENTING: membaca users LANGSUNG dari closure. Wajib [users, toast_] di deps.
   const addUser = useCallback(async ({ username, password, nama }) => {
+    if (!isAdminUser(currentUser)) {
+      toast_("Hanya admin yang dapat menambah pengguna", "err");
+      return false;
+    }
     if (users.find(u => u.username === username.trim())) {
       toast_("Username sudah terdaftar", "err");
       return false;
     }
-    const newUser = { username: username.trim(), password, nama: nama.trim() };
+    const newUser = { username: username.trim(), password, nama: nama.trim(), role: "cashier" };
     const next = [...users, newUser];
     await api.saveUsers(next);
     setUsers(next);
     toast_(`Pengguna "${nama}" ditambahkan`, "ok");
     return true;
-  }, [users, toast_]);
+  }, [users, currentUser, toast_]);
 
   // PENTING: membaca users & currentUser LANGSUNG dari closure. Wajib [users, currentUser, toast_] di deps.
   const deleteUser = useCallback(async (username) => {
@@ -143,11 +147,66 @@ function useAuth({ getNow, toast_ }) {
     toast_(`Pengguna "${username}" dihapus`, "ok");
   }, [users, currentUser, toast_]);
 
+  const changePassword = useCallback(async (username, newPassword) => {
+    if (!isAdminUser(currentUser)) {
+      toast_("Hanya admin yang dapat mengubah password", "err");
+      return false;
+    }
+    const targetUsername = String(username || "").trim();
+    const password = String(newPassword || "").trim();
+    if (!targetUsername || password.length < 4) {
+      toast_("Password minimal 4 karakter", "err");
+      return false;
+    }
+    if (!users.some((user) => user.username === targetUsername)) {
+      toast_("Akun tidak ditemukan", "err");
+      return false;
+    }
+    const next = users.map((user) => user.username === targetUsername ? { ...user, password } : user);
+    const result = await api.saveUsers(next);
+    if (result?.ok === false) {
+      toast_(result.error || "Gagal mengubah password", "err");
+      return false;
+    }
+    setUsers(next);
+    if (currentUser.username === targetUsername) setCurrentUser(next.find((user) => user.username === targetUsername));
+    toast_(`Password akun "${targetUsername}" berhasil diubah`, "ok");
+    return true;
+  }, [currentUser, users, toast_]);
+
+  const changeOwnPassword = useCallback(async (currentPassword, newPassword, confirmation) => {
+    if (!currentUser) return false;
+    if (String(currentPassword || "") !== String(currentUser.password || "")) {
+      toast_("Password saat ini salah", "err");
+      return false;
+    }
+    const password = String(newPassword || "").trim();
+    if (password.length < 4) {
+      toast_("Password minimal 4 karakter", "err");
+      return false;
+    }
+    if (password !== String(confirmation || "")) {
+      toast_("Konfirmasi password tidak sama", "err");
+      return false;
+    }
+    const next = users.map((user) => user.username === currentUser.username ? { ...user, password } : user);
+    const result = await api.saveUsers(next);
+    if (result?.ok === false) {
+      toast_(result.error || "Gagal mengubah password", "err");
+      return false;
+    }
+    const updated = next.find((user) => user.username === currentUser.username);
+    setUsers(next);
+    setCurrentUser(updated);
+    toast_("Password Anda berhasil diubah", "ok");
+    return true;
+  }, [currentUser, users, toast_]);
+
   return {
     activeShift, shifts, loginForm, closingShift, selectedShiftId, users, currentUser,
     setLoginForm, setClosingShift, setSelectedShiftId,
     loadInitial, doLogin, updateShift, confirmCloseShift,
-    addUser, deleteUser,
+    addUser, deleteUser, changePassword, changeOwnPassword,
   };
 }
 

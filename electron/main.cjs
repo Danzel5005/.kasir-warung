@@ -1,3 +1,18 @@
+  ipcMain.handle("trx-void", (_e, id, { reason, actor, note }) => {
+    if (!db) { 
+      const all = rJSON(FILES.trx) || [];
+      const updated = all.map(t => t.id === id ? { ...t, status: "voided", voidedAt: new Date().toISOString(), voidedBy: actor, voidReason: reason, voidNote: note } : t);
+      atomicWrite(FILES.trx, updated);
+      return { ok: true };
+    }
+    try {
+      db.prepare(`UPDATE transactions SET data = ? WHERE id = ?`).run(JSON.stringify({ status: "voided", voidedAt: new Date().toISOString(), voidedBy: actor, voidReason: reason, voidNote: note }), id);
+      return { ok: true };
+    } catch (err) {
+      console.error("[trx-void] Error:", err.message);
+      return { ok: false, error: err.message };
+    }
+  });
 const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("path");
 const fs = require("fs");
@@ -23,6 +38,7 @@ const FILES = {
   shifts: path.join(DATA_DIR, "shifts.json"),
   qris: path.join(DATA_DIR, "qris.json"),
   users: path.join(DATA_DIR, "users.json"),
+  customers: path.join(DATA_DIR, "customers.json"),
   wal: path.join(DATA_DIR, "trx.wal"),
   backups: path.join(DATA_DIR, "backups"),
   db: path.join(DATA_DIR, "kasir.db"),
@@ -51,6 +67,8 @@ function registerFileHandlers() {
   ipcMain.handle("settings-save", (_e, data) => { backup.atomicWrite(FILES.settings, data); return { ok: true }; });
   ipcMain.handle("users-load", () => backup.rJSON(FILES.users) || []);
   ipcMain.handle("users-save", (_e, list) => { backup.atomicWrite(FILES.users, list); return { ok: true }; });
+  ipcMain.handle("customers-load", () => backup.rJSON(FILES.customers) || []);
+  ipcMain.handle("customers-save", (_e, list) => { backup.atomicWrite(FILES.customers, list); return { ok: true }; });
   ipcMain.handle("csv-save", async (_e, { filename, content }) => {
     const { filePath, canceled } = await dialog.showSaveDialog({ title: "Simpan File CSV", defaultPath: filename, filters: [{ name: "CSV Files", extensions: ["csv"] }] });
     if (canceled || !filePath) return { ok: false };

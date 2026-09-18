@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { api } from "../utilities/utils.js";
+import { isAdmin } from "../utilities/permissions.js";
 
 // useHistory — transaksi history dengan server-side filtering & pagination untuk skalabilitas
 // collapse-by-day UI state, delete + undo, dan CSV download generic.
@@ -141,7 +142,7 @@ function useHistory({ toast_, addUndo, getNow, authH }) {
   // Delete transaction
   const deleteTrx = useCallback(async (id) => {
     // Only admin can delete transactions
-    if (!authH.currentUser?.role === "admin") {
+    if (!isAdmin(authH?.currentUser)) {
       toast_("Hanya admin yang dapat menghapus riwayat transaksi", "err");
       return;
     }
@@ -155,10 +156,14 @@ function useHistory({ toast_, addUndo, getNow, authH }) {
       setHistory(snap); 
       setTotalCount(snapTotal);
     });
-  }, [history, totalCount, addUndo]);
+  }, [history, totalCount, addUndo, authH, toast_]);
 
   // Clear all transactions
   const clearAllTrx = useCallback(async () => {
+    if (!isAdmin(authH?.currentUser)) {
+      toast_("Hanya admin yang dapat menghapus riwayat transaksi", "err");
+      return;
+    }
     const snap = [...history];
     const snapTotal = totalCount;
     await api.clearTrx();
@@ -169,7 +174,7 @@ function useHistory({ toast_, addUndo, getNow, authH }) {
       setHistory(snap); 
       setTotalCount(snapTotal);
     });
-  }, [history, totalCount, addUndo]);
+  }, [history, totalCount, addUndo, authH, toast_]);
 
   // CSV timestamp
   const at = useCallback(() => {

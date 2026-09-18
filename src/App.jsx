@@ -17,14 +17,16 @@ import { useBills } from "./hooks/useBills.js";
 import { useCart } from "./hooks/useCart.js";
 import { useHistory } from "./hooks/useHistory.js";
 import { useBarcodeScanner } from "./hooks/useBarcodeScanner.js";
+import { useCustomers } from "./hooks/useCustomers.js";
 import { row } from "./constants/design.js";
-import { isAdminUser } from "./utilities/users.js";
+import { canAccessView, isAdmin } from "./utilities/permissions.js";
 
 import ViewOpenBill from "./views/ViewOpenBill.jsx";
 import ViewKasir from "./views/ViewKasir.jsx";
 import ViewRiwayat from "./views/ViewRiwayat.jsx";
 import ViewLaporan from "./views/ViewLaporan.jsx";
 import ViewKelola from "./views/ViewKelola.jsx";
+import CustomerPicker from "./components/CustomerPicker.jsx";
 
 import PayModal        from "./components/modals/PayModal.jsx";
 import ReceiptModal    from "./components/modals/ReceiptModal.jsx";
@@ -34,6 +36,8 @@ import SettingsModal   from "./components/modals/SettingsModal.jsx";
 import PrinterModal    from "./components/modals/PrinterModal.jsx";
 import CloseShiftModal from "./components/modals/CloseShiftModal.jsx";
 import ConfirmDelModal from "./components/modals/ConfirmDelModal.jsx";
+  import VoidModal from "./components/modals/VoidModal.jsx";
+  import { useHistoryVoid } from "./hooks/useHistoryVoid.js";
 
 const HARI  = ["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
 const BULAN = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
@@ -118,12 +122,14 @@ function KasirWorkspace() {
   // ── Hooks: panggil semua di sini, App.jsx jadi satu-satunya tempat yang
   // tahu seluruh data flow antar domain. Tidak ada hook yang import hook lain.
   const toastH    = useToast();
+  const voidH     = useHistoryVoid({ toast_: toastH.toast_, addUndo: toastH.addUndo });
   const licenseH  = useLicense();
   const authH     = useAuth({ getNow, toast_: toastH.toast_ });
   const menuH     = useMenu({ toast_: toastH.toast_, addUndo: toastH.addUndo });
   const billsH    = useBills({ toast_: toastH.toast_, addUndo: toastH.addUndo });
   const cartH     = useCart({ toast_: toastH.toast_, getNow, receiptAdditionals: [] });
-  const historyH  = useHistory({ toast_: toastH.toast_, addUndo: toastH.addUndo, getNow });
+  const historyH  = useHistory({ toast_: toastH.toast_, addUndo: toastH.addUndo, getNow, authH });
+  const customersH = useCustomers({ toast_: toastH.toast_ });
   // settingsH needs cartH to be defined first for onChange callback
   const settingsH = useSettings({ 
     toast_: toastH.toast_, 
@@ -139,6 +145,15 @@ function KasirWorkspace() {
 
   // ── Navigasi (UI-level, tidak dimiliki domain manapun)
   const [view, setView] = useState("menu");
+
+  const navigate = useCallback((nextView) => {
+    if (canAccessView(authH.currentUser, nextView)) setView(nextView);
+    else toastH.toast_("Akses hanya tersedia untuk admin", "err");
+  }, [authH.currentUser, toastH.toast_]);
+
+  useEffect(() => {
+    if (authH.currentUser && !canAccessView(authH.currentUser, view)) setView("menu");
+  }, [authH.currentUser, view]);
 
   // ── confirmDel: SENGAJA tetap di App.jsx, bukan di salah satu hook.
   // Dipakai lintas domain (hapus trx/bill/item/kategori) dengan shape
@@ -254,15 +269,16 @@ function KasirWorkspace() {
   // ── Load data (sekali saat mount) — distribusikan ke tiap hook
   useEffect(() => {
     (async () => {
-      const [trxs, savedMenu, savedLogo, savedBills, savedCats, savedSettings, dp, savedShifts, savedUsers] = await Promise.all([
+      const [trxs, savedMenu, savedLogo, savedBills, savedCats, savedSettings, dp, savedShifts, savedUsers, savedCustomers] = await Promise.all([
         api.loadTrx(), api.loadMenu(), api.loadLogo(), api.loadBills(),
-        api.loadCats(), api.loadSettings(), api.getDataPath(), api.loadShifts(), api.loadUsers(),
+        api.loadCats(), api.loadSettings(), api.getDataPath(), api.loadShifts(), api.loadUsers(), api.loadCustomers(),
       ]);
-      historyH.loadInitial(trxs);
+      historyH.loadInitial(trxs, voidH.openVoidModal);
       menuH.loadInitial(savedMenu, savedCats);
       settingsH.loadInitial(savedLogo, savedSettings);
       billsH.loadInitial(savedBills);
       authH.loadInitial(savedShifts, savedUsers);
+      customersH.loadInitial(savedCustomers);
       setDataPath(dp);
     })();
   }, []);
@@ -274,18 +290,18 @@ function KasirWorkspace() {
       if (["INPUT", "TEXTAREA", "SELECT"].includes(tagName)) return;
       if (e.ctrlKey || e.altKey || e.metaKey) return;
       switch (e.key.toUpperCase()) {
-        case "K": setView("menu"); break;
-        case "O": setView("bills"); break;
-        case "R": setView("history"); break;
-        case "L": setView("laporan"); break;
-        case "M": setView("kelola"); break;
+        case "K": navigate("menu"); break;
+        case "O": navigate("bills"); break;
+        case "R": navigate("history"); break;
+        case "L": navigate("laporan"); break;
+        case "M": navigate("kelola"); break;
         case "P": cartH.setDrawerOpen(d => !d); break;
-        case "/": e.preventDefault(); setView("menu"); setTimeout(() => searchRef.current?.focus(), 80); break;
+        case "/": e.preventDefault(); navigate("menu"); setTimeout(() => searchRef.current?.focus(), 80); break;
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, []);
+  }, [navigate]);
 
   // ── Wiring lintas-hook (pengganti fungsi lama yang dulu di satu scope)
   // Semua dibungkus useCallback supaya stabil sebagai props ke views/ yang
@@ -378,15 +394,20 @@ const printReceipt = useCallback(async (trx) => {
   // atas perihal bug race condition yang belum di-root-cause).
   const loadBillAndPay = useCallback((bill) => {
     cartH.loadBillToCart(bill);
-    setView("menu");
+    navigate("menu");
     setTimeout(() => setPayModal(true), 300);
-  }, [cartH.loadBillToCart, setView]);
+  }, [cartH.loadBillToCart, navigate]);
 
   // confirmDel dispatcher — menggantikan switch-case yang dulu inline di modal konfirmasi
   // PENTING: membaca confirmDel langsung dari closure. Wajib di deps, atau
   // dispatcher akan selalu mengeksekusi confirmDel dari render pertama (null).
 const executeConfirmDel = useCallback(() => {
     if (!confirmDel) return;
+    if (!isAdmin(authH.currentUser) && ["all", "trx", "allBills", "bill", "allMenu", "item"].includes(confirmDel.type)) {
+      toastH.toast_("Hanya admin yang dapat melakukan tindakan ini", "err");
+      setConfirmDel(null);
+      return;
+    }
     if (confirmDel.type === "all") historyH.clearAllTrx();
     else if (confirmDel.type === "trx") historyH.deleteTrx(confirmDel.id);
     else if (confirmDel.type === "allBills") billsH.clearAllBills();
@@ -401,7 +422,7 @@ const executeConfirmDel = useCallback(() => {
     else if (confirmDel.type === "allMenu") menuH.clearAllMenu();   // ← new, must be explicit
     else menuH.deleteItem(confirmDel.id);
     setConfirmDel(null);
-  }, [confirmDel, historyH.clearAllTrx, historyH.deleteTrx, billsH.clearAllBills, billsH.cancelBill, menuH.computeStockRestoration, menuH.computeStockDeduction, menuH.setMenu, menuH.clearAllMenu, menuH.deleteItem]);
+  }, [confirmDel, authH.currentUser, toastH.toast_, historyH.clearAllTrx, historyH.deleteTrx, billsH.clearAllBills, billsH.cancelBill, menuH.computeStockRestoration, menuH.computeStockDeduction, menuH.setMenu, menuH.clearAllMenu, menuH.deleteItem]);
  
   const at = historyH.at;
   const doCSV = historyH.doCSV;
@@ -578,17 +599,17 @@ const executeConfirmDel = useCallback(() => {
 
         {/* Nav */}
         <div style={{display:"flex",gap:2,marginLeft:8}}>
-          {[{key:"menu",label:"Kasir",hotkey:"K"},{key:"bills",label:`Open Bill (${billsH.bills.filter(b=>b.status==="open").length})`,hotkey:"O"},{key:"history",label:`Riwayat (${historyH.history.length})`,hotkey:"R"},{key:"laporan",label:"Laporan",hotkey:"L"},{key:"kelola",label:"Menu",hotkey:"M"}].filter(b => authH.currentUser?.role === "admin" || ["menu","bills","history","laporan"].includes(b.key)).map(b=>(
-            <button key={b.key} onClick={()=>setView(b.key)} title={`Hotkey: ${b.hotkey}`} style={{padding:"4px 11px",borderRadius:5,border:"none",cursor:"pointer",fontFamily:"inherit",fontSize:11,fontWeight:600,background:view===b.key?G:"transparent",color:view===b.key?W:MT,transition:"all 0.15s"}}>
+          {[{key:"menu",label:"Kasir",hotkey:"K"},{key:"bills",label:`Open Bill (${billsH.bills.filter(b=>b.status==="open").length})`,hotkey:"O"},{key:"history",label:`Riwayat (${historyH.history.length})`,hotkey:"R"},{key:"laporan",label:"Laporan",hotkey:"L"},{key:"kelola",label:"Menu",hotkey:"M"}].filter(b => canAccessView(authH.currentUser, b.key)).map(b=>(
+            <button key={b.key} onClick={()=>navigate(b.key)} title={`Hotkey: ${b.hotkey}`} style={{padding:"4px 11px",borderRadius:5,border:"none",cursor:"pointer",fontFamily:"inherit",fontSize:11,fontWeight:600,background:view===b.key?G:"transparent",color:view===b.key?W:MT,transition:"all 0.15s"}}>
               {b.label}
             </button>
           ))}
         </div>
 
         <div style={{marginLeft:"auto",display:"flex",gap:6,alignItems:"center"}}>
-          <button onClick={() => settingsH.setSettingsModal(true)} title="Pengaturan" style={{padding:"4px 10px",background:LT,color:G,border:`1px solid ${BD}`,borderRadius:6,cursor:"pointer",fontFamily:"inherit",fontSize:10,fontWeight:600}}>
+          {isAdmin(authH.currentUser) && <button onClick={() => settingsH.setSettingsModal(true)} title="Pengaturan" style={{padding:"4px 10px",background:LT,color:G,border:`1px solid ${BD}`,borderRadius:6,cursor:"pointer",fontFamily:"inherit",fontSize:10,fontWeight:600}}>
             ⚙️ Pengaturan
-          </button>
+          </button>}
           {/* Shift badge */}
           {authH.activeShift&&(
             <div style={{fontSize:10,color:G,padding:"4px 9px",background:"#e8f5ee",borderRadius:5,border:"1px solid #a8d5b8",fontWeight:600}}>
@@ -614,6 +635,7 @@ const executeConfirmDel = useCallback(() => {
             search={menuH.search} setSearch={menuH.setSearch} displayMenu={menuH.displayMenu} cats={menuH.cats}
             cart={cartH.cart} drawerOpen={cartH.drawerOpen} setDrawerOpen={cartH.setDrawerOpen}
             receiptAdditionalValues={cartH.receiptAdditionalValues} receiptAdditionals={cartH.receiptAdditionals} updateReceiptAdditionalValue={cartH.updateReceiptAdditionalValue}
+            customerPicker={<CustomerPicker customers={customersH.customers} selectedCustomer={customersH.selectedCustomer} setSelectedCustomerId={customersH.setSelectedCustomerId} upsertCustomer={customersH.upsertCustomer} />}
             items={cartH.items} subtotal={cartH.subtotal} service={cartH.service} discount={cartH.discount}
             pajak={cartH.pajak} total={cartH.total} activeBill={cartH.activeBill}
             addToCart={cartH.addToCart} decCart={cartH.decCart} delCart={cartH.delCart} clearCart={cartH.clearCart}
@@ -648,6 +670,7 @@ const executeConfirmDel = useCallback(() => {
             expandedDays={historyH.expandedDays} setExpandedDays={historyH.setExpandedDays}
             doCSV={historyH.doCSV} at={historyH.at}
             setConfirmDel={setConfirmDel}
+            canDelete={isAdmin(authH.currentUser)}
             setReceipt={setReceipt}
             // New: shift-based view
             viewMode={historyH.viewMode} setViewMode={historyH.setViewMode}
@@ -660,8 +683,7 @@ const executeConfirmDel = useCallback(() => {
             totalCount={historyH.totalCount} currentPage={historyH.currentPage} pageSize={historyH.pageSize}
             isLoading={historyH.isLoading} hasMore={historyH.hasMore} loadMore={historyH.loadMore}
             refresh={historyH.refresh} loadAllForExport={historyH.loadAllForExport}
-            sortOrder={historyH.sortOrder} toggleSort={historyH.toggleSort}
-          />
+            sortOrder={historyH.sortOrder} toggleSort={historyH.toggleSort} voidProps={{ isVoiding: voidH.isVoiding, voidTrx: voidH.voidTrx, openVoidModal: voidH.openVoidModal }} />
         )}
 
         {/* ══════ LAPORAN VIEW ════════════════════════════════════════════ */}
@@ -682,7 +704,7 @@ const executeConfirmDel = useCallback(() => {
         )}
 
         {/* ══════ KELOLA MENU VIEW ════════════════════════════════════════ */}
-        {view==="kelola"&&(
+        {view==="kelola" && isAdmin(authH.currentUser) && (
           <ViewKelola
             menu={menuH.menu} cats={menuH.cats} allCats={menuH.allCats}
             setCatModal={menuH.setCatModal} openAdd={menuH.openAdd} openEdit={menuH.openEdit}
@@ -702,7 +724,10 @@ const executeConfirmDel = useCallback(() => {
       {/* ══ MODAL: PEMBAYARAN ══════════════════════════════════════════════ */}
       {payModal && (
         <PayModal cartH={cartH} processPayment={processPayment} setPayModal={setPayModal} paymentMethods={settingsH.settings.paymentMethods} receiptAdditionals={settingsH.settings.receiptAdditionals} />
-      )}
+        )}
+        
+        {/* VOID MODAL */}
+        {voidH && voidH.isVoiding && <VoidModal {...{ ...voidH, setVoidTargetId: (id) => typeof id === "function" ? id(voidH.setVoidTargetId) : voidH.setVoidTargetId(id) }} />}
 
       {/* ══ MODAL: RESI (klik transaksi atau setelah bayar) ════════════════ */}
       {receipt && (

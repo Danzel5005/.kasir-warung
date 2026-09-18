@@ -13,6 +13,7 @@ function ViewRiwayat({
   expandedDays, setExpandedDays,           // historyH
   doCSV, at,                               // historyH
   setConfirmDel,                           // App.jsx local
+  canDelete = false,
   setReceipt,                              // App.jsx local
   // New: shift-based view
   viewMode, setViewMode,                   // historyH
@@ -84,10 +85,10 @@ function ViewRiwayat({
         <div style={{ display:"flex", gap:7, alignItems:"center" }}>
           <span style={{ fontSize:9, color:MT }}>{t.jam}:{t.mnt}:{t.dtk}</span>
           <span style={{ fontSize:9, color:MT, fontStyle:"italic" }}>klik untuk lihat resi</span>
-          <button onClick={e => { e.stopPropagation(); setConfirmDel({type:"trx", id:t.id}); }}
+          {canDelete && <button onClick={e => { e.stopPropagation(); setConfirmDel({type:"trx", id:t.id}); }}
             style={{ background:"none", border:"none", cursor:"pointer", color:"#4b4b4b", fontSize:24, padding:0 }}>
             &times;
-          </button>
+          </button>}
         </div>
       </div>
       <div style={{ fontSize:10, color:MT, marginBottom:4 }}>
@@ -167,12 +168,12 @@ function ViewRiwayat({
               color:totalCount ? G : MT, border:`1px solid ${totalCount ? "#b8ddc8" : BD}`,
               borderRadius:5, cursor:totalCount ? "pointer" : "not-allowed",
               fontFamily:"inherit", fontSize:10, fontWeight:600 }}>Unduh CSV</button>
-          <button onClick={() => totalCount && setConfirmDel({type:"all"})}
+          {canDelete && <button onClick={() => totalCount && setConfirmDel({type:"all"})}
             disabled={!totalCount}
             style={{ padding:"4px 9px", background:totalCount ? "#fef0f0" : LT,
               color:totalCount ? "#e84040" : MT, border:`1px solid ${totalCount ? "#f5a8a8" : BD}`,
               borderRadius:5, cursor:totalCount ? "pointer" : "not-allowed",
-              fontFamily:"inherit", fontSize:10, fontWeight:600 }}>Hapus Semua</button>
+              fontFamily:"inherit", fontSize:10, fontWeight:600 }}>Hapus Semua</button>}
         </div>
         <div style={{ width:"100%", fontSize:10, color:MT }}>
           {totalCount} transaksi total · Menampilkan halaman {currentPage + 1} ({history.length} item) · Total: <b style={{ color:G }}>{fmt(history.reduce((s,t) => s + t.total, 0))}</b>

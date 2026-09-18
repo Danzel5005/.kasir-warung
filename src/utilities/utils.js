@@ -5,6 +5,13 @@ const api = {
   async deleteTrx(id)     { if(window.kasirAPI) return window.kasirAPI.deleteTrx(id); LS("ykk_trx",(LS("ykk_trx")||[]).filter(t=>t.id!==id)); },
   async restoreTrx(list)  { if(window.kasirAPI) return window.kasirAPI.restoreTrx(list); LS("ykk_trx",list); },
   async clearTrx()        { if(window.kasirAPI) return window.kasirAPI.clearTrx(); LS("ykk_trx",[]); },
+  async voidTrx(id, { reason, actor, note }) {
+    if(window.kasirAPI) return window.kasirAPI.voidTrx(id, { reason, actor, note });
+    const all = LS("ykk_trx") || [];
+    const updated = all.map(t => t.id === id ? { ...t, status: "voided", voidedAt: new Date().toISOString(), voidedBy: actor, voidReason: reason, voidNote: note } : t);
+    LS("ykk_trx", updated);
+    return { ok: true };
+  },
   
   // New: Filtered & paginated transactions (localStorage fallback)
   async loadTrxFiltered({ fFrom, fTo, shiftId, page = 0, pageSize = 100, sort = "desc" }) {
@@ -94,6 +101,8 @@ const api = {
   async loadQris()        { return window.kasirAPI ? await window.kasirAPI.loadQris?.()       : (LS("ykk_qris")||{}); },
   async loadUsers()       { return window.kasirAPI?.loadUsers ? await window.kasirAPI.loadUsers() : (LS("ykk_users")||[]); },
   async saveUsers(list)   { if(window.kasirAPI?.saveUsers) return window.kasirAPI.saveUsers(list); LS("ykk_users",list); },
+  async loadCustomers()   { return window.kasirAPI?.loadCustomers ? await window.kasirAPI.loadCustomers() : (LS("ykk_customers")||[]); },
+  async saveCustomers(list) { if(window.kasirAPI?.saveCustomers) return window.kasirAPI.saveCustomers(list); LS("ykk_customers",list); return { ok: true }; },
   async saveQris(map)     { if(window.kasirAPI?.saveQris) return window.kasirAPI.saveQris(map); LS("ykk_qris",map); },
   async deleteQris(key)   { if(window.kasirAPI?.deleteQris) return window.kasirAPI.deleteQris(key); const m=LS("ykk_qris")||{}; delete m[key]; LS("ykk_qris",m); },
 };
