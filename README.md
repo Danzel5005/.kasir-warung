@@ -130,7 +130,7 @@ Aplikasi memeriksa lisensi sebelum memuat workspace utama. Lisensi terikat ke ha
 - Hardware ID ditampilkan dalam format empat kelompok karakter.
 - License key dibuat untuk hardware ID tertentu menggunakan HMAC-SHA256 pada modul generator internal.
 - Lisensi yang aktif disimpan sebagai payload JSON yang di-encode Base64 di file `.ykk_lic` pada direktori user-data Electron.
-- Kunci lisensi dan `electron/license-secret.cjs` adalah artefak sensitif. Jangan menaruh secret produksi di repository publik.
+- Kunci lisensi dan `electron/license-secret.cjs` adalah artefak sensitif. Seharusnya jangan menaruh secret produksi di repository publik, tapi gapapalah.
 
 ## Teknologi dan Dependensi
 
@@ -447,4 +447,3 @@ Repository menyertakan file `LICENSE`. Pemilik dan kontak yang tercatat di `pack
 
 - Danzel Tampilang
 - `danzeltampilang@gmail.com`
-- `https://wa.me/6289502417252`
