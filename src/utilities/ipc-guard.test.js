@@ -108,7 +108,15 @@ describe("regresi: konstanta desain harus di-import", () => {
   const files = [
     "../components/BackupRestorePanel.jsx",
     "../components/ErrorBoundary.jsx",
-    "../components/modals/SettingsPanels.jsx",
+    "../components/modals/settings-tabs/PrinterSettingsTab.jsx",
+    "../components/modals/settings-tabs/WarungSettingsTab.jsx",
+    "../components/modals/settings-tabs/PaymentSettingsTab.jsx",
+    "../components/modals/settings-tabs/QrisSettingsTab.jsx",
+    "../components/modals/settings-tabs/ReceiptSettingsTab.jsx",
+    "../components/modals/settings-tabs/PricingSettingsTab.jsx",
+    "../components/modals/settings-tabs/BackupSettingsTab.jsx",
+    "../components/modals/settings-tabs/UsersSettingsTab.jsx",
+    "../components/modals/settings-tabs/shared.jsx",
     "../components/modals/SettingsModal.jsx",
     "../views/ViewKelola.jsx",
   ];

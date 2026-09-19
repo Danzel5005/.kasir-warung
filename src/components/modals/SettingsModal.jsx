@@ -9,7 +9,7 @@ import {
   PricingSettingsTab,
   BackupSettingsTab,
   UsersSettingsTab,
-} from "./SettingsPanels.jsx";
+} from "./settings-tabs/index.js";
 
 const SETTINGS_TABS = [
   ["printer", "Printer"],
