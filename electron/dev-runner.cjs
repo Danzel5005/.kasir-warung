@@ -26,29 +26,90 @@ const fs = require("fs");
 const ROOT = path.join(__dirname, "..");
 const WATCH_DIR = __dirname;
 const DEBOUNCE_MS = 250;
+// A stale-Electron lock crash happens before main.cjs can log anything and
+// returns almost immediately. These bounds let us tell it apart from a normal
+// window close (which is also code 0/1 but comes much later, after output).
+const FAST_EXIT_MS = 5000;
+const MAX_AUTO_RETRIES = 1;
 
 let child = null;
 let restartTimer = null;
 let shuttingDown = false;
+let sawOutput = false;
+let autoRetries = 0;
 
 function log(msg) {
   console.log(`[dev-runner] ${msg}`);
+}
+
+// Kill leftover Electron from THIS repo so a stale Chromium singleton lock
+// cannot make the next launch exit 1 with no output. Mirrors kill-electron.cjs
+// but runs in-process so the retry is immediate.
+function reapStaleElectron(done) {
+  if (process.platform !== "win32") return done();
+  const ps =
+    "Get-CimInstance Win32_Process -Filter \"Name='electron.exe'\" | " +
+    "Select-Object ProcessId,CommandLine | ConvertTo-Csv -NoTypeInformation";
+  const kill = spawn("powershell", ["-NoProfile", "-Command", ps], { stdio: ["ignore", "pipe", "ignore"] });
+  let out = "";
+  kill.stdout.on("data", (d) => { out += d.toString(); });
+  const finish = () => {
+    const root = ROOT.replace(/\\/g, "/").toLowerCase();
+    for (const line of out.split(/\r?\n/)) {
+      const m = line.match(/^"?(\d+)"?,"(.*)"\s*$/);
+      if (!m) continue;
+      const pid = Number(m[1]);
+      const cmd = m[2].replace(/""/g, '"').replace(/\\/g, "/").toLowerCase();
+      if (pid === process.pid) continue;
+      if (!cmd.includes(root)) continue;
+      try { spawn("taskkill", ["/pid", String(pid), "/T", "/F"], { stdio: "ignore" }); } catch { /* gone */ }
+    }
+    done();
+  };
+  kill.on("exit", finish);
+  kill.on("error", () => done());
+  setTimeout(finish, 3000);
 }
 
 function startElectron() {
   if (shuttingDown) return;
   log("starting electron...");
 
+  const startedAt = Date.now();
+  sawOutput = false;
+
   child = spawn(
     process.platform === "win32" ? "npx.cmd" : "npx",
     ["electron", "."],
-    { cwd: ROOT, stdio: "inherit", shell: process.platform === "win32" }
+    { cwd: ROOT, stdio: ["inherit", "pipe", "pipe"], shell: process.platform === "win32" }
   );
+
+  // Forward child output to our own streams, and remember that we saw some —
+  // that is what distinguishes a real startup from a stale-lock crash.
+  const forward = (stream, dest) => {
+    stream.on("data", (chunk) => {
+      sawOutput = true;
+      dest.write(chunk);
+    });
+  };
+  forward(child.stdout, process.stdout);
+  forward(child.stderr, process.stderr);
 
   child.on("exit", (code, signal) => {
     // If we killed it ourselves for a restart, ignore this exit.
     if (shuttingDown) return;
     if (restartTimer) return; // a pending restart owns the lifecycle
+
+    // Stale-lock signature: dies almost instantly, code 1, produced no output.
+    // Reap leftovers and retry once before giving up.
+    const fast = Date.now() - startedAt < FAST_EXIT_MS;
+    if (code === 1 && fast && !sawOutput && autoRetries < MAX_AUTO_RETRIES) {
+      autoRetries++;
+      log(`electron exited (code=1) with no output after ${Date.now() - startedAt}ms — likely a stale instance; clearing and retrying...`);
+      child = null;
+      return reapStaleElectron(() => startElectron());
+    }
+
     log(`electron exited (code=${code}, signal=${signal || "none"})`);
     shutdown(code ?? 0);
   });

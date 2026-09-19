@@ -13,6 +13,28 @@ let NodePrinterDriver = null;
 try { NodePrinterDriver = require("electron-printer"); }
 catch (err) { console.warn("[Main] electron-printer unavailable; continuing without legacy native printer driver:", err.message); }
 
+// ── Single-instance guard ───────────────────────────────────────────────────
+// A stale Electron left behind by Ctrl-C still holds Chromium's singleton lock
+// on userData. Without this, a second launch crashes at the C++ level with
+// exit code 1 and prints NOTHING (no [Main] logs), which looks like a broken
+// app. With the lock, the second instance exits cleanly and focuses the first.
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  console.log("[Main] Another instance is already running — focusing it and exiting.");
+  // app.quit() is asynchronous; without exiting here the rest of this module
+  // would still run (open the DB, create a second window) before the quit
+  // lands. Exit immediately instead — a second instance must do nothing.
+  app.quit();
+  process.exit(0);
+} else {
+  app.on("second-instance", () => {
+    const [win] = BrowserWindow.getAllWindows();
+    if (!win) return;
+    if (win.isMinimized()) win.restore();
+    win.focus();
+  });
+}
+
 const isDev = !app.isPackaged;
 const DATA_DIR = path.join(app.getPath("userData"), "data");
 const FILES = {
