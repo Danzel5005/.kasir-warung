@@ -149,6 +149,9 @@ function KasirWorkspace() {
 
   // ── Navigasi (UI-level, tidak dimiliki domain manapun)
   const [view, setView] = useState("menu");
+  // Info versi baru dari main process (lihat electron/update-check.cjs).
+  // null = tidak ada update / belum dicek.
+  const [updateInfo, setUpdateInfo] = useState(null);
 
   const navigate = useCallback((nextView) => {
     if (canAccessView(authH.currentUser, nextView)) setView(nextView);
@@ -269,6 +272,15 @@ function KasirWorkspace() {
 
   // ── Cek license dulu sebelum load data
   useEffect(() => { licenseH.checkLicenseOnLoad(); }, []);
+
+  // ── Info update: main process mengecek versi sekali saat app ready dan
+  // mengirim event bila ada versi lebih baru. Gagal/kosong = tidak ada banner.
+  useEffect(() => {
+    if (!window.kasirAPI?.onUpdateAvailable) return;
+    return window.kasirAPI.onUpdateAvailable((info) => {
+      if (info?.hasUpdate) setUpdateInfo(info);
+    });
+  }, []);
 
   // ── Load data (sekali saat mount) — distribusikan ke tiap hook
   useEffect(() => {
@@ -867,6 +879,20 @@ const executeConfirmDel = useCallback(() => {
       {toastH.toast&&(
         <div style={{position:"fixed",bottom:toastH.undoBuf?95:50,left:"50%",transform:"translateX(-50%)",background:toastH.toast.type==="ok"?"#e8f5ee":"#fef0f0",border:`1px solid ${toastH.toast.type==="ok"?"#a8d5b8":"#f5a8a8"}`,color:toastH.toast.type==="ok"?G:"#e84040",padding:"8px 16px",borderRadius:8,fontSize:11,fontWeight:600,zIndex:400,boxShadow:"0 4px 14px rgba(0,0,0,0.1)",whiteSpace:"nowrap"}}>
           {toastH.toast.msg}
+        </div>
+      )}
+
+      {/* ── BANNER: VERSI BARU TERSEDIA (info saja, tidak auto-download) ─── */}
+      {updateInfo && (
+        <div style={{position:"fixed",top:0,left:0,right:0,background:"#eef4ff",borderBottom:"1px solid #b9cdf5",color:"#1b3a6b",padding:"8px 14px",fontSize:11,fontWeight:600,zIndex:600,display:"flex",gap:10,alignItems:"center",justifyContent:"center",flexWrap:"wrap"}}>
+          <span>
+            Versi baru {updateInfo.latestVersion} tersedia (saat ini {updateInfo.currentVersion}).
+            {updateInfo.notes ? ` ${updateInfo.notes}` : ""}
+          </span>
+          {updateInfo.url && (
+            <a href={updateInfo.url} target="_blank" rel="noreferrer" style={{color:"#1b3a6b",fontWeight:700,textDecoration:"underline"}}>Unduh</a>
+          )}
+          <button onClick={() => setUpdateInfo(null)} style={{background:"transparent",border:"1px solid #b9cdf5",color:"#1b3a6b",borderRadius:5,padding:"2px 9px",cursor:"pointer",fontFamily:"inherit",fontSize:11,fontWeight:700}}>Tutup</button>
         </div>
       )}
     </div>

@@ -6,6 +6,8 @@ const { createBackupService } = require("./backup.cjs");
 const { createBackupRestoreService } = require("./backup-restore.cjs");
 const { createDatabaseService } = require("./db.cjs");
 const { createPrintingService } = require("./printing.cjs");
+const { registerAuthHandlers } = require("./auth-ipc.cjs");
+const { checkForUpdate } = require("./update-check.cjs");
 
 let NodePrinterDriver = null;
 try { NodePrinterDriver = require("electron-printer"); }
@@ -93,6 +95,13 @@ function startRawScannerFallback(win) {
 }
 
 registerFileHandlers();
+registerAuthHandlers({
+  ipcMain,
+  store: {
+    read: () => backup.rJSON(FILES.users) || [],
+    write: (list) => backup.atomicWrite(FILES.users, list),
+  },
+});
 database.registerHandlers();
 backupRestore.registerHandlers();
 registerLicenseHandlers();
@@ -119,6 +128,14 @@ app.whenReady().then(() => {
     backup.dailyBackup();
     createWindow();
   } catch (err) { console.error("[Main] Error during startup:", err); }
+  // Cek versi terbaru: best-effort, tidak pernah menggagalkan startup.
+  checkForUpdate()
+    .then((result) => {
+      if (!result?.hasUpdate) return;
+      const [win] = BrowserWindow.getAllWindows();
+      if (win) win.webContents.send("update-available", result);
+    })
+    .catch((err) => console.warn("[Update] Pemeriksaan versi dilewati:", err?.message || err));
   app.on("activate", () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
 });
 

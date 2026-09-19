@@ -30,6 +30,11 @@ const kasirAPI = {
   // Users
   loadUsers:   ()      => ipcRenderer.invoke("users-load"),
   saveUsers:   (list)  => ipcRenderer.invoke("users-save", list),
+  // Auth (password disimpan sebagai hash scrypt di main process)
+  authLogin:          (payload) => ipcRenderer.invoke("auth-login", payload),
+  authSetPassword:    (payload) => ipcRenderer.invoke("auth-set-password", payload),
+  authChangePassword: (payload) => ipcRenderer.invoke("auth-change-own-password", payload),
+  authCreateUser:     (payload) => ipcRenderer.invoke("auth-create-user", payload),
   loadCustomers: () => ipcRenderer.invoke("customers-load"),
   saveCustomers: (list) => ipcRenderer.invoke("customers-save", list),
   // Categories
@@ -67,6 +72,11 @@ const kasirAPI = {
     const listener = (_event, code) => callback(code);
     ipcRenderer.on("barcode-scanned", listener);
     return () => ipcRenderer.removeListener("barcode-scanned", listener);
+  },
+  onUpdateAvailable: (callback) => {
+    const listener = (_event, info) => callback(info);
+    ipcRenderer.on("update-available", listener);
+    return () => ipcRenderer.removeListener("update-available", listener);
   },
 };
 

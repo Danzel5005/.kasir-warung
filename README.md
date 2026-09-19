@@ -330,9 +330,26 @@ npm run test:watch
 npm run build
 ```
 
-Test unit utama berada di `src/utilities/` dan mencakup barcode, kalkulasi, category management, CSP, CSV, printer, receipt, stock, backup, ipc guard, dan utilitas IPC. Skrip `test-db.js`, `test-printer.js`, dan `test-app-printer.js` adalah pemeriksaan manual/integrasi terpisah dari script `npm test`.
+Test unit renderer berada di `src/utilities/` dan `src/hooks/`, mencakup barcode, kalkulasi, category management, CSP, CSV, printer, receipt, stock, backup, ipc guard, pemulihan sesi login, dan utilitas IPC.
 
-Perlu diperhatikan bahwa test unit tidak menjalankan Electron. Perubahan pada `electron/*.cjs` tidak ter-cover oleh `npm test`, sehingga bagian main process sebaiknya diverifikasi dengan `node --check` dan pengujian manual melalui `npm run electron:dev`.
+Test unit main process berada di `electron/` dan ikut dijalankan oleh `npm test`:
+
+| Berkas test | Cakupan |
+| --- | --- |
+| `electron/auth.test.cjs` | Hashing scrypt, verifikasi panjang-tetap, migrasi lazy dari plaintext, seluruh handler IPC `auth-*`. |
+| `electron/backup.test.cjs` | `atomicWrite`, `rJSON`, WAL append/clear/recover, backup harian dan pruning. |
+| `electron/db.test.cjs` | CRUD transaksi, void, filter/paginasi, agregasi harian, shifts, `process-payment`, migrasi JSON ke SQLite. |
+| `electron/backup-restore.test.cjs` | `stats`, `createBackup`, `previewBackup`, `restoreBackup` (termasuk safety snapshot), `listInternalBackups`, registrasi handler. |
+| `electron/license.test.cjs` | `generateKey`, aktivasi, penolakan key perangkat lain, lisensi rusak, hardware ID tidak terbaca. |
+| `electron/update-check.test.cjs` | `compareVersions`, deteksi versi baru, dan jaminan tidak melempar saat offline. |
+
+Catatan penting saat menambah test baru di `electron/`:
+
+- Modul main process memakai pola factory dengan dependency injection, jadi cukup menyuntik stub `ipcMain`/`app`/`dialog` — Electron asli tidak perlu dijalankan.
+- `better-sqlite3` di-rebuild untuk ABI Electron oleh script `postinstall`, sehingga binary-nya **tidak bisa** di-require dari Node yang dipakai Vitest. `electron/db.test.cjs` mengganti modul itu dengan implementasi in-memory lewat `require.cache` agar tes tetap deterministik.
+- Modul `electron` tidak bisa di-`vi.mock` dari test CJS karena `require` bawaan Node melewati mock registry Vitest. Untuk nilai yang bergantung runtime Electron, gunakan opsi injeksi seperti `getCurrentVersion` pada `update-check.cjs`.
+
+Skrip `test-db.js`, `test-printer.js`, dan `test-app-printer.js` adalah pemeriksaan manual/integrasi terpisah dari `npm test`. `electron/main.cjs` dan `electron/printing.cjs` belum punya test otomatis — keduanya butuh `BrowserWindow` asli, jadi tetap diverifikasi dengan `node --check` dan pengujian manual melalui `npm run electron:dev`.
 
 ## Build Installer Windows
 
@@ -366,9 +383,15 @@ File installer yang dihasilkan mengikuti versi `package.json`, sehingga nama fil
 6. Jalankan `npm run build` untuk memastikan renderer production berhasil dibundel.
 7. Jalankan `npm run electron:build` pada Windows x64 untuk membuat installer.
 8. Uji installer di komputer bersih: instalasi, startup, license screen, login, shift, tambah menu, transaksi, open bill, pembayaran, pelanggan, void transaksi, peringatan stok, laporan, ekspor CSV, backup dan restore, dan printing.
-9. Uji printer thermal pada lebar yang dipakai dan uji printer PDF secara terpisah.
-10. Simpan installer dan checksum internal sesuai prosedur distribusi. Jangan memasukkan license secret atau license key pelanggan ke repository.
-11. Saat upgrade pada komputer pengguna, tutup aplikasi lebih dahulu, pasang installer baru, lalu verifikasi data dan lisensi. Migrasi JSON ke SQLite dilakukan saat startup dan membuat salinan migrasi di `json-backups`.
+9. Verifikasi fitur berikut sebelum distribusi:
+	- **Void transaksi**: lakukan void pada satu transaksi sebagai admin, pastikan transaksi tetap tampil dengan penanda void dan alasan, bukan terhapus, dan tidak lagi dihitung pada total laporan.
+	- **Pelanggan pada nota**: pilih pelanggan, selesaikan penjualan, lalu pastikan baris `PELANGGAN` muncul di nota thermal dan preview (format `Nama (telepon)` bila nomor tersedia). Setelah pembayaran selesai, pastikan pilihan pelanggan tereset untuk transaksi berikutnya.
+	- **Peringatan stok**: atur "Batas Stok Menipis" di Settings → Pricing, pastikan panel peringatan stok muncul di Kelola Menu dan ekspor daftar restock (CSV) berisi item yang perlu ditambah.
+	- **Ekspor CSV bebas void**: ekspor dari Riwayat dan Laporan, lalu pastikan transaksi yang sudah di-void tidak ikut menyumbang angka pada file CSV.
+	- **Backup & Restore**: buat backup dari Settings → Backup, pulihkan dari file, dan pastikan aplikasi meminta restart, data kembali utuh, serta snapshot pengaman `pre-restore_<stamp>.json` terbentuk.
+10. Uji printer thermal pada lebar yang dipakai dan uji printer PDF secara terpisah.
+11. Simpan installer dan checksum internal sesuai prosedur distribusi. Jangan memasukkan license secret atau license key pelanggan ke repository.
+12. Saat upgrade pada komputer pengguna, tutup aplikasi lebih dahulu, pasang installer baru, lalu verifikasi data dan lisensi. Migrasi JSON ke SQLite dilakukan saat startup dan membuat salinan migrasi di `json-backups`.
 
 ## Pemeliharaan dan Troubleshooting
 

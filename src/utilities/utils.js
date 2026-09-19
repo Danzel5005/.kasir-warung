@@ -142,6 +142,43 @@ const api = {
   async loadQris()        { return window.kasirAPI ? await window.kasirAPI.loadQris?.()       : (LS("ykk_qris")||{}); },
   async loadUsers()       { return window.kasirAPI?.loadUsers ? await window.kasirAPI.loadUsers() : (LS("ykk_users")||[]); },
   async saveUsers(list)   { if(window.kasirAPI?.saveUsers) return window.kasirAPI.saveUsers(list); LS("ykk_users",list); },
+
+  // --- Auth (password di-hash scrypt di main process) -----------------------
+  // Di browser dev (tanpa Electron) tidak ada main process: verifikasi dilakukan
+  // apa adanya terhadap localStorage supaya UI tetap bisa dicoba.
+  async authLogin({ username, password } = {}) {
+    if (window.kasirAPI?.authLogin) return safeIpc("Login", () => window.kasirAPI.authLogin({ username, password }));
+    const users = LS("ykk_users") || [];
+    const uname = String(username ?? "").trim();
+    const found = users.find(u => String(u?.username ?? "").trim() === uname && u?.password === password);
+    if (!found) return { ok: false, reason: "wrong-password" };
+    const { password: _pw, ...safeUser } = found;
+    return { ok: true, user: safeUser, migrated: false };
+  },
+  async authCreateUser({ user } = {}) {
+    if (window.kasirAPI?.authCreateUser) return safeIpc("Tambah pengguna", () => window.kasirAPI.authCreateUser({ user }));
+    const users = LS("ykk_users") || [];
+    const uname = String(user?.username ?? "").trim();
+    if (!uname || users.some(u => String(u?.username ?? "").trim() === uname)) return { ok: false, reason: "duplicate" };
+    LS("ykk_users", [...users, { ...user, username: uname }]);
+    return { ok: true };
+  },
+  async authSetPassword({ username, newPassword } = {}) {
+    if (window.kasirAPI?.authSetPassword) return safeIpc("Ubah password", () => window.kasirAPI.authSetPassword({ username, newPassword }));
+    const uname = String(username ?? "").trim();
+    const users = (LS("ykk_users") || []).map(u => String(u?.username ?? "").trim() === uname ? { ...u, password: newPassword } : u);
+    LS("ykk_users", users);
+    return { ok: true };
+  },
+  async authChangePassword({ username, oldPassword, newPassword } = {}) {
+    if (window.kasirAPI?.authChangePassword) return safeIpc("Ganti password", () => window.kasirAPI.authChangePassword({ username, oldPassword, newPassword }));
+    const uname = String(username ?? "").trim();
+    const users = LS("ykk_users") || [];
+    const found = users.find(u => String(u?.username ?? "").trim() === uname);
+    if (!found || found.password !== oldPassword) return { ok: false, reason: "wrong-password" };
+    LS("ykk_users", users.map(u => String(u?.username ?? "").trim() === uname ? { ...u, password: newPassword } : u));
+    return { ok: true };
+  },
   async loadCustomers()   { return window.kasirAPI?.loadCustomers ? await window.kasirAPI.loadCustomers() : (LS("ykk_customers")||[]); },
   async saveCustomers(list) { if(window.kasirAPI?.saveCustomers) return window.kasirAPI.saveCustomers(list); LS("ykk_customers",list); return { ok: true }; },
   async saveQris(map)     { if(window.kasirAPI?.saveQris) return window.kasirAPI.saveQris(map); LS("ykk_qris",map); },

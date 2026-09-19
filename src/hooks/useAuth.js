@@ -58,6 +58,11 @@ function useAuth({ getNow, toast_ }) {
     // Load users: jika storage kosong, pakai default
     const userList = savedUsers && savedUsers.length ? savedUsers : DEFAULT_USERS;
     setUsers(userList);
+    // First-run: tulis user default (dengan password TER-HASH) ke storage lewat
+    // main process. Tanpa ini, store tetap kosong dan hash baru dibuat saat login.
+    if (!savedUsers || !savedUsers.length) {
+      Promise.all(DEFAULT_USERS.map((user) => api.authCreateUser({ user }))).catch(() => { /* lazy-migration saat login tetap jadi fallback */ });
+    }
 
     // Restore sesi login. Hanya dipulihkan bila shift masih terbuka — kalau
     // shift sudah ditutup, user memang diminta login lagi (lihat showLoginScreen
@@ -78,12 +83,24 @@ function useAuth({ getNow, toast_ }) {
     }
   }, []);
 
-  // PENTING: membaca loginForm, users, dan shifts LANGSUNG dari closure. Wajib
-  // [loginForm, users, shifts, getNow] di deps — tanpa shifts, nomor urut shift
-  // berjalan (shiftNum) akan selalu dihitung dari snapshot shifts kosong.
+  // PENTING: membaca loginForm, shifts, dan getNow LANGSUNG dari closure.
+  // Verifikasi password sekarang dilakukan di MAIN PROCESS (scrypt hash);
+  // renderer tidak lagi membandingkan password mentah.
   const doLogin = useCallback(async () => {
-    const u = users.find(u => u.username === loginForm.username.trim() && u.password === loginForm.password);
-    if (!u) { setLoginForm(f => ({ ...f, error: "Username atau password salah" })); return false; }
+    const result = await api.authLogin({ username: loginForm.username, password: loginForm.password });
+    if (!result?.ok || !result.user) {
+      setLoginForm(f => ({ ...f, error: "Username atau password salah" }));
+      return false;
+    }
+    const u = result.user;
+    // Migrasi lazy: password lama (plaintext) baru di-hash setelah login sukses,
+    // jadi daftar `users` di state perlu disegarkan agar tidak menyimpan nilai basi.
+    if (result.migrated) {
+      try {
+        const fresh = await api.loadUsers();
+        if (Array.isArray(fresh)) setUsers(fresh);
+      } catch { /* tidak fatal: verifikasi berikutnya tetap lewat main process */ }
+    }
     const t = getNow();
     const todayKey = `${t.tgl}-${t.blnNum}-${t.thn}`;
     // Nomor shift berjalan GLOBAL (lanjut antar hari), bukan per hari.
@@ -114,7 +131,7 @@ function useAuth({ getNow, toast_ }) {
     LS(SESSION_KEY, u.username);
     setLoginForm({ username: "", password: "", error: "" });
     return true;
-  }, [loginForm, users, shifts, getNow]);
+  }, [loginForm, shifts, getNow]);
 
   const updateShift = useCallback(async (shiftId, patch, sourceShifts = shifts) => {
     if (!shiftId) return false;
@@ -169,8 +186,15 @@ function useAuth({ getNow, toast_ }) {
       return false;
     }
     const newUser = { username: username.trim(), password, nama: nama.trim(), role: "cashier" };
-    const next = [...users, newUser];
-    await api.saveUsers(next);
+    // Password di-hash di main process — JANGAN tulis password mentah ke store.
+    const result = await api.authCreateUser({ user: newUser });
+    if (result?.ok === false) {
+      toast_("Gagal menambah pengguna", "err");
+      return false;
+    }
+    // Simpan salinan tanpa password di state renderer (state hanya untuk tampilan).
+    const { password: _pw, ...safeUser } = newUser;
+    const next = [...users, safeUser];
     setUsers(next);
     toast_(`Pengguna "${nama}" ditambahkan`, "ok");
     return true;
@@ -227,23 +251,18 @@ function useAuth({ getNow, toast_ }) {
       toast_("Password akun admin tidak dapat diubah dari daftar pengguna", "err");
       return false;
     }
-    const next = users.map((user) => user.username === targetUsername ? { ...user, password } : user);
-    const result = await api.saveUsers(next);
+    // Password di-hash di main process; state renderer tidak menyimpan password.
+    const result = await api.authSetPassword({ username: targetUsername, newPassword: password });
     if (result?.ok === false) {
-      toast_(result.error || "Gagal mengubah password", "err");
+      toast_("Gagal mengubah password", "err");
       return false;
     }
-    setUsers(next);
     toast_(`Password akun "${targetUsername}" berhasil diubah`, "ok");
     return true;
   }, [currentUser, users, toast_]);
 
   const changeOwnPassword = useCallback(async (currentPassword, newPassword, confirmation) => {
     if (!currentUser) return false;
-    if (String(currentPassword || "") !== String(currentUser.password || "")) {
-      toast_("Password saat ini salah", "err");
-      return false;
-    }
     const password = String(newPassword || "").trim();
     if (password.length < 4) {
       toast_("Password minimal 4 karakter", "err");
@@ -253,15 +272,16 @@ function useAuth({ getNow, toast_ }) {
       toast_("Konfirmasi password tidak sama", "err");
       return false;
     }
-    const next = users.map((user) => user.username === currentUser.username ? { ...user, password } : user);
-    const result = await api.saveUsers(next);
+    // Verifikasi password lama + penulisan hash keduanya di main process.
+    const result = await api.authChangePassword({
+      username: currentUser.username,
+      oldPassword: String(currentPassword || ""),
+      newPassword: password,
+    });
     if (result?.ok === false) {
-      toast_(result.error || "Gagal mengubah password", "err");
+      toast_(result.reason === "wrong-password" ? "Password saat ini salah" : "Gagal mengubah password", "err");
       return false;
     }
-    const updated = next.find((user) => user.username === currentUser.username);
-    setUsers(next);
-    setCurrentUser(updated);
     toast_("Password Anda berhasil diubah", "ok");
     return true;
   }, [currentUser, users, toast_]);
