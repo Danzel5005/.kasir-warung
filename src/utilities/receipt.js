@@ -127,7 +127,7 @@ const buildCategoryTotals = (items, cats = []) => {
   return { taggedCategories, untaggedCategories };
 };
 
-function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName, cats = [], warungAddress = "", warungPhone = "", paymentMethods = [], paperWidthMm = DEFAULT_PAPER_WIDTH_MM) {
+function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName, cats = [], warungAddress = "", warungPhone = "", paymentMethods = [], paperWidthMm = DEFAULT_PAPER_WIDTH_MM, customerEnabled = true) {
   // Use stored tax/service from transaction (no recalculation)
   const pajak = trx.pajak || 0;
   const service = trx.service || 0;
@@ -145,8 +145,8 @@ function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName,
   const operatorName = trx.operator || "Kasir"; // [2] dynamic operator name from transaction
   // GAP 5 — customer/member. Denormalized on the trx, so an old receipt keeps
   // showing the name that was correct at the time of sale.
-  const customerName = (trx.customerNama || "").trim();
-  const customerPhone = (trx.customerTelepon || "").trim();
+  const customerName = customerEnabled ? (trx.customerNama || "").trim() : "";
+  const customerPhone = customerEnabled ? (trx.customerTelepon || "").trim() : "";
   const customerLine = customerName
     ? `<div class="kv"><span class="k">PELANGGAN</span><span class="v">${customerName}${customerPhone ? ` (${customerPhone})` : ""}</span></div>`
     : "";

@@ -36,6 +36,7 @@ function useSettings({ toast_, onChange }) {
     discounts: [],
     pajak: { enabled: false, value: 0 },
     service: { enabled: false, value: 0 },
+    customerEnabled: true,
   });
   const [settingsModal, setSettingsModal] = useState(false);
   const [printerModal, setPrinterModal] = useState(false);
@@ -85,6 +86,8 @@ function useSettings({ toast_, onChange }) {
     // Ensure new fields exist
     if (!s.warungAddress) s.warungAddress = "";
     if (!s.warungPhone) s.warungPhone = "";
+    // Customer/member feature — enabled by default, must be a boolean
+    if (typeof s.customerEnabled !== "boolean") s.customerEnabled = true;
     // Receipt paper width — migrate older settings; invalid values fall back to 80mm
     const pw = Math.round(Number(s.receiptPaperWidthMm));
     if (!Number.isFinite(pw) || pw < 30 || pw > 210) s.receiptPaperWidthMm = 80;
@@ -327,6 +330,18 @@ function useSettings({ toast_, onChange }) {
     toast_("Nomor telepon warung disimpan", "ok");
   }, [settings, toast_]);
 
+  // Customer/member feature toggle — when off, the customer picker, the
+  // "Pelanggan" block in the bill detail, and the PELANGGAN receipt line
+  // are all hidden. Defaults to enabled for backward compatibility.
+  const setCustomerEnabled = useCallback(async (enabled) => {
+    const next = !!enabled;
+    const s = { ...settings, customerEnabled: next };
+    await api.saveSettings(s);
+    setSettings(s);
+    onChange?.(s);
+    toast_(next ? "Fitur pelanggan diaktifkan" : "Fitur pelanggan dimatikan", "ok");
+  }, [settings, toast_, onChange]);
+
   // Receipt paper width (@page size) — clamped to 30–210mm, falls back to 80mm
   const setReceiptPaperWidth = useCallback(async (mm) => {
     const n = Math.round(Number(mm));
@@ -380,6 +395,7 @@ function useSettings({ toast_, onChange }) {
     handleQrisImageUpload, deleteQrisImage,
     toggleReceiptAdditionalRequired, deleteReceiptAdditional, addReceiptField,
     setWarungName, setWarungAddress, setWarungPhone,
+    setCustomerEnabled,
     setReceiptPaperWidth,
     setLowStockThreshold,
     savePricing,

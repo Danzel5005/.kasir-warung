@@ -153,6 +153,17 @@ describe("receipt.js - Receipt utilities and HTML builders", () => {
       const html = buildReceiptHTML({ ...mockTrxCash, customerNama: "   " }, null, [], {});
       expect(html).not.toContain("PELANGGAN");
     });
+
+    it("should omit the PELANGGAN row when the customer feature is disabled", () => {
+      const html = buildReceiptHTML(
+        { ...mockTrxCash, customerNama: "Budi Santoso", customerTelepon: "08123456789" },
+        null, [], {}, null, [], "", "", [], 80, false
+      );
+      expect(html).not.toContain("PELANGGAN");
+      expect(html).not.toContain("Budi Santoso");
+      expect(html).toContain("KASIR");
+      expect(html).toContain("METODE");
+    });
   });
 
   describe("buildPreviewHTML", () => {

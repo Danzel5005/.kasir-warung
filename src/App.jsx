@@ -330,7 +330,8 @@ function KasirWorkspace() {
     persistBills: billsH.persistBills, setBillId: billsH.setBillId,
     computeStockDeduction: menuH.computeStockDeduction,
     commitMenu: menuH.setMenu,
-  }), [cartH.saveOpenBill, billsH.bills, billsH.billId, billsH.persistBills, billsH.setBillId, menuH.computeStockDeduction, menuH.setMenu]);
+    customer: customersH.selectedCustomer, // denormalized into the open bill
+  }), [cartH.saveOpenBill, billsH.bills, billsH.billId, billsH.persistBills, billsH.setBillId, menuH.computeStockDeduction, menuH.setMenu, customersH.selectedCustomer]);
 
   // processPayment butuh potongan dari useHistory, useMenu, useAuth, useBills
   // FIX: Use cartH.activeBill?.id directly to avoid race condition with setTimeout
@@ -380,6 +381,7 @@ const printReceipt = useCallback(async (trx) => {
       warungPhone: settingsH.settings.warungPhone,
       operatorName: trx.operator,
       cats: menuH.cats,
+      customerEnabled: settingsH.settings.customerEnabled !== false,
     });
     if (res?.ok) toastH.toast_("Selesai Mencetak Resi", "ok");
     else toastH.toast_(res?.error || "Gagal cetak thermal", "err");
@@ -387,15 +389,15 @@ const printReceipt = useCallback(async (trx) => {
   }
 
   if (selection.isPdf) {
-    const html = buildReceiptHTML(trx, settingsH.logo, settingsH.settings.receiptAdditionals, settingsH.settings.qrisImages, settingsH.settings.warungName, menuH.cats, settingsH.settings.warungAddress, settingsH.settings.warungPhone, settingsH.settings.paymentMethods, settingsH.settings.receiptPaperWidthMm);
+    const html = buildReceiptHTML(trx, settingsH.logo, settingsH.settings.receiptAdditionals, settingsH.settings.qrisImages, settingsH.settings.warungName, menuH.cats, settingsH.settings.warungAddress, settingsH.settings.warungPhone, settingsH.settings.paymentMethods, settingsH.settings.receiptPaperWidthMm, settingsH.settings.customerEnabled !== false);
     const res = await settingsH.printHTML(html, "Selesai Mencetak Resi");
     return res;
   }
 
-  const html = buildReceiptHTML(trx, settingsH.logo, settingsH.settings.receiptAdditionals, settingsH.settings.qrisImages, settingsH.settings.warungName, menuH.cats, settingsH.settings.warungAddress, settingsH.settings.warungPhone, settingsH.settings.paymentMethods, settingsH.settings.receiptPaperWidthMm);
+  const html = buildReceiptHTML(trx, settingsH.logo, settingsH.settings.receiptAdditionals, settingsH.settings.qrisImages, settingsH.settings.warungName, menuH.cats, settingsH.settings.warungAddress, settingsH.settings.warungPhone, settingsH.settings.paymentMethods, settingsH.settings.receiptPaperWidthMm, settingsH.settings.customerEnabled !== false);
   const res = await settingsH.printHTML(html, "Selesai Mencetak Resi");
   return res;
-}, [settingsH.logo, settingsH.printHTML, settingsH.settings.printerName, settingsH.settings.receiptAdditionals, settingsH.settings.qrisImages, settingsH.settings.warungName, settingsH.settings.warungAddress, settingsH.settings.warungPhone, menuH.cats, settingsH.settings.paymentMethods, settingsH.settings.receiptPaperWidthMm, toastH.toast_]);
+}, [settingsH.logo, settingsH.printHTML, settingsH.settings.printerName, settingsH.settings.receiptAdditionals, settingsH.settings.qrisImages, settingsH.settings.warungName, settingsH.settings.warungAddress, settingsH.settings.warungPhone, menuH.cats, settingsH.settings.paymentMethods, settingsH.settings.receiptPaperWidthMm, settingsH.settings.customerEnabled, toastH.toast_]);
 
   // printPreview — depend ke cart (items/receiptAdditionalValues), pakai printHTML generic dari settings
   // PENTING: membaca cartH.items/receiptAdditionalValues dan settingsH.logo langsung. Semua wajib di deps.
@@ -410,14 +412,23 @@ const printReceipt = useCallback(async (trx) => {
     }
   }, [cartH.items, cartH.receiptAdditionalValues, cartH.pricingConfig, cartH.paidNum, cartH.metode, toastH.toast_, settingsH.logo, settingsH.printHTML, settingsH.settings.receiptAdditionals, settingsH.settings.warungName, settingsH.settings.warungAddress, settingsH.settings.warungPhone, menuH.cats, settingsH.settings.receiptPaperWidthMm]);
 
+  // loadBillToCart (wrapped) — selain mengisi cart, juga memulihkan pelanggan
+  // yang tersimpan di bill. useCart.loadBillToCart sengaja tetap "murni"
+  // (hanya cart) karena customers dimiliki useCustomers, bukan useCart.
+  // Memulihkan customer di sini menjaga satu sumber kebenaran (App.jsx).
+  const loadBillToCart = useCallback((bill) => {
+    cartH.loadBillToCart(bill);
+    customersH.setSelectedCustomerId(bill?.customerId || null);
+  }, [cartH.loadBillToCart, customersH.setSelectedCustomerId]);
+
   // Dipanggil dari tombol "Bayar" di Open Bill view — pola setTimeout
   // DIPERTAHANKAN PERSIS dari kode asli (lihat catatan di useCart.js bagian
   // atas perihal bug race condition yang belum di-root-cause).
   const loadBillAndPay = useCallback((bill) => {
-    cartH.loadBillToCart(bill);
+    loadBillToCart(bill);
     navigate("menu");
     setTimeout(() => setPayModal(true), 300);
-  }, [cartH.loadBillToCart, navigate]);
+  }, [loadBillToCart, navigate]);
 
   // confirmDel dispatcher — menggantikan switch-case yang dulu inline di modal konfirmasi
   // PENTING: membaca confirmDel langsung dari closure. Wajib di deps, atau
@@ -657,6 +668,7 @@ const executeConfirmDel = useCallback(() => {
             cart={cartH.cart} drawerOpen={cartH.drawerOpen} setDrawerOpen={cartH.setDrawerOpen}
             receiptAdditionalValues={cartH.receiptAdditionalValues} receiptAdditionals={cartH.receiptAdditionals} updateReceiptAdditionalValue={cartH.updateReceiptAdditionalValue}
             customerPicker={<CustomerPicker customers={customersH.customers} selectedCustomer={customersH.selectedCustomer} setSelectedCustomerId={customersH.setSelectedCustomerId} upsertCustomer={customersH.upsertCustomer} />}
+            customerEnabled={settingsH.settings.customerEnabled !== false}
             items={cartH.items} subtotal={cartH.subtotal} service={cartH.service} discount={cartH.discount}
             pajak={cartH.pajak} total={cartH.total} activeBill={cartH.activeBill}
             addToCart={cartH.addToCart} decCart={cartH.decCart} delCart={cartH.delCart} clearCart={cartH.clearCart}
@@ -671,12 +683,13 @@ const executeConfirmDel = useCallback(() => {
         {view==="bills"&&(
           <ViewOpenBill
             bills={billsH.bills}
-            loadBillToCart={cartH.loadBillToCart}
+            loadBillToCart={loadBillToCart}
             setView={setView}
             loadBillAndPay={loadBillAndPay}
             setConfirmDel={setConfirmDel}
             settingsH={settingsH}
             pricingConfig={cartH.pricingConfig}
+            customerEnabled={settingsH.settings.customerEnabled !== false}
           />
         )}
 

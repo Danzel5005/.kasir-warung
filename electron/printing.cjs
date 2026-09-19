@@ -91,14 +91,14 @@ function createPrintingService({ app, ipcMain, BrowserWindow, dialog, dataDir, e
     return "";
   };
   const kvLine = (printer, label, value) => printer.leftRight(label, value);
-  const buildEscPosReceipt = (printer, trx, warungName, warungAddress, warungPhone, operatorName, cats = []) => {
+  const buildEscPosReceipt = (printer, trx, warungName, warungAddress, warungPhone, operatorName, cats = [], customerEnabled = true) => {
     const storeName = warungName || trx.warungName || "Warung";
     printer.alignCenter(); printer.bold(true); printer.setTextDoubleHeight(); printer.println(storeName); printer.setTextNormal(); printer.resetLineSpacing(); printer.bold(false);
     if (warungAddress || trx.warungAddress) printer.println(warungAddress || trx.warungAddress);
     if (warungPhone || trx.warungPhone) printer.println(`Telp: ${warungPhone || trx.warungPhone}`);
     printer.println(`${trx.hari}, ${trx.tgl} ${trx.bln} ${trx.thn} - ${trx.jam}:${trx.mnt}:${trx.dtk}`); printer.alignLeft(); printer.drawLine();
     kvLine(printer, "NO TRX", trx.id); kvLine(printer, "KASIR", operatorName || trx.operator || "Kasir");
-    if ((trx.customerNama || "").trim()) {
+    if (customerEnabled && (trx.customerNama || "").trim()) {
       const phone = (trx.customerTelepon || "").trim();
       kvLine(printer, "PELANGGAN", `${trx.customerNama}${phone ? ` (${phone})` : ""}`);
     }
@@ -115,14 +115,14 @@ function createPrintingService({ app, ipcMain, BrowserWindow, dialog, dataDir, e
     if (!driver?.printDirect) throw new Error("Driver printer RAW tidak tersedia");
     for (let offset = 0; offset < buffer.length; offset += 512) { await printDirect(driver, printerName, buffer.subarray(offset, Math.min(offset + 512, buffer.length))); if (offset + 512 < buffer.length) await new Promise((resolve) => setTimeout(resolve, 25)); }
   };
-  ipcMain.handle("print-receipt-escpos", async (_e, { trx, printerName, paperWidthMm, warungName, warungAddress, warungPhone, operatorName, cats = [] }) => {
+  ipcMain.handle("print-receipt-escpos", async (_e, { trx, printerName, paperWidthMm, warungName, warungAddress, warungPhone, operatorName, cats = [], customerEnabled = true }) => {
     const selectedName = printerName || "auto";
     try {
       const paperW = normalizePaperWidthMm(paperWidthMm);
       if (!selectedName || /pdf/i.test(selectedName)) return { ok: false, error: "Printer yang dipilih bukan printer thermal. Pilih printer thermal fisik atau gunakan printer sistem/PDF." };
       const printer = new ThermalPrinter({ type: PrinterTypes.EPSON, interface: selectedName === "auto" ? "printer:auto" : `printer:${selectedName}`, ...(nodePrinterDriver ? { driver: nodePrinterDriver } : {}), width: charsPerLineForWidth(paperW), removeSpecialCharacters: false, options: { timeout: 5000 } });
       if (!await printer.isPrinterConnected()) return { ok: false, error: `Printer tidak ditemukan 404: "${selectedName}" tidak terhubung. Pastikan printer terhubung dan driver terinstall.` };
-      buildEscPosReceipt(printer, trx, warungName, warungAddress, warungPhone, operatorName, [...cats, ...(rJSON(files.cats) || [])]);
+      buildEscPosReceipt(printer, trx, warungName, warungAddress, warungPhone, operatorName, [...cats, ...(rJSON(files.cats) || [])], customerEnabled);
       await executeEscPosInChunks(printer, printer.Interface.getPrinterName());
       console.log("[ESC/POS] Print successful to:", selectedName);
       return { ok: true };

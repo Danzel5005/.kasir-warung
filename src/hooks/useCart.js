@@ -142,11 +142,21 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
   // yang jauh lebih parah dari yang sedang kita selidiki.
   const saveOpenBill = useCallback(async ({ 
     bills, billId, persistBills, setBillId,
-    computeStockDeduction, commitMenu  // NEW: for stock deduction
+    computeStockDeduction, commitMenu,  // NEW: for stock deduction
+    customer = null, // Selected customer/member snapshot (denormalized into bill)
   }) => {
     if (!items.length || !checkRequiredAdditionals(receiptAdditionals)) { toast_("Isi field wajib dan pesanan dulu", "err"); return; }
     const t = getNow();
     
+    // Customer is DENORMALIZED (name/phone copied, not just id) into the bill
+    // so the open-bill detail stays readable even if the customer record is
+    // later renamed or removed. Mirrors processPayment's trx snapshot.
+    const customerData = {
+      customerId: customer?.id || null,
+      customerNama: customer?.name || "",
+      customerTelepon: customer?.phone || "",
+    };
+
     // Build receipt additional values for the bill
     const receiptAdditionalData = {};
     if (receiptAdditionals) {
@@ -186,7 +196,7 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
       
       updatedBills = bills.map(b =>
         String(b.id) === String(activeBill.id)
-          ? { ...b, items: [...items], updatedAt: t.timestamp, ...receiptAdditionalData }
+          ? { ...b, items: [...items], updatedAt: t.timestamp, ...customerData, ...receiptAdditionalData }
           : b
       );
       toast_('Open Bill diperbarui', "ok");
@@ -198,7 +208,7 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
         return acc;
       }, {});
       
-      const bill = { id: billId, items: [...items], createdAt: t.timestamp, updatedAt: t.timestamp, status: "open", ...receiptAdditionalData };
+      const bill = { id: billId, items: [...items], createdAt: t.timestamp, updatedAt: t.timestamp, status: "open", ...customerData, ...receiptAdditionalData };
       updatedBills = [...bills, bill];
       setBillId(n => n + 1);
       toast_('Open Bill dibuat', "ok");

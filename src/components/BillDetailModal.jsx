@@ -8,6 +8,8 @@ import { Tag } from "./Tag.jsx";
 export default function BillDetailModal({
   bill,
   receiptAdditionals = [],
+  pricingConfig = {},
+  customerEnabled = true,
   onClose,
   onAddOrder,
   onPay,
@@ -35,7 +37,9 @@ export default function BillDetailModal({
   }, [onClose]);
 
   const sub = bill.items?.reduce((s, i) => s + (i.harga || 0) * (i.qty || 0), 0) || 0;
-  const { pajak: p, service: s, total: tot } = calcPrice(sub);
+  // Must mirror ViewOpenBill: pass bill.items + pricingConfig, otherwise the
+  // modal would show different discount/tax/service/total than the bill card.
+  const { pajak: p, service: s, discount: disc, total: tot } = calcPrice(sub, { ...pricingConfig, items: bill.items || [] });
   const itemCount = bill.items?.reduce((sum, i) => sum + (i.qty || 0), 0) || 0;
   const created = new Date(bill.createdAt);
   const timeStr = created.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
@@ -47,19 +51,26 @@ export default function BillDetailModal({
       .filter(f => f.category === "receipt" && f.visible !== false)
       .map(field => {
         const val = bill[field.key];
-        if (val === undefined || val === null || val === "") return null;
+        // Keep the row even when empty so the cashier can SEE that the field
+        // exists (and was not filled) — hiding it made the modal look like
+        // the receipt additionals were lost.
+        const isEmpty = val === undefined || val === null || val === "";
         // Use field's icon if available, otherwise default
         let icon = field.icon || "📋";
         // Fallback icons for common fields
         if (field.key === "tableNum" || field.key === "nomor_meja") icon = "🪑";
         else if (field.key === "jumlah_pax") icon = "👥";
         else if (field.key === "catatan") icon = "📝";
-        return { label: field.label, value: val, icon };
+        return { label: field.label, value: isEmpty ? "—" : val, icon, isEmpty };
       })
       .filter(Boolean);
   };
 
   const receiptFields = formatReceiptAdditionals();
+
+  // Customer/member snapshot denormalized on the bill (see useCart.saveOpenBill).
+  const customerNama = (bill?.customerNama || "").trim();
+  const customerTelepon = (bill?.customerTelepon || "").trim();
 
   return (
     <div
@@ -135,6 +146,7 @@ export default function BillDetailModal({
             </div>
             <div style={{ fontSize: TYPOGRAPHY.caption.fontSize, color: MT }}>
               {dateStr} • {timeStr}
+              {customerEnabled && customerNama && <> • 👤 {customerNama}</>}
             </div>
           </div>
           <button
@@ -230,6 +242,55 @@ export default function BillDetailModal({
             ))}
           </div>
 
+          {/* Pelanggan / Member */}
+          {customerEnabled && (
+          <div style={{ marginTop: SPACING.lg, paddingTop: SPACING.lg, borderTop: `1px solid ${BD}` }}>
+            <div style={{
+              fontSize: TYPOGRAPHY.caption.fontSize,
+              fontWeight: 600,
+              color: MT,
+              textTransform: "uppercase",
+              letterSpacing: 0.5,
+              marginBottom: SPACING.sm
+            }}>
+              Pelanggan
+            </div>
+            {customerNama ? (
+              <div style={{
+                ...row,
+                alignItems: "center",
+                gap: SPACING.sm,
+                padding: `${SPACING.xs} ${SPACING.sm}`,
+                background: "#f0fdf4",
+                border: "1px solid #a8d5b8",
+                borderRadius: RADIUS.md
+              }}>
+                <span style={{ fontSize: TYPOGRAPHY.small.fontSize }}>👤</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: TYPOGRAPHY.caption.fontSize, color: MT }}>
+                    Nama Pelanggan
+                  </div>
+                  <div style={{ fontSize: TYPOGRAPHY.small.fontSize, fontWeight: 700, color: G }}>
+                    {customerNama}
+                    {customerTelepon && <span style={{ fontWeight: 500, color: MT }}> · {customerTelepon}</span>}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                padding: `${SPACING.xs} ${SPACING.sm}`,
+                background: LT,
+                borderRadius: RADIUS.md,
+                fontSize: TYPOGRAPHY.caption.fontSize,
+                color: MT,
+                fontStyle: "italic"
+              }}>
+                Tanpa pelanggan
+              </div>
+            )}
+          </div>
+          )}
+
           {/* Receipt Additionals */}
           {receiptFields.length > 0 && (
             <div style={{ marginTop: SPACING.lg, paddingTop: SPACING.lg, borderTop: `1px solid ${BD}` }}>
@@ -288,6 +349,12 @@ export default function BillDetailModal({
               <span style={{ fontSize: TYPOGRAPHY.small.fontSize, color: MT }}>Subtotal</span>
               <span style={{ fontSize: TYPOGRAPHY.small.fontSize, fontWeight: 500, color: G }}>{fmt(sub)}</span>
             </div>
+            {disc > 0 && (
+              <div style={{ ...row, justifyContent: "space-between", marginBottom: SPACING.xs }}>
+                <span style={{ fontSize: TYPOGRAPHY.small.fontSize, color: MT }}>Diskon</span>
+                <span style={{ fontSize: TYPOGRAPHY.small.fontSize, fontWeight: 500, color: COLOR_PALETTE.danger }}>-{fmt(disc)}</span>
+              </div>
+            )}
             {p > 0 && (
               <div style={{ ...row, justifyContent: "space-between", marginBottom: SPACING.xs }}>
                 <span style={{ fontSize: TYPOGRAPHY.small.fontSize, color: MT }}>Pajak</span>
