@@ -1,6 +1,7 @@
 import { memo, useMemo, useState } from "react";
 import { G, OR, W, LT, BD, TX, MT, row, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../constants/design.js";
 import { getStockAlerts, buildRestockList, DEFAULT_LOW_STOCK_THRESHOLD } from "../utilities/stock.js";
+import { getCategoryName } from "../utilities/receipt.js";
 
 // StockAlertPanel — low-stock / out-of-stock dashboard with a restock list.
 //
@@ -8,6 +9,7 @@ import { getStockAlerts, buildRestockList, DEFAULT_LOW_STOCK_THRESHOLD } from ".
 // dropped into a view unconditionally without adding noise.
 function StockAlertPanel({
   menu = [],
+  cats = [],           // daftar kategori untuk me-resolve key → label (Bug #3)
   threshold = DEFAULT_LOW_STOCK_THRESHOLD,
   onOpenItem,          // optional: open the item editor for a given item
   onExportCSV,         // optional: (restockRows) => void
@@ -78,7 +80,7 @@ function StockAlertPanel({
                 <div style={{ display:"flex", alignItems:"center", gap:6, minWidth:0 }}>
                   <span style={{ width:7, height:7, borderRadius:"50%", flexShrink:0, background: r.level === "out" ? COLOR_PALETTE.danger : OR }} />
                   <span style={{ fontSize:11, fontWeight:600, color:TX, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{r.nama}</span>
-                  <span style={{ fontSize:9, color:MT, flexShrink:0 }}>{r.kategori}</span>
+                  <span style={{ fontSize:9, color:MT, flexShrink:0 }}>{getCategoryName(r.kategori, cats)}</span>
                 </div>
                 <div style={{ display:"flex", alignItems:"center", gap:10, flexShrink:0 }}>
                   <span style={{ fontSize:10, color: r.level === "out" ? COLOR_PALETTE.danger : "#b07000", fontWeight:700 }}>

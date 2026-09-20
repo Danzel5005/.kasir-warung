@@ -21,6 +21,7 @@ function ViewKasir({
   saveOpenBill, printPreview, printingPreview, setPayModal,
   // validation
   checkRequiredAdditionals,
+  stockErrors = [],
   // ref
   searchRef,
 }) {
@@ -239,15 +240,25 @@ function ViewKasir({
               <span style={{fontSize:14,fontWeight:700}}>Total</span>
               <span style={{fontSize:15,fontWeight:700,color:OR}}>{fmt(total)}</span>
             </div>
+            {stockErrors.length>0&&(
+              <div style={{background:"#fdecec",border:"1px solid #f3b8b8",borderRadius:6,padding:"6px 8px",marginBottom:8}}>
+                <div style={{fontSize:10,fontWeight:700,color:"#c0392b",marginBottom:2}}>Stok tidak mencukupi</div>
+                {stockErrors.map(e=>(
+                  <div key={e.id} style={{fontSize:9,color:"#c0392b",lineHeight:1.4}}>
+                    {e.nama}: butuh {e.needed}, tersedia {e.available}
+                  </div>
+                ))}
+              </div>
+            )}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>
               <button onClick={saveOpenBill}
-              disabled={!checkRequiredAdditionals(receiptAdditionals)}
+              disabled={!checkRequiredAdditionals(receiptAdditionals) || stockErrors.length>0}
               style={{padding:"8px 0",
-              border:`2px solid ${checkRequiredAdditionals(receiptAdditionals)?"#a8d5b8":BD}`,
+              border:`2px solid ${checkRequiredAdditionals(receiptAdditionals)&&stockErrors.length===0?"#a8d5b8":BD}`,
               borderRadius:7,
-              background:checkRequiredAdditionals(receiptAdditionals)?"#e8f5ee":LT,
-              color:checkRequiredAdditionals(receiptAdditionals)?G:MT,
-              cursor:checkRequiredAdditionals(receiptAdditionals)?"pointer":"not-allowed",
+              background:checkRequiredAdditionals(receiptAdditionals)&&stockErrors.length===0?"#e8f5ee":LT,
+              color:checkRequiredAdditionals(receiptAdditionals)&&stockErrors.length===0?G:MT,
+              cursor:checkRequiredAdditionals(receiptAdditionals)&&stockErrors.length===0?"pointer":"not-allowed",
               fontFamily:"inherit",fontSize:10,fontWeight:700}}>
                 {activeBill?"Perbarui Open Bill":"Simpan Open Bill"}
               </button>
@@ -264,22 +275,25 @@ fontFamily:"inherit", fontSize:10, fontWeight:700}}>
 {printingPreview ? "Mencetak..." : "Print Preview"}
 </button>
               <button onClick={
-                ()=>checkRequiredAdditionals(receiptAdditionals)&&setPayModal(true)
+                ()=>checkRequiredAdditionals(receiptAdditionals)&&stockErrors.length===0&&setPayModal(true)
               }
-               disabled={!checkRequiredAdditionals(receiptAdditionals)}
+               disabled={!checkRequiredAdditionals(receiptAdditionals) || stockErrors.length>0}
                 style={{
                   padding:"8px 0",
                   border:"none",
                   borderRadius:7,
-                  background:checkRequiredAdditionals(receiptAdditionals)?OR:"#f0c89a",
+                  background:checkRequiredAdditionals(receiptAdditionals)&&stockErrors.length===0?OR:"#f0c89a",
                   color:W,
-                  cursor:checkRequiredAdditionals(receiptAdditionals)?"pointer":"not-allowed",
+                  cursor:checkRequiredAdditionals(receiptAdditionals)&&stockErrors.length===0?"pointer":"not-allowed",
                   fontFamily:"inherit",
                   fontSize:10,
                   fontWeight:700}}>
                 Bayar Sekarang
               </button>
             </div>
+            {stockErrors.length>0&&<div style={{fontSize:9,color:"#e84040",
+              textAlign:"center",marginTop:4}}>
+                Kurangi jumlah item agar tidak melebihi stok</div>}
             {!checkRequiredAdditionals(receiptAdditionals)&&<div style={{fontSize:9,color:"#e84040",
               textAlign:"center",marginTop:4}}>
                 Isi field wajib terlebih dahulu</div>}

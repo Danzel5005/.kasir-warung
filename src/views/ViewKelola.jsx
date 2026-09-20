@@ -112,6 +112,7 @@ function ViewKelola({
         <div style={{padding:"10px 16px 0",flexShrink:0}}>
           <StockAlertPanel
             menu={menu}
+            cats={cats}
             threshold={lowStockThreshold}
             onOpenItem={openEdit}
             onExportCSV={exportRestock}

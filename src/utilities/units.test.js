@@ -7,6 +7,9 @@ import {
   tierPrice,
   resolveLine,
   cartKeyFor,
+  linePricing,
+  stepQtyForUnit,
+  computeStockErrors,
 } from "./units.js";
 import { calcPrice } from "./calculations.js";
 
@@ -263,5 +266,174 @@ describe("units.js: integrasi calcPrice dengan harga tier + diskon", () => {
     });
     expect(discount).toBe(5640);
     expect(total).toBe(56400 - 5640);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// linePricing — harga/modal efektif per SATUAN DASAR untuk BARIS KERANJANG
+// (qty baris sudah dalam satuan dasar)
+// ---------------------------------------------------------------------------
+
+describe("units.js: linePricing (baris keranjang, qty = satuan dasar)", () => {
+  it("satuan dasar tanpa tier → harga = item.harga", () => {
+    const p = linePricing({ ...KOPI, unit: "", qty: 3 });
+    expect(p.harga).toBe(2000);
+    expect(p.modal).toBe(1200);
+    expect(p.baseQty).toBe(3);
+    expect(p.tierHarga).toBeNull();
+  });
+
+  it("satuan dasar melewati batas tier → harga = harga tier", () => {
+    const p = linePricing({ ...TEH, unit: "", qty: 12 });
+    expect(p.harga).toBe(4700);
+    expect(p.tierHarga).toBe(4700);
+  });
+
+  it("satuan dasar tier besar menang untuk qty besar", () => {
+    const p = linePricing({ ...TEH, unit: "", qty: 50 });
+    expect(p.harga).toBe(4500);
+  });
+
+  it("tier dihitung dari qty dasar apa adanya (tanpa faktor lagi) — bukti fix double-multiply", () => {
+    // Baris dus: qty sudah = 48 (base). Tier 48 harus aktif, bukan dianggap 48*factor.
+    const p = linePricing({ ...TEH, unit: "dus", qty: 48 });
+    expect(p.baseQty).toBe(48);
+    expect(p.harga).toBe(200); // 4800/24
+  });
+
+  it("satuan tambahan: harga per dasar = unit.harga / factor", () => {
+    const p = linePricing({ ...TEH, unit: "dus", qty: 24 });
+    // 4800/24 = 200 per pcs; satu dus (24 pcs) = 4800
+    expect(p.harga).toBe(200);
+    expect(p.harga * p.baseQty).toBe(4800);
+  });
+
+  it("satuan tambahan tanpa unit.harga → jatuh ke item.harga", () => {
+    const item = {
+      id: "x",
+      harga: 3000,
+      unit: "pack",
+      qty: 6,
+      units: [{ key: "pack", label: "Pack", factor: 6 }],
+    };
+    const p = linePricing(item);
+    expect(p.harga).toBe(3000);
+    expect(p.harga * p.baseQty).toBe(18000);
+  });
+
+  it("modal satuan tambahan dibagi factor; modal item dipakai kalau unit tak punya modal", () => {
+    const withUnitModal = linePricing({ ...TEH, unit: "dus", qty: 24 });
+    expect(withUnitModal.modal).toBe(3300 / 24);
+
+    const unitNoModal = linePricing({ ...TEH, unit: "pack", qty: 6 });
+    expect(unitNoModal.modal).toBe(3500); // unit tanpa modal → modal item
+  });
+
+  it("item tanpa modal → modal null", () => {
+    const p = linePricing({ ...ROTI, unit: "", qty: 2 });
+    expect(p.modal).toBeNull();
+  });
+
+  it("harga * baseQty mengubah total akhir item (bukti fix tier & satuan)", () => {
+    const viaBase = linePricing({ ...TEH, unit: "", qty: 50 });
+    const viaDus = linePricing({ ...TEH, unit: "dus", qty: 48 });
+    expect(viaBase.harga * viaBase.baseQty).toBe(4500 * 50);
+    expect(viaDus.harga * viaDus.baseQty).toBe(4800 * 2); // 2 dus = 48 pcs
+  });
+});
+
+// ---------------------------------------------------------------------------
+// stepQtyForUnit — langkah tombol +/- (Bug #1: satu klik = satu satuan tampilan)
+// ---------------------------------------------------------------------------
+
+describe("units.js: stepQtyForUnit (langkah +/-)", () => {
+  it("satuan dasar → langkah 1", () => {
+    expect(stepQtyForUnit({ ...TEH, unit: "", qty: 5 })).toBe(1);
+  });
+
+  it("item lama tanpa units → langkah 1", () => {
+    expect(stepQtyForUnit({ ...KOPI, unit: "", qty: 5 })).toBe(1);
+  });
+
+  it("satuan tambahan → langkah = factor satuan", () => {
+    expect(stepQtyForUnit({ ...TEH, unit: "dus", qty: 24 })).toBe(24);
+    expect(stepQtyForUnit({ ...TEH, unit: "pack", qty: 6 })).toBe(6);
+  });
+
+  it("unit tak dikenal → jatuh ke satuan dasar (langkah 1)", () => {
+    expect(stepQtyForUnit({ ...TEH, unit: "ghost", qty: 3 })).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeStockErrors — guard checkout melebihi stok (Bug #2)
+// ---------------------------------------------------------------------------
+
+describe("units.js: computeStockErrors (cek stok keranjang)", () => {
+  const baseQtyOf = (line) => Number(line?.qty) || 0;
+  const MENU = [
+    { id: "m1", nama: "Teh", stok: 50 },
+    { id: "m2", nama: "Kopi", stok: 10 },
+    { id: "m3", nama: "Roti", stok: null }, // tak terbatas
+  ];
+
+  it("tidak ada error saat qty <= stok", () => {
+    const errs = computeStockErrors({
+      menu: MENU,
+      cartItems: [{ id: "m1", qty: 50 }, { id: "m2", qty: 10 }],
+      baseQtyOf,
+    });
+    expect(errs).toEqual([]);
+  });
+
+  it("melaporkan error saat qty > stok (kasus 50 vs 100)", () => {
+    const errs = computeStockErrors({
+      menu: MENU,
+      cartItems: [{ id: "m1", qty: 100 }],
+      baseQtyOf,
+    });
+    expect(errs).toHaveLength(1);
+    expect(errs[0]).toMatchObject({ id: "m1", nama: "Teh", needed: 100, available: 50 });
+  });
+
+  it("stok null = tak terbatas → tidak pernah error", () => {
+    const errs = computeStockErrors({
+      menu: MENU,
+      cartItems: [{ id: "m3", qty: 9999 }],
+      baseQtyOf,
+    });
+    expect(errs).toEqual([]);
+  });
+
+  it("qty open bill aktif ditambahkan kembali ke stok tersedia", () => {
+    // Stok menu sudah 20 karena bill memegang 30. Item belum masuk keranjang
+    // (baris bill head Items dihitung sebagai held, bukan cart).
+    const errs = computeStockErrors({
+      menu: [{ id: "m1", nama: "Teh", stok: 20 }],
+      cartItems: [{ id: "m1", qty: 20 }],
+      heldItems: [{ id: "m1", qty: 30 }],
+      baseQtyOf,
+    });
+    expect(errs).toEqual([]); // 20 + 30 = 50 tersedia
+  });
+
+  it("qty dijumlahkan lintas varian/satuan item yang sama", () => {
+    const errs = computeStockErrors({
+      menu: [{ id: "m1", nama: "Teh", stok: 30 }],
+      cartItems: [{ id: "m1", qty: 20 }, { id: "m1", qty: 20 }],
+      baseQtyOf,
+    });
+    expect(errs).toHaveLength(1);
+    expect(errs[0].needed).toBe(40);
+    expect(errs[0].available).toBe(30);
+  });
+
+  it("item tak dikenal di menu → diabaikan (tidak error)", () => {
+    const errs = computeStockErrors({
+      menu: MENU,
+      cartItems: [{ id: "unknown", qty: 5 }],
+      baseQtyOf,
+    });
+    expect(errs).toEqual([]);
   });
 });

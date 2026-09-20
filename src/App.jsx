@@ -72,7 +72,7 @@ function KasirWorkspace() {
   const menuH     = useMenu({ toast_: toastH.toast_, addUndo: toastH.addUndo });
   menuSetRef.current = menuH.setMenu;
   const billsH    = useBills({ toast_: toastH.toast_, addUndo: toastH.addUndo });
-  const cartH     = useCart({ toast_: toastH.toast_, getNow, receiptAdditionals: [] });
+  const cartH     = useCart({ toast_: toastH.toast_, getNow, receiptAdditionals: [], menu: menuH.menu });
   const historyH  = useHistory({ toast_: toastH.toast_, addUndo: toastH.addUndo, getNow, authH });
   historyRefreshRef.current = historyH.refresh;
   const customersH = useCustomers({ toast_: toastH.toast_ });
@@ -425,6 +425,7 @@ const executeConfirmDel = useCallback((restoreStock = false) => {
             saveOpenBill={saveOpenBill} printPreview={printPreview} printingPreview={printingPreview} setPayModal={setPayModal}
             searchRef={searchRef}
             checkRequiredAdditionals={cartH.checkRequiredAdditionals}
+            stockErrors={cartH.stockErrors}
           />
         )}
 

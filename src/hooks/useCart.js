@@ -1,7 +1,23 @@
 import { useState, useCallback } from "react";
 import { calcPrice } from "../utilities/calculations.js";
 import { api } from "../utilities/utils.js";
-import { resolveLine, stockQty, cartKeyFor, unitOptions } from "../utilities/units.js";
+import { resolveLine, stockQty, cartKeyFor, unitOptions, linePricing, stepQtyForUnit, computeStockErrors } from "../utilities/units.js";
+
+// lineBaseQty — qty baris keranjang SELALU disimpan dalam SATUAN DASAR.
+// Jadi untuk baris yang sudah tersimpan, qty-nya langsung dipakai (JANGAN
+// dikali factor lagi — itulah sumber bug "50 x 50 = 2500" saat ganti satuan).
+// Fungsi ini beda dengan stockQty(item, qty, unitKey) di units.js yang
+// mengonversi "jumlah dalam satuan tertentu" → satuan dasar.
+function lineBaseQty(line) {
+  const qty = Number(line?.qty);
+  return Number.isFinite(qty) ? qty : 0;
+}
+
+// Koersi angka yang aman (NaN/undefined → 0).
+function num_(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
 
 // Beri label satuan pada baris (dipakai struk HTML & ESC/POS). Satuan dasar
 // tidak diberi label supaya struk lama tidak berubah.
@@ -35,7 +51,7 @@ function withUnitLabel(items) {
 // terlibat dalam race condition Tahap 2. Dependency array di bawah
 // diverifikasi dengan sangat hati-hati: salah satu deps hilang di sini
 // bisa MENCIPTAKAN stale closure baru, bukan cuma gagal mencegah yang lama.
-function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals = [] }) {
+function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals = [], menu = [] }) {
   const [cart, setCart]         = useState({});
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [receiptAdditionalValues, setReceiptAdditionalValues] = useState({}); // { "nomor_meja": "5", "jumlah_pax": "2" }
@@ -52,7 +68,17 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
     service: { enabled: false, value: 0 },
   });
 
-  const items    = Object.values(cart);
+  // items — baris keranjang dengan harga/modal EFEKTIF per satuan dasar.
+  // Harga dihitung ulang setiap render dari qty & satuan aktif lewat
+  // linePricing(), sehingga:
+  //   - tier harga aktif begitu qty baris melewati minQty (Bug #4)
+  //   - harga satuan tambahan memakai unit.harga/factor (Bug #4)
+  // State `cart` TIDAK dimutasi; kita hanya memetakan untuk konsumsi UI &
+  // kalkulasi supaya tidak ada harga basi (stale) yang tersimpan.
+  const items    = Object.values(cart).map(line => {
+    const p = linePricing(line);
+    return { ...line, harga: p.harga, modal: p.modal, tierHarga: p.tierHarga };
+  });
   const subtotal = items.reduce((s, i) => s + i.harga * i.qty, 0);
   const { pajak, service, discount, total } = calcPrice(subtotal, { ...pricingConfig, items });
   const paidNum   = parseInt(paid.replace(/\D/g, "")) || 0;
@@ -68,8 +94,21 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
     });
   }, [receiptAdditionalValues]);
 
+  // stockErrors — daftar baris keranjang yang melebihi stok tersedia (Bug #2).
+  // Stok tersedia = stok menu saat ini + qty yang SUDAH dipotong oleh open
+  // bill aktif (karena baris bill dimuat kembali ke keranjang, stoknya sudah
+  // berkurang — kalau tidak ditambahkan kembali, bill valid malah dianggap
+  // kelebihan stok). `stok === null` berarti tak terbatas.
+  // Logikanya murni di units.js (computeStockErrors) supaya bisa dites.
+  const stockErrors = computeStockErrors({
+    menu,
+    cartItems: items,
+    heldItems: activeBill?.items || [],
+    baseQtyOf: lineBaseQty,
+  });
+
   // Use checkRequiredAdditionals to validate all required receipt additionals (not just tableNum)
-  const canPay    = items.length > 0 && checkRequiredAdditionals(receiptAdditionals) && (metode !== "cash" || paidNum > 0 || total === 0);
+  const canPay    = items.length > 0 && stockErrors.length === 0 && checkRequiredAdditionals(receiptAdditionals) && (metode !== "cash" || paidNum > 0 || total === 0);
 
   // PENTING: pakai functional update setCart(c=>...), TIDAK baca `cart`
   // langsung dari closure — pattern paling stabil. Tapi memanggil toast_,
@@ -97,7 +136,7 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
     // Sum up all BASE quantities for this item ID across additionals & satuan
     const currentTotalQty = Object.values(c)
       .filter(cartItem => cartItem.id === item.id)
-      .reduce((sum, cartItem) => sum + stockQty(cartItem), 0);
+      .reduce((sum, cartItem) => sum + lineBaseQty(cartItem), 0);
 
     // Check if adding one more would exceed stock (stok selalu satuan dasar)
     if (item.stok !== null && currentTotalQty + perUnitBaseQty > item.stok) {
@@ -130,7 +169,9 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
       const oldKey = line.unit || "";
       if (String(oldKey) === String(unitKey || "")) return c;
 
-      const baseQty = stockQty(line);
+      // qty baris sudah dalam SATUAN DASAR → pakai apa adanya (bukan stockQty,
+      // yang akan mengalikannya dengan factor lagi).
+      const baseQty = lineBaseQty(line);
       const opts = unitOptions(line);
       const target = opts.find(o => String(o.key) === String(unitKey || "")) || opts[0];
       const factor = target.factor || 1;
@@ -150,9 +191,14 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
   // Note: id parameter is now cartKey which may include additionals in the format "itemId_{...}"
   const decCart = useCallback((cartKey) => setCart(c => { 
     const n = { ...c }; 
-    if (!n[cartKey]) return c;
-    if (n[cartKey].qty <= 1) delete n[cartKey]; 
-    else n[cartKey] = { ...n[cartKey], qty: n[cartKey].qty - 1 }; 
+    const line = n[cartKey];
+    if (!line) return c;
+    // Satu "klik" minus = kurangi SATU SATUAN TAMPILAN (factor), bukan 1
+    // satuan dasar — qty baris disimpan dalam satuan dasar (Bug #1).
+    const step = stepQtyForUnit(line); // default 1 untuk satuan dasar
+    const nextQty = num_(line.qty) - step;
+    if (nextQty <= 0) delete n[cartKey];
+    else n[cartKey] = { ...line, qty: nextQty };
     return n; 
   }), []);
   const delCart = useCallback((cartKey) => setCart(c => { 
@@ -174,9 +220,10 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
   // Dynamic canPay - includes receipt additionals validation
   const getCanPay = useCallback((additionals) => {
     if (items.length === 0) return false;
+    if (stockErrors.length > 0) return false;
     if (!checkRequiredAdditionals(additionals)) return false;
     return metode !== "cash" || paidNum > 0 || total === 0;
-  }, [items, checkRequiredAdditionals, metode, paidNum, total]);
+  }, [items, stockErrors, checkRequiredAdditionals, metode, paidNum, total]);
   // saveOpenBill & loadBillToCart tinggal di sini (bukan useBills) karena
   // mereka menulis langsung ke state cart/activeBill yang dimiliki hook ini.
   // `bills`/`billId`/`persistBills`/`setBillId` adalah ARGUMEN PANGGILAN
@@ -194,6 +241,11 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
     customer = null, // Selected customer/member snapshot (denormalized into bill)
   }) => {
     if (!items.length || !checkRequiredAdditionals(receiptAdditionals)) { toast_("Isi field wajib dan pesanan dulu", "err"); return; }
+    if (stockErrors.length > 0) {
+      const e = stockErrors[0];
+      toast_(`Stok "${e.nama}" tidak mencukupi: butuh ${e.needed}, tersedia ${e.available}`, "err");
+      return;
+    }
     const t = getNow();
     
     // Customer is DENORMALIZED (name/phone copied, not just id) into the bill
@@ -219,16 +271,17 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
     let stockDelta = null;
     if (activeBill) {
       // Calculate stock delta: new items - old items.
-      // Langkah 3: qty dinormalkan ke SATUAN DASAR lewat stockQty(item)
-      // supaya delta stok benar untuk baris bersatuan (mis. 2 dus = 48).
+      // qty baris (bill lama & keranjang) SUDAH dalam SATUAN DASAR → pakai
+      // apa adanya lewat lineBaseQty(). JANGAN stockQty() — itu akan
+      // mengalikannya dengan factor lagi (sumber bug "50 x 50 = 2500").
       const oldItemsById = (activeBill.items || []).reduce((acc, item) => {
         const existing = acc[item.id] || { qty: 0 };
-        acc[item.id] = { ...existing, qty: existing.qty + stockQty(item) };
+        acc[item.id] = { ...existing, qty: existing.qty + lineBaseQty(item) };
         return acc;
       }, {});
       const newItemsById = items.reduce((acc, item) => {
         const existing = acc[item.id] || { qty: 0 };
-        acc[item.id] = { ...existing, qty: existing.qty + stockQty(item) };
+        acc[item.id] = { ...existing, qty: existing.qty + lineBaseQty(item) };
         return acc;
       }, {});
       
@@ -253,7 +306,7 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
     } else {
       // New bill - all items are new stock deduction (dalam satuan dasar)
       stockDelta = items.reduce((acc, item) => {
-        acc[item.id] = (acc[item.id] || 0) - stockQty(item);
+        acc[item.id] = (acc[item.id] || 0) - lineBaseQty(item);
         return acc;
       }, {});
       
@@ -274,7 +327,7 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
     await persistBills(updatedBills);
     clearCart();
     setDrawerOpen(false);
-  }, [items, receiptAdditionalValues, receiptAdditionals, activeBill, toast_, getNow, clearCart]);
+  }, [items, receiptAdditionalValues, receiptAdditionals, activeBill, toast_, getNow, clearCart, stockErrors]);
 
   // deps: needs receiptAdditionals to read current receipt additionals config
   const loadBillToCart = useCallback((bill) => {
@@ -316,6 +369,11 @@ const processPayment = useCallback(async ({
   paymentMethods = [],
   customer = null, // Selected customer/member snapshot (denormalized into trx)
 }) => {
+    if (stockErrors.length > 0) {
+      const e = stockErrors[0];
+      toast_(`Stok "${e.nama}" tidak mencukupi: butuh ${e.needed}, tersedia ${e.available}`, "err");
+      return null;
+    }
   const t = getNow();
   const { pajak: p, service: s, discount: d, total: tot } = calcPrice(subtotal, { ...pricingConfig, items });
   
@@ -378,11 +436,12 @@ const processPayment = useCallback(async ({
   clearCart();
   if (onSuccess) onSuccess(trx);
   return trx;
-}, [items, subtotal, pricingConfig, metode, paidNum, kembalian, cart, toast_, getNow, clearCart]);
+}, [items, subtotal, pricingConfig, metode, paidNum, kembalian, cart, toast_, getNow, clearCart, stockErrors]);
 
   return {
     cart, drawerOpen, receiptAdditionalValues, receiptAdditionals, metode, paid, activeBill,
     items, subtotal, pajak, service, discount, total, pricingConfig, paidNum, kembalian, canPay,
+    stockErrors,
     setDrawerOpen, updateReceiptAdditionalValue, setMetode, setPaid,
     addToCart, decCart, delCart, clearCart,
     setUnit, resolveLine,

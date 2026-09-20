@@ -10,9 +10,17 @@ const path = require("path");
 //   • expose the on-disk data folder and quick stats for the settings UI
 //
 // Storage map is derived from `files` so it stays in sync with main.cjs.
-function createBackupRestoreService({ app, ipcMain, dialog, files, ensureDir, rJSON, closeDB, initDB, migrateJSONToSQLite }) {
+function createBackupRestoreService({ app, ipcMain, dialog, files, ensureDir, rJSON, closeDB, initDB, migrateJSONToSQLite, loadTrx, loadShifts }) {
   const FORMAT = "kasir-warung-backup";
   const VERSION = 1;
+
+  // Bug #5: transaksi & shift hidup di SQLite (tabel `transactions`/`shifts`),
+  // sementara file JSON-nya (files.trx / files.shifts) hanya dicermin pada
+  // jalur fallback dan sering kosong/basi. Jadi saat menyusun backup, kita
+  // baca DUA store ini langsung dari DB lewat reader opsional yang
+  // di-inject dari main.cjs (loadTrx/loadShifts dari database service).
+  // Opsional supaya modul tetap bisa dites tanpa SQLite (test menyuntik JSON).
+  const DB_READERS = { transactions: loadTrx, shifts: loadShifts };
 
   // The JSON stores that make up "all the data". `db` (SQLite) is handled
   // separately because it must be closed before/after the file copy.
@@ -48,7 +56,16 @@ function createBackupRestoreService({ app, ipcMain, dialog, files, ensureDir, rJ
     const counts = {};
     for (const [key, file] of STORES) {
       let value = null;
-      try { value = rJSON(file); } catch { value = null; }
+      // Bug #5: untuk store yang sumber kebenarannya SQLite, baca dari DB
+      // lebih dulu. Kalau reader tak tersedia / mengembalikan null (mis. DB
+      // belum ada), baru jatuh ke file JSON seperti sebelumnya.
+      const reader = DB_READERS[key];
+      if (reader) {
+        try { value = reader(); } catch { value = null; }
+      }
+      if (value === null || value === undefined) {
+        try { value = rJSON(file); } catch { value = null; }
+      }
       if (value === null || value === undefined) value = ARRAY_STORES.has(key) ? [] : {};
       out[key] = value;
       counts[key] = Array.isArray(value) ? value.length : value && typeof value === "object" ? Object.keys(value).length : 1;

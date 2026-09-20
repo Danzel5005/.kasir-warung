@@ -58,7 +58,7 @@ const FILES = {
 const backup = createBackupService({ dataDir: DATA_DIR, files: FILES });
 const license = createLicenseService(app);
 const database = createDatabaseService({ ipcMain, files: FILES, ensureDir: backup.ensureDir, rJSON: backup.rJSON, atomicWrite: backup.atomicWrite, walAppend: backup.walAppend, walClear: backup.walClear });
-const backupRestore = createBackupRestoreService({ app, ipcMain, dialog, files: FILES, ensureDir: backup.ensureDir, rJSON: backup.rJSON, closeDB: database.closeDB, initDB: database.initDB, migrateJSONToSQLite: database.migrateJSONToSQLite });
+const backupRestore = createBackupRestoreService({ app, ipcMain, dialog, files: FILES, ensureDir: backup.ensureDir, rJSON: backup.rJSON, closeDB: database.closeDB, initDB: database.initDB, migrateJSONToSQLite: database.migrateJSONToSQLite, loadTrx: database.loadTrx, loadShifts: database.loadShifts });
 
 function registerFileHandlers() {
   ipcMain.handle("bills-load", () => backup.rJSON(FILES.bills) || []);

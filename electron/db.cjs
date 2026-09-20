@@ -628,7 +628,22 @@ function createDatabaseService({ ipcMain, files, ensureDir, rJSON, atomicWrite, 
     });
   }
 
-  return { initDB, migrateJSONToSQLite, migrateMenuToProducts, closeDB, registerHandlers, applyStockDelta, loadMenuList, replaceMenuList, restoreStockFromTrx };
+  // loadTrx / loadShifts — baca LANGSUNG dari SQLite (bukan JSON) untuk
+  // dipakai layanan backup (Bug #5: transaksi & shift hidup di SQLite, jadi
+  // file JSON lama sering kosong/basi). Mengembalikan null kalau DB/mesin
+  // tidak tersedia supaya pemanggil bisa jatuh ke JSON.
+  function loadTrx() {
+    if (!db) return null;
+    try { return db.prepare("SELECT id, data FROM transactions ORDER BY created_at DESC").all().map((row) => JSON.parse(row.data)); }
+    catch (err) { console.error("[loadTrx] Error:", err.message); return null; }
+  }
+  function loadShifts() {
+    if (!db) return null;
+    try { return db.prepare("SELECT id, data FROM shifts ORDER BY created_at DESC").all().map((row) => JSON.parse(row.data)); }
+    catch (err) { console.error("[loadShifts] Error:", err.message); return null; }
+  }
+
+  return { initDB, migrateJSONToSQLite, migrateMenuToProducts, closeDB, registerHandlers, applyStockDelta, loadMenuList, replaceMenuList, restoreStockFromTrx, loadTrx, loadShifts };
 }
 
 module.exports = { createDatabaseService };
