@@ -240,6 +240,8 @@ Persyaratan RAM dan ruang di atas adalah batas operasional yang disarankan untuk
 
 Dokumentasi internal perubahan, desain, rencana, checklist pengujian, format struk, dan catatan implementasi. Berkas di folder ini membantu memahami keputusan historis, tetapi source code dan `package.json` tetap menjadi sumber kebenaran untuk perilaku saat ini.
 
+Untuk panduan menambahkan menu — ditulis untuk pengguna awam sekaligus developer yang ingin berkontribusi — lihat [`updates/TUTORIAL-MENAMBAH-MENU.md`](updates/TUTORIAL-MENAMBAH-MENU.md).
+
 ### Direktori generated atau distribusi
 
 - `dist/` dibuat oleh `npm run build` dan berisi renderer production.
