@@ -1,8 +1,7 @@
 const https = require("https");
 const http = require("http");
 
-// `require("electron")` hanya valid di runtime Electron — di Node murni modul itu
-// mengembalikan path string. Karena itu aksesnya lazy + dibungkus try/catch.
+
 function electronAppVersion() {
   try {
     const electron = require("electron");
@@ -11,11 +10,10 @@ function electronAppVersion() {
   return null;
 }
 
-// Manifest kecil yang dicek:
-// { "version": "1.2.0", "notes": "Perbaikan ...", "url": "https://.../download" }
+
 const DEFAULT_MANIFEST_URL =
   process.env.KASIR_UPDATE_MANIFEST_URL ||
-  "https://raw.githubusercontent.com/danzeltampilang/kasir-warung/main/updates/latest.json";
+  "https://raw.githubusercontent.com/Danzel5005/.kasir-warung/master/updates/latest.json";
 
 const TIMEOUT_MS = 6000;
 
