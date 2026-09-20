@@ -1,6 +1,6 @@
 {
   "name": "kasir-warung",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Aplikasi Kasir",
   "author": {
     "name": "Danzel Tampilang",
@@ -42,7 +42,7 @@
   },
   "build": {
     "appId": "com.warung.kasir",
-    "productName": "Kasir Warung",
+    "productName": "DEN POS",
     "directories": {
       "output": "release"
     },
@@ -71,7 +71,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Kasir WRG"
+      "shortcutName": "DEN POS"
     }
   },
   "allowScripts": {
