@@ -494,6 +494,7 @@ const executeConfirmDel = useCallback((restoreStock = false) => {
           <ViewKelola
             menu={menuH.menu} cats={menuH.cats} allCats={menuH.allCats}
             setCatModal={menuH.setCatModal} openAdd={menuH.openAdd} openEdit={menuH.openEdit}
+            applyStockView={menuH.applyStockView}
             setConfirmDel={setConfirmDel}
             search={menuH.search} setSearch={menuH.setSearch}
             lowStockThreshold={Number(settingsH.settings.lowStockThreshold) > 0 ? Number(settingsH.settings.lowStockThreshold) : undefined}

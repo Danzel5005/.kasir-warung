@@ -28,11 +28,24 @@ function createDatabaseService({ ipcMain, files, ensureDir, rJSON, atomicWrite, 
           data TEXT NOT NULL,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE TABLE IF NOT EXISTS stock_movements (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          product_id TEXT,
+          nama TEXT,
+          type TEXT NOT NULL,
+          delta REAL NOT NULL,
+          stok_after REAL,
+          ref TEXT,
+          actor TEXT,
+          note TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
         CREATE INDEX IF NOT EXISTS idx_trx_created ON transactions(created_at);
         CREATE INDEX IF NOT EXISTS idx_shifts_created ON shifts(created_at);
         CREATE INDEX IF NOT EXISTS idx_trx_created_date ON transactions(date(created_at));
         CREATE INDEX IF NOT EXISTS idx_products_menu_id ON products(menu_id);
         CREATE INDEX IF NOT EXISTS idx_products_kategori ON products(kategori);
+        CREATE INDEX IF NOT EXISTS idx_stock_movements_product ON stock_movements(product_id, created_at);
       `);
       console.log("[Main] Tables created");
       console.log("[DB] SQLite initialized successfully");
@@ -161,6 +174,15 @@ function createDatabaseService({ ipcMain, files, ensureDir, rJSON, atomicWrite, 
     if (!ids.length) return stock;
     const getRow = db.prepare("SELECT menu_id, stok, data FROM products WHERE menu_id = ?");
     const setRow = db.prepare("UPDATE products SET stok = ? WHERE menu_id = ?");
+    // Langkah 6: setiap perubahan stok dicatat ke stock_movements di dalam
+    // fungsi ini, jadi log tak mungkin lepas dari stok.
+    const logRow = db.prepare(
+      "INSERT INTO stock_movements (product_id, nama, type, delta, stok_after, ref, actor, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+    );
+    const logType = meta.type || "adjust";
+    const logRef = meta.ref != null ? String(meta.ref) : null;
+    const logActor = meta.actor != null ? String(meta.actor) : null;
+    const logNote = meta.note != null ? String(meta.note) : null;
     const run = db.transaction(() => {
       for (const id of ids) {
         const row = getRow.get(String(id));
@@ -169,7 +191,11 @@ function createDatabaseService({ ipcMain, files, ensureDir, rJSON, atomicWrite, 
         const delta = Number(map[id]) || 0;
         if (delta === 0) continue;
         const next = Math.max(0, Number(row.stok) + delta);
+        const applied = next - Number(row.stok);
         setRow.run(next, String(id));
+        let nama = id;
+        try { nama = JSON.parse(row.data || "{}").nama || id; } catch { /* ignore */ }
+        logRow.run(String(id), nama, logType, applied, next, logRef, logActor, logNote);
         stock[id] = next;
       }
     });
@@ -235,6 +261,93 @@ function createDatabaseService({ ipcMain, files, ensureDir, rJSON, atomicWrite, 
     ipcMain.handle("apply-stock", (_e, deltas, meta) => {
       try { const stock = applyStockDelta(deltas, meta || {}); return { ok: true, stock }; }
       catch (err) { console.error("[apply-stock] Error:", err.message); return { ok: false, error: err.message }; }
+    });
+
+    // ── Langkah 6: stok masuk, opname, riwayat mutasi, set stok.
+    // `stock-in` menambah stok (type "in") dan opsional memperbarui harga modal
+    // (harga beli terakhir). Tanpa `modalBaru`, modal lama dipertahankan.
+    ipcMain.handle("stock-in", (_e, { id, qty, modalBaru, note, actor } = {}) => {
+      const addQty = Number(qty) || 0;
+      if (!id || addQty <= 0) return { ok: false, error: "qty tidak valid" };
+      if (!db) return { ok: false, error: "database belum siap" };
+      try {
+        let stock = {};
+        const run = db.transaction(() => {
+          stock = applyStockDelta({ [String(id)]: addQty }, { type: "in", ref: null, actor, note });
+          if (!Object.keys(stock).length) return;
+          const row = db.prepare("SELECT data FROM products WHERE menu_id = ?").get(String(id));
+          if (!row) return;
+          const data = JSON.parse(row.data || "{}");
+          if (modalBaru !== undefined && modalBaru !== null && modalBaru !== "") {
+            const m = parseInt(modalBaru);
+            if (!Number.isNaN(m) && m >= 0) { data.modal = m; db.prepare("UPDATE products SET data = ? WHERE menu_id = ?").run(JSON.stringify(data), String(id)); }
+          }
+        });
+        run();
+        if (!Object.keys(stock).length) return { ok: false, error: "item tak ada atau stok tak terbatas" };
+        return { ok: true, stock, menu: loadMenuList() };
+      } catch (err) { console.error("[stock-in] Error:", err.message); return { ok: false, error: err.message }; }
+    });
+
+    // `stock-opname` menyetel stok fisik hasil hitung (type "opname"). Delta
+    // dihitung dari stok sistem saat itu; kalau beda, dicatat sebagai mutasi.
+    ipcMain.handle("stock-opname", (_e, rows, meta = {}) => {
+      if (!db) return { ok: false, error: "database belum siap" };
+      const list = Array.isArray(rows) ? rows : [];
+      try {
+        const stock = {};
+        const getRow = db.prepare("SELECT menu_id, stok, data FROM products WHERE menu_id = ?");
+        const setRow = db.prepare("UPDATE products SET stok = ? WHERE menu_id = ?");
+        const logRow = db.prepare(
+          "INSERT INTO stock_movements (product_id, nama, type, delta, stok_after, ref, actor, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        );
+        const run = db.transaction(() => {
+          for (const r of list) {
+            if (!r || r.id === undefined || r.id === null) continue;
+            const row = getRow.get(String(r.id));
+            if (!row) continue;
+            if (row.stok === null || row.stok === undefined) continue;
+            const counted = Number(r.counted);
+            if (Number.isNaN(counted) || counted < 0) continue;
+            const delta = counted - Number(row.stok);
+            setRow.run(counted, String(r.id));
+            if (delta !== 0) {
+              let nama = r.id;
+              try { nama = JSON.parse(row.data || "{}").nama || r.id; } catch { /* ignore */ }
+              logRow.run(String(r.id), nama, "opname", delta, counted, meta.ref != null ? String(meta.ref) : null, meta.actor != null ? String(meta.actor) : null, meta.note != null ? String(meta.note) : null);
+            }
+            stock[r.id] = counted;
+          }
+        });
+        run();
+        return { ok: true, stock, menu: loadMenuList() };
+      } catch (err) { console.error("[stock-opname] Error:", err.message); return { ok: false, error: err.message }; }
+    });
+
+    // `stock-movements` — riwayat mutasi. Filter opsional: productId, limit.
+    ipcMain.handle("stock-movements", (_e, { productId = null, limit = 200 } = {}) => {
+      if (!db) return [];
+      try {
+        const lim = Math.max(1, Math.min(2000, Number(limit) || 200));
+        if (productId != null) {
+          return db.prepare("SELECT * FROM stock_movements WHERE product_id = ? ORDER BY created_at DESC, id DESC LIMIT ?").all(String(productId), lim);
+        }
+        return db.prepare("SELECT * FROM stock_movements ORDER BY created_at DESC, id DESC LIMIT ?").all(lim);
+      } catch (err) { console.error("[stock-movements] Error:", err.message); return []; }
+    });
+
+    // `stock-set` menyetel stok langsung tanpa log — HANYA untuk peralihan
+    // null (tak terbatas) ↔ angka, sesuai Langkah 6.
+    ipcMain.handle("stock-set", (_e, { id, stok } = {}) => {
+      if (!db) return { ok: false, error: "database belum siap" };
+      if (id === undefined || id === null) return { ok: false, error: "id wajib" };
+      try {
+        const value = stok === null || stok === "" ? null : Number(stok);
+        if (value !== null && (Number.isNaN(value) || value < 0)) return { ok: false, error: "stok tidak valid" };
+        const info = db.prepare("UPDATE products SET stok = ? WHERE menu_id = ?").run(value, String(id));
+        if (!info.changes) return { ok: false, error: "item tak ada" };
+        return { ok: true, menu: loadMenuList() };
+      } catch (err) { console.error("[stock-set] Error:", err.message); return { ok: false, error: err.message }; }
     });
 
     ipcMain.handle("trx-load", () => {

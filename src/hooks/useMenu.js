@@ -79,8 +79,23 @@ function useMenu({ toast_, addUndo }) {
     // upsert di main process; stok baris yang sudah ada TIDAK ditimpa
     // (Langkah 2). Field `stok` dari form hanya berlaku untuk item baru.
     await api.upsertMenu(record);
+    // Langkah 6: perubahan stok item lama dikirim terpisah dari upsert.
+    // Peralihan null (tak terbatas) <-> angka diset langsung tanpa log;
+    // perubahan angka ke angka dicatat sebagai mutasi `adjust`.
+    let stockPatch = {};
+    if (editTarget) {
+      const before = editTarget.stok === undefined ? null : editTarget.stok;
+      const after = stok;
+      if (before === null || after === null) {
+        if (before !== after) { const res = await api.stockSet(editTarget.id, after); if (res?.ok && res.stock) stockPatch = res.stock; }
+      } else if (Number(before) !== Number(after)) {
+        const diff = Number(after) - Number(before);
+        const res = await api.adjustStock({ [editTarget.id]: diff }, { type: "adjust", note: "edit item" });
+        if (res?.ok && res.stock) stockPatch = res.stock;
+      }
+    }
     const next = editTarget
-      ? menu.map(m => m.id === editTarget.id ? { ...record, stok: m.stok } : m)
+      ? menu.map(m => m.id === editTarget.id ? { ...record, stok: stockPatch[m.id] === undefined ? m.stok : stockPatch[m.id] } : m)
       : [...menu, record];
     setMenu(next); setItemModal(false);
     toast_(`"${nama}" ${editTarget ? "diperbarui" : "ditambahkan"}`, "ok");

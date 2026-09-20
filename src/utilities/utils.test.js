@@ -260,6 +260,57 @@ describe("utils.js - LocalStorage Helper (LS) & API Wrapper", () => {
       const path = await api.getDataPath();
       expect(path).toBe("localStorage");
     });
+
+    it("stockIn adds qty, updates modal & logs an 'in' movement (browser)", async () => {
+      LS("ykk_menu", [{ id: "M1", nama: "Kopi", stok: 5, modal: 3000 }]);
+      const res = await api.stockIn({ id: "M1", qty: 7, modalBaru: 3500, note: "kulakan" });
+      expect(res.ok).toBe(true);
+      expect(res.stock).toEqual({ M1: 12 });
+      const menu = await api.loadMenu();
+      expect(menu[0].stok).toBe(12);
+      expect(menu[0].modal).toBe(3500);
+      const mv = await api.stockMovements({ productId: "M1" });
+      expect(mv).toHaveLength(1);
+      expect(mv[0]).toMatchObject({ productId: "M1", type: "in", delta: 7, stokAfter: 12, note: "kulakan" });
+    });
+
+    it("stockIn rejects invalid qty and unlimited stock (browser)", async () => {
+      LS("ykk_menu", [{ id: "M1", nama: "Kopi", stok: 5 }, { id: "M2", nama: "Teh", stok: null }]);
+      expect((await api.stockIn({ id: "M1", qty: 0 })).ok).toBe(false);
+      expect((await api.stockIn({ id: "M2", qty: 4 })).ok).toBe(false);
+      expect((await api.loadMenu()).find((m) => m.id === "M1").stok).toBe(5);
+    });
+
+    it("stockOpname sets physical counts & logs only the diff (browser)", async () => {
+      LS("ykk_menu", [{ id: "M1", nama: "Kopi", stok: 10 }, { id: "M2", nama: "Teh", stok: 4 }]);
+      const res = await api.stockOpname([{ id: "M1", counted: 8 }, { id: "M2", counted: 4 }], { note: "fisik" });
+      expect(res.ok).toBe(true);
+      expect(res.stock).toEqual({ M1: 8, M2: 4 });
+      const mv = await api.stockMovements();
+      expect(mv).toHaveLength(1);
+      expect(mv[0]).toMatchObject({ productId: "M1", type: "opname", delta: -2, stokAfter: 8, note: "fisik" });
+    });
+
+    it("stockSet flips null<->number without logging (browser)", async () => {
+      LS("ykk_menu", [{ id: "M1", nama: "Kopi", stok: null }]);
+      expect((await api.stockSet("M1", 20)).ok).toBe(true);
+      expect((await api.loadMenu())[0].stok).toBe(20);
+      expect((await api.stockSet("M1", null)).ok).toBe(true);
+      expect((await api.loadMenu())[0].stok).toBeNull();
+      expect(await api.stockMovements()).toEqual([]);
+      expect((await api.stockSet("ghost", 1)).ok).toBe(false);
+    });
+
+    it("stockMovements filters by product and honours limit (browser)", async () => {
+      LS("ykk_menu", [{ id: "M1", nama: "Kopi", stok: 0 }, { id: "M2", nama: "Teh", stok: 0 }]);
+      await api.stockIn({ id: "M1", qty: 1 });
+      await api.stockIn({ id: "M2", qty: 2 });
+      await api.stockIn({ id: "M1", qty: 3 });
+      expect(await api.stockMovements({ productId: "M1" })).toHaveLength(2);
+      expect(await api.stockMovements({ productId: "M2" })).toHaveLength(1);
+      expect(await api.stockMovements({ limit: 2 })).toHaveLength(2);
+      expect(await api.stockMovements()).toHaveLength(3);
+    });
   });
 
   describe("API Object - Electron window.kasirAPI Delegated Mode", () => {
@@ -278,6 +329,10 @@ describe("utils.js - LocalStorage Helper (LS) & API Wrapper", () => {
         deleteMenu: vi.fn().mockResolvedValue({ ok: true }),
         replaceMenu: vi.fn().mockResolvedValue({ ok: true }),
         applyStock: vi.fn().mockResolvedValue({ ok: true, stock: { M1: 4 } }),
+        stockIn: vi.fn().mockResolvedValue({ ok: true, stock: { M1: 9 } }),
+        stockSet: vi.fn().mockResolvedValue({ ok: true, stock: { M1: 20 } }),
+        stockOpname: vi.fn().mockResolvedValue({ ok: true, stock: { M1: 8 } }),
+        stockMovements: vi.fn().mockResolvedValue([{ productId: "M1", type: "in" }]),
         loadSettings: vi.fn().mockResolvedValue({ printDelay: 100 }),
         getDataPath: vi.fn().mockResolvedValue("/app/data"),
         getPrinters: vi.fn().mockResolvedValue([{ name: "POS-58" }]),
@@ -303,6 +358,17 @@ describe("utils.js - LocalStorage Helper (LS) & API Wrapper", () => {
       const path = await api.getDataPath();
       expect(mockKasirAPI.getDataPath).toHaveBeenCalled();
       expect(path).toBe("/app/data");
+    });
+
+    it("should delegate stock IPC calls to window.kasirAPI", async () => {
+      await api.stockIn({ id: "M1", qty: 5, modalBaru: 2000 });
+      expect(mockKasirAPI.stockIn).toHaveBeenCalledWith({ id: "M1", qty: 5, modalBaru: 2000, note: undefined, actor: undefined });
+      await api.stockSet("M1", 20);
+      expect(mockKasirAPI.stockSet).toHaveBeenCalledWith({ id: "M1", stok: 20 });
+      await api.stockOpname([{ id: "M1", counted: 8 }], { note: "x" });
+      expect(mockKasirAPI.stockOpname).toHaveBeenCalledWith([{ id: "M1", counted: 8 }], { note: "x" });
+      await api.stockMovements({ productId: "M1" });
+      expect(mockKasirAPI.stockMovements).toHaveBeenCalledWith({ productId: "M1" });
     });
   });
 });

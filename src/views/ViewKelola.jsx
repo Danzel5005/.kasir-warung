@@ -1,8 +1,10 @@
-import { memo, useMemo } from "react";
+import { memo, useMemo, useState, useCallback } from "react";
 import { fmt } from "../utilities/receipt.js";
 import { G, W, BD, MT, row, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../constants/design.js";
 import StockBadge from "../components/StockBadge.jsx";
 import StockAlertPanel from "../components/StockAlertPanel.jsx";
+import StockInModal from "../components/modals/StockInModal.jsx";
+import OpnameModal from "../components/modals/OpnameModal.jsx";
 import { csvRestock } from "../utilities/csvbuild.js";
 import { api } from "../utilities/utils.js";
 import { DEFAULT_LOW_STOCK_THRESHOLD } from "../utilities/stock.js";
@@ -11,11 +13,20 @@ import { DEFAULT_LOW_STOCK_THRESHOLD } from "../utilities/stock.js";
 function ViewKelola({
   menu, cats, allCats,                  // menuH
   setCatModal, openAdd, openEdit,       // menuH
+  applyStockView,                       // menuH — sinkron stok ke state
   setConfirmDel,                        // App.jsx local
   search, setSearch,                    // search from menuH
   lowStockThreshold = DEFAULT_LOW_STOCK_THRESHOLD,
   toast_ = null,                        // optional feedback hook
 }) {
+  const [stockInItem, setStockInItem] = useState(null);
+  const [opnameOpen, setOpnameOpen] = useState(false);
+
+  // Sinkronkan stok baru hasil stok-masuk / opname ke state menu React.
+  const syncStock = useCallback((res) => {
+    if (res?.stock && applyStockView) applyStockView(res.stock);
+  }, [applyStockView]);
+
   // Group items by their actual category (kategori field), not just categories in cats array
   // This ensures ALL items show even if their category is missing from cats
   const groupedItems = useMemo(() => {
@@ -104,6 +115,8 @@ function ViewKelola({
             threshold={lowStockThreshold}
             onOpenItem={openEdit}
             onExportCSV={exportRestock}
+            onStockIn={(item) => setStockInItem(item)}
+            onOpname={() => setOpnameOpen(true)}
           />
         </div>
       )}
@@ -123,6 +136,9 @@ function ViewKelola({
                       <div style={{fontSize:TYPOGRAPHY.label.fontSize,color:MT}}>Modal: {item.modal?fmt(item.modal):<span style={{color:"#e8a040"}}>Belum diisi</span>}</div>
                       <div style={{display:"flex",gap:5,marginTop:6}}>
                         <button onClick={()=>openEdit(item)} style={{flex:1,background:COLOR_PALETTE.infoLight,color:COLOR_PALETTE.info,border:"none",borderRadius:RADIUS.sm,padding:"4px 0",cursor:"pointer",fontFamily:"inherit",fontSize:TYPOGRAPHY.label.fontSize,fontWeight:600}}>Edit</button>
+                        {item.stok !== null && item.stok !== undefined && (
+                          <button onClick={()=>setStockInItem(item)} style={{flex:1,background:"#e8f5ee",color:G,border:"none",borderRadius:RADIUS.sm,padding:"4px 0",cursor:"pointer",fontFamily:"inherit",fontSize:TYPOGRAPHY.label.fontSize,fontWeight:600}}>Stok Masuk</button>
+                        )}
                         <button onClick={()=>setConfirmDel({type:"item",id:item.id})} style={{flex:1,background:COLOR_PALETTE.dangerLight,color:COLOR_PALETTE.danger,border:"none",borderRadius:RADIUS.sm,padding:"4px 0",cursor:"pointer",fontFamily:"inherit",fontSize:TYPOGRAPHY.label.fontSize,fontWeight:600}}>Hapus</button>
                       </div>
                     </div>
@@ -133,6 +149,12 @@ function ViewKelola({
           );
         })}
       </div>
+      {stockInItem && (
+        <StockInModal item={stockInItem} toast_={toast_} onClose={()=>setStockInItem(null)} onDone={syncStock} />
+      )}
+      {opnameOpen && (
+        <OpnameModal menu={menu} toast_={toast_} onClose={()=>setOpnameOpen(false)} onDone={syncStock} />
+      )}
     </div>
   );
 }

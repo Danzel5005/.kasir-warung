@@ -25,6 +25,10 @@ const kasirAPI = {
   deleteMenu:  (id)    => ipcRenderer.invoke("menu-delete", id),
   replaceMenu: (list)  => ipcRenderer.invoke("menu-replace", list),
   applyStock:  (deltas, meta) => ipcRenderer.invoke("apply-stock", deltas, meta),
+  stockIn:     (payload) => ipcRenderer.invoke("stock-in", payload),
+  stockOpname: (rows, meta) => ipcRenderer.invoke("stock-opname", rows, meta),
+  stockMovements: (q) => ipcRenderer.invoke("stock-movements", q),
+  stockSet:    (payload) => ipcRenderer.invoke("stock-set", payload),
   // Logo
   loadLogo:    ()      => ipcRenderer.invoke("logo-load"),
   saveLogo:    (data)  => ipcRenderer.invoke("logo-save", data),

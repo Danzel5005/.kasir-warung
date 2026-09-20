@@ -205,6 +205,68 @@ const api = {
     LS("ykk_menu", list);
     return { ok: true, stock };
   },
+  // Alias eksplisit supaya pemanggil tidak perlu tahu `applyStock`.
+  async adjustStock(deltas, meta) { return this.applyStock(deltas, meta); },
+  // Stok masuk (restock). Browser fallback: tambah stok + catat mutasi di LS.
+  async stockIn({ id, qty, modalBaru, note, actor } = {}) {
+    if (window.kasirAPI?.stockIn) return window.kasirAPI.stockIn({ id, qty, modalBaru, note, actor });
+    const addQty = Number(qty) || 0;
+    if (!id || addQty <= 0) return { ok: false, error: "qty tidak valid" };
+    const list = LS("ykk_menu") || [];
+    const it = list.find((m) => String(m.id) === String(id));
+    if (!it) return { ok: false, error: "item tak ada" };
+    if (it.stok === null || it.stok === undefined) return { ok: false, error: "stok tak terbatas" };
+    const before = Number(it.stok);
+    const after = Math.max(0, before + addQty);
+    it.stok = after;
+    if (modalBaru !== undefined && modalBaru !== null && modalBaru !== "") {
+      const m = parseInt(modalBaru); if (!Number.isNaN(m) && m >= 0) it.modal = m;
+    }
+    LS("ykk_menu", list);
+    this.logMovementLS({ productId: id, nama: it.nama, type: "in", delta: after - before, stokAfter: after, note, actor });
+    return { ok: true, stock: { [id]: after }, menu: list };
+  },
+  // Set stok langsung tanpa log (peralihan null <-> angka). Browser fallback.
+  async stockSet(id, stok) {
+    if (window.kasirAPI?.stockSet) return window.kasirAPI.stockSet({ id, stok });
+    const list = LS("ykk_menu") || [];
+    const it = list.find((m) => String(m.id) === String(id));
+    if (!it) return { ok: false, error: "item tak ada" };
+    const value = stok === null || stok === "" ? null : Number(stok);
+    if (value !== null && (Number.isNaN(value) || value < 0)) return { ok: false, error: "stok tidak valid" };
+    it.stok = value; LS("ykk_menu", list);
+    return { ok: true, stock: { [id]: value }, menu: list };
+  },
+  // Opname: set stok fisik, catat selisih sebagai mutasi "opname". Browser fallback.
+  async stockOpname(rows, meta) {
+    if (window.kasirAPI?.stockOpname) return window.kasirAPI.stockOpname(rows, meta);
+    const list = LS("ykk_menu") || [];
+    const stock = {};
+    (Array.isArray(rows) ? rows : []).forEach((r) => {
+      if (!r || r.id === undefined || r.id === null) return;
+      const it = list.find((m) => String(m.id) === String(r.id));
+      if (!it || it.stok === null || it.stok === undefined) return;
+      const counted = Number(r.counted); if (Number.isNaN(counted) || counted < 0) return;
+      const delta = counted - Number(it.stok);
+      it.stok = counted; stock[r.id] = counted;
+      if (delta !== 0) this.logMovementLS({ productId: r.id, nama: it.nama, type: "opname", delta, stokAfter: counted, ...(meta || {}) });
+    });
+    LS("ykk_menu", list);
+    return { ok: true, stock, menu: list };
+  },
+  // Riwayat mutasi. Browser fallback membaca LS.
+  async stockMovements(q) {
+    if (window.kasirAPI?.stockMovements) return window.kasirAPI.stockMovements(q);
+    const all = LS("ykk_stock_movements") || [];
+    const { productId = null, limit = 200 } = q || {};
+    const filtered = productId != null ? all.filter((m) => String(m.productId) === String(productId)) : all;
+    return filtered.slice(0, Math.max(1, Number(limit) || 200));
+  },
+  logMovementLS(m) {
+    const all = LS("ykk_stock_movements") || [];
+    all.unshift({ ...m, createdAt: new Date().toISOString() });
+    LS("ykk_stock_movements", all.slice(0, 2000));
+  },
   async loadLogo()        { return window.kasirAPI ? await window.kasirAPI.loadLogo()         : LS("ykk_logo"); },
   async saveLogo(data)    { if(window.kasirAPI) return window.kasirAPI.saveLogo(data); LS("ykk_logo",data); },
   async loadCats()        { return window.kasirAPI ? await window.kasirAPI.loadCats()         : (LS("ykk_cats")||[]); },

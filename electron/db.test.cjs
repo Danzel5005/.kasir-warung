@@ -50,6 +50,14 @@ class FakeDatabase {
     if (e === "menu_id") return row.menu_id;
     if (e === "kategori") return row.kategori;
     if (e === "stok") return row.stok;
+    if (e === "product_id") return row.product_id;
+    if (e === "nama") return row.nama;
+    if (e === "type") return row.type;
+    if (e === "delta") return row.delta;
+    if (e === "stok_after") return row.stok_after;
+    if (e === "ref") return row.ref;
+    if (e === "actor") return row.actor;
+    if (e === "note") return row.note;
     if (new RegExp(`^${DATE_EXPR}$`).test(e)) return row.created_at.slice(0, 10);
     const j = new RegExp(`^json_extract\\(data, '\\$\\.(\\w+)'\\)$`).exec(e);
     if (j) { try { return JSON.parse(row.data)?.[j[1]]; } catch { return undefined; } }
@@ -177,7 +185,13 @@ class FakeDatabase {
         return out;
       });
     } else {
-      rows = rows.map((row) => ({ id: row.id, data: row.data, created_at: row.created_at }));
+      // SELECT * — bentuk kolom bergantung tabel. transactions/shifts hanya
+      // punya (id, data, created_at); stock_movements diekspos utuh.
+      if (table === "stock_movements") {
+        rows = rows.map((row) => ({ ...row }));
+      } else {
+        rows = rows.map((row) => ({ id: row.id, data: row.data, created_at: row.created_at }));
+      }
     }
 
     rows = this._sort(rows, sql);
@@ -245,6 +259,15 @@ class FakeDatabase {
       const target = rows.find((r) => String(r.menu_id) === String(params[1]));
       if (!target) return { changes: 0 };
       target.stok = params[0];
+      return { changes: 1 };
+    }
+    // UPDATE products SET data = ? WHERE menu_id = ? (stock-in modal baru).
+    const updData = /^UPDATE\s+(\w+)\s+SET\s+data\s*=\s*\?\s+WHERE\s+menu_id\s*=\s*\?$/i.exec(sql);
+    if (updData) {
+      const rows = this.tables[updData[1]] || [];
+      const target = rows.find((r) => String(r.menu_id) === String(params[1]));
+      if (!target) return { changes: 0 };
+      target.data = params[0];
       return { changes: 1 };
     }
 
@@ -354,6 +377,7 @@ describe("db.cjs: initDB & registerHandlers", () => {
     expect(Object.keys(services.registry).sort()).toEqual([
       "apply-stock", "menu-delete", "menu-load", "menu-replace", "menu-upsert",
       "process-payment", "shifts-load", "shifts-save",
+      "stock-in", "stock-movements", "stock-opname", "stock-set",
       "trx-clear", "trx-delete", "trx-get-daily-stats", "trx-get-shift-ids",
       "trx-load", "trx-load-filtered", "trx-restore", "trx-restore-cleared",
       "trx-restore-preview",
@@ -743,5 +767,96 @@ describe("db.cjs: closeDB", () => {
     expect(() => services.svc.closeDB()).not.toThrow();
     // Setelah closeDB, db null -> jalur JSON dipakai dan tidak melempar.
     expect(services.registry["trx-save"](null, { id: "b", total: 2 })).toEqual({ ok: true });
+  });
+});
+
+describe("db.cjs: Langkah 6 — stok masuk, opname, mutasi", () => {
+  beforeEach(() => {
+    services.svc.initDB();
+    services.svc.registerHandlers();
+  });
+
+  const call = (name, ...args) => services.registry[name](null, ...args);
+  const stokOf = (id) => call("menu-load").find((m) => m.id === id)?.stok;
+  const movements = (q) => call("stock-movements", q);
+
+  it("stock-in menambah stok, mencatat mutasi type 'in', dan memperbarui modal", () => {
+    call("menu-replace", [{ id: "m1", nama: "Kopi", stok: 5, modal: 3000 }]);
+    const res = call("stock-in", { id: "m1", qty: 7, modalBaru: 3500, note: "kulakan" });
+    expect(res.ok).toBe(true);
+    expect(res.stock).toEqual({ m1: 12 });
+    expect(stokOf("m1")).toBe(12);
+    // Modal (harga beli terakhir) ikut diperbarui.
+    expect(call("menu-load").find((m) => m.id === "m1").modal).toBe(3500);
+    const mv = movements({ productId: "m1" });
+    expect(mv).toHaveLength(1);
+    expect(mv[0]).toMatchObject({ product_id: "m1", nama: "Kopi", type: "in", delta: 7, stok_after: 12, note: "kulakan" });
+  });
+
+  it("stock-in menolak qty tidak valid dan item berstok tak terbatas", () => {
+    // stok null = tak terbatas -> tidak ada delta yang tercatat.
+    call("menu-replace", [{ id: "m1", nama: "Kopi", stok: 5 }, { id: "m2", nama: "Teh", stok: null }]);
+    expect(call("stock-in", { id: "m1", qty: 0 }).ok).toBe(false);
+    expect(call("stock-in", { id: "m1", qty: -3 }).ok).toBe(false);
+    expect(call("stock-in", { id: "m2", qty: 4 }).ok).toBe(false);
+    expect(stokOf("m1")).toBe(5);
+  });
+
+  it("stock-opname menyetel stok fisik dan mencatat selisih sebagai 'opname'", () => {
+    call("menu-replace", [{ id: "m1", nama: "Kopi", stok: 10 }, { id: "m2", nama: "Teh", stok: 4 }]);
+    const res = call("stock-opname", [{ id: "m1", counted: 8 }, { id: "m2", counted: 4 }], { note: "hitung fisik" });
+    expect(res.ok).toBe(true);
+    expect(res.stock).toEqual({ m1: 8, m2: 4 });
+    expect(stokOf("m1")).toBe(8);
+    expect(stokOf("m2")).toBe(4);
+    // Hanya baris yang berubah (delta != 0) yang menyisakan mutasi.
+    const all = movements();
+    expect(all).toHaveLength(1);
+    expect(all[0]).toMatchObject({ product_id: "m1", type: "opname", delta: -2, stok_after: 8, note: "hitung fisik" });
+  });
+
+  it("stock-movements memfilter per produk dan menghormati limit", () => {
+    call("menu-replace", [{ id: "m1", nama: "Kopi", stok: 0 }, { id: "m2", nama: "Teh", stok: 0 }]);
+    call("stock-in", { id: "m1", qty: 1 });
+    call("stock-in", { id: "m2", qty: 2 });
+    call("stock-in", { id: "m1", qty: 3 });
+    expect(movements({ productId: "m1" })).toHaveLength(2);
+    expect(movements({ productId: "m2" })).toHaveLength(1);
+    expect(movements({ limit: 2 })).toHaveLength(2);
+    expect(movements()).toHaveLength(3);
+  });
+
+  it("stock-set mengubah stok transisi null↔angka TANPA mencatat mutasi", () => {
+    call("menu-replace", [{ id: "m1", nama: "Kopi", stok: null }]);
+    expect(call("stock-set", { id: "m1", stok: 20 }).ok).toBe(true);
+    expect(stokOf("m1")).toBe(20);
+    expect(call("stock-set", { id: "m1", stok: null }).ok).toBe(true);
+    expect(stokOf("m1")).toBeNull();
+    // Tidak ada satu pun mutasi tercatat oleh stock-set.
+    expect(movements()).toHaveLength(0);
+    expect(call("stock-set", { id: "ghost", stok: 1 }).ok).toBe(false);
+  });
+
+  it("apply-stock dengan meta.type 'sale' ikut menulis mutasi", () => {
+    call("menu-replace", [{ id: "m1", nama: "Kopi", stok: 10 }]);
+    const res = call("apply-stock", { m1: -3 }, { type: "sale", ref: "trx-1", actor: "kasir" });
+    expect(res.ok).toBe(true);
+    expect(res.stock).toEqual({ m1: 7 });
+    const mv = movements({ productId: "m1" });
+    expect(mv).toHaveLength(1);
+    expect(mv[0]).toMatchObject({ type: "sale", delta: -3, stok_after: 7, ref: "trx-1", actor: "kasir" });
+  });
+
+  it("INVARIANT: stok awal + Σdelta = stok akhir", () => {
+    call("menu-replace", [{ id: "m1", nama: "Kopi", stok: 10 }]);
+    call("stock-in", { id: "m1", qty: 5 });                       // +5 -> 15
+    call("apply-stock", { m1: -3 }, { type: "sale", ref: "t1" }); // -3 -> 12
+    call("apply-stock", { m1: 3 }, { type: "void", ref: "t1" });  // +3 -> 15
+    call("stock-opname", [{ id: "m1", counted: 13 }], { note: "opname" }); // -2 -> 13
+
+    const awal = 10;
+    const sum = movements({ productId: "m1" }).reduce((acc, m) => acc + Number(m.delta), 0);
+    expect(sum).toBe(3); // 5 - 3 + 3 - 2
+    expect(awal + sum).toBe(stokOf("m1")); // 10 + 3 === 13
   });
 });

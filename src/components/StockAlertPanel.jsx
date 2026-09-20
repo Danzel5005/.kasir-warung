@@ -11,6 +11,8 @@ function StockAlertPanel({
   threshold = DEFAULT_LOW_STOCK_THRESHOLD,
   onOpenItem,          // optional: open the item editor for a given item
   onExportCSV,         // optional: (restockRows) => void
+  onStockIn,           // optional: (item) => void — buka modal stok masuk
+  onOpname,            // optional: () => void — buka modal opname
   defaultOpen = false,
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -55,12 +57,20 @@ function StockAlertPanel({
         <div style={{ borderTop:`1px solid ${out.length ? "#f5c0c0" : "#f0dca8"}`, padding:"8px 12px", background:W }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
             <span style={{ fontSize:TYPOGRAPHY.label.fontSize, fontWeight:700, color:G }}>Daftar Restock</span>
-            {onExportCSV && (
-              <button onClick={exportRestock}
-                style={{ padding:"3px 9px", background:"#e8f5ee", color:G, border:"1px solid #b8ddc8", borderRadius:5, cursor:"pointer", fontFamily:"inherit", fontSize:10, fontWeight:600 }}>
-                Unduh CSV
-              </button>
-            )}
+            <div style={{ display:"flex", gap:6 }}>
+              {onOpname && (
+                <button onClick={(e) => { e.stopPropagation(); onOpname(); }}
+                  style={{ padding:"3px 9px", background:"#eef2ff", color:COLOR_PALETTE.info, border:"1px solid #cdd6f5", borderRadius:5, cursor:"pointer", fontFamily:"inherit", fontSize:10, fontWeight:600 }}>
+                  Opname
+                </button>
+              )}
+              {onExportCSV && (
+                <button onClick={exportRestock}
+                  style={{ padding:"3px 9px", background:"#e8f5ee", color:G, border:"1px solid #b8ddc8", borderRadius:5, cursor:"pointer", fontFamily:"inherit", fontSize:10, fontWeight:600 }}>
+                  Unduh CSV
+                </button>
+              )}
+            </div>
           </div>
           <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
             {restock.map((r) => (
@@ -75,6 +85,12 @@ function StockAlertPanel({
                     {r.stok === 0 ? "Habis" : `Sisa ${r.stok}`}
                   </span>
                   <span style={{ fontSize:9, color:MT }}>saran +{r.suggestQty}</span>
+                  {onStockIn && r.stok !== null && r.stok !== undefined && (
+                    <button onClick={() => onStockIn(itemById.get(String(r.id)) || r)}
+                      style={{ padding:"2px 7px", background:"#e8f5ee", color:G, border:"none", borderRadius:4, cursor:"pointer", fontFamily:"inherit", fontSize:9, fontWeight:700 }}>
+                      Stok Masuk
+                    </button>
+                  )}
                   {onOpenItem && (
                     <button onClick={() => onOpenItem(itemById.get(String(r.id)) || r)}
                       style={{ padding:"2px 7px", background:COLOR_PALETTE.infoLight, color:COLOR_PALETTE.info, border:"none", borderRadius:4, cursor:"pointer", fontFamily:"inherit", fontSize:9, fontWeight:600 }}>
