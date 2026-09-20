@@ -73,10 +73,16 @@ function useMenu({ toast_, addUndo }) {
     }
 
     const stok = form.stok === "" ? null : parseInt(form.stok) || 0;
+    const record = editTarget
+      ? { ...editTarget, menuId: menuId || undefined, nama, harga, modal, kategori: form.kategori, desc: form.desc.trim(), stok }
+      : { id: `c_${Date.now()}`, menuId: menuId || undefined, nama, harga, modal, kategori: form.kategori, desc: form.desc.trim(), stok };
+    // upsert di main process; stok baris yang sudah ada TIDAK ditimpa
+    // (Langkah 2). Field `stok` dari form hanya berlaku untuk item baru.
+    await api.upsertMenu(record);
     const next = editTarget
-      ? menu.map(m => m.id === editTarget.id ? { ...m, menuId: menuId || undefined, nama, harga, modal, kategori: form.kategori, desc: form.desc.trim(), stok } : m)
-      : [...menu, { id: `c_${Date.now()}`, menuId: menuId || undefined, nama, harga, modal, kategori: form.kategori, desc: form.desc.trim(), stok }];
-    await api.saveMenu(next); setMenu(next); setItemModal(false);
+      ? menu.map(m => m.id === editTarget.id ? { ...record, stok: m.stok } : m)
+      : [...menu, record];
+    setMenu(next); setItemModal(false);
     toast_(`"${nama}" ${editTarget ? "diperbarui" : "ditambahkan"}`, "ok");
   }, [form, editTarget, menu, toast_]);
 
@@ -85,8 +91,8 @@ function useMenu({ toast_, addUndo }) {
   const deleteItem = useCallback(async (id) => {
     const snap = [...menu];
     const next = menu.filter(m => m.id !== id);
-    await api.saveMenu(next); setMenu(next);
-    addUndo("Hapus Menu", async () => { await api.saveMenu(snap); setMenu(snap); });
+    await api.deleteMenu(id); setMenu(next);
+    addUndo("Hapus Menu", async () => { await api.replaceMenu(snap); setMenu(snap); });
   }, [menu, addUndo]);
 
   // ── Categories CRUD
@@ -157,38 +163,20 @@ function useMenu({ toast_, addUndo }) {
     toast_(`Tag "${tag}" dihapus`, "ok");
   }, [cats, toast_]);
 
-  // Hanya MENGHITUNG updatedMenu — TIDAK setMenu di sini.
-  // Kode asli (processPayment) baru setMenu(updatedMenu) SETELAH
-  // api.processPayment() sukses. Kalau di-setMenu di sini (sebelum IPC
-  // selesai), UI akan terlihat stok sudah terkurangi walau pembayaran
-  // gagal di main process — itu bug baru yang tidak ada di kode asli.
-  // App.jsx yang panggil setMenu(updatedMenu) setelah IPC confirm ok.
-  // PENTING: membaca menu LANGSUNG dari closure. Wajib [menu] —
-  // tanpa ini, deduksi stok saat payment akan selalu pakai snapshot
-  // menu dari render pertama, salah hitung stok untuk item yang stoknya
-  // sudah berubah sejak app dibuka.
-  const computeStockDeduction = useCallback((cartItems) => {
-    return menu.map(m => {
-      const o = cartItems[m.id];
-      if (!o || m.stok === null) return m;
-      return { ...m, stok: Math.max(0, (m.stok || 0) - o.qty) };
-    });
-  }, [menu]);
-
-  // Restore stock when open bill is cancelled (without payment)
-  const computeStockRestoration = useCallback((billItems) => {
-    return menu.map(m => {
-      const item = billItems.find(i => i.id === m.id);
-      if (!item || m.stok === null) return m;
-      return { ...m, stok: (m.stok || 0) + (item.qty || 0) };
-    });
-  }, [menu]);
+  // computeStockDeduction/computeStockRestoration DIHAPUS (Langkah 2): stok
+  // sekarang dihitung di main process lewat applyStockDelta. Jika perlu
+  // menyesuaikan tampilan setelah delta diterapkan, pakai `applyStockView`.
+  // Terapkan peta `{id: stok}` hasil IPC ke state menu.
+  const applyStockView = useCallback((stock) => {
+    if (!stock || !Object.keys(stock).length) return;
+    setMenu(prev => prev.map(m => (stock[m.id] === undefined ? m : { ...m, stok: stock[m.id] })));
+  }, []);
 
 // PENTING: membaca menu LANGSUNG dari closure untuk snapshot undo. Wajib [menu, addUndo].
 const clearAllMenu = useCallback(async () => {
   const snap = [...menu];
-  await api.saveMenu([]); setMenu([]);
-  addUndo("Hapus Semua Menu", async () => { await api.saveMenu(snap); setMenu(snap); });
+  await api.replaceMenu([]); setMenu([]);
+  addUndo("Hapus Semua Menu", async () => { await api.replaceMenu(snap); setMenu(snap); });
 }, [menu, addUndo]);
 
   return {
@@ -196,8 +184,9 @@ const clearAllMenu = useCallback(async () => {
     itemModal, editTarget, form, catModal, newCatLabel,
     setKategori, setSearch, setItemModal, setForm, setCatModal, setNewCatLabel,
     setMenu, // diperlukan App.jsx untuk commit stok SETELAH IPC processPayment sukses
+    applyStockView,
     loadInitial, openAdd, openEdit, saveItem, deleteItem,
-    addCat, editCat, deleteCat, addTagToCategory, removeTagFromCategory, computeStockDeduction, computeStockRestoration, clearAllMenu
+    addCat, editCat, deleteCat, addTagToCategory, removeTagFromCategory, clearAllMenu
   };
 }
 

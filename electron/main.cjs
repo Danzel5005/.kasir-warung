@@ -65,8 +65,8 @@ function registerFileHandlers() {
   ipcMain.handle("bills-save", (_e, list) => { backup.atomicWrite(FILES.bills, list); return { ok: true }; });
   ipcMain.handle("bills-restore", (_e, list) => { backup.atomicWrite(FILES.bills, list); return { ok: true }; });
   ipcMain.handle("bills-clear", () => { backup.atomicWrite(FILES.bills, []); return { ok: true }; });
-  ipcMain.handle("menu-load", () => backup.rJSON(FILES.menu));
-  ipcMain.handle("menu-save", (_e, list) => { backup.atomicWrite(FILES.menu, list); return { ok: true }; });
+  // menu-load / menu-save sekarang ditangani db.cjs (tabel `products`, Langkah 2).
+  // menu.json tetap ditulis sebagai cermin oleh db.cjs untuk backup lama.
   ipcMain.handle("logo-load", () => (backup.rJSON(FILES.logo) || {}).data || null);
   ipcMain.handle("logo-save", (_e, data) => { backup.atomicWrite(FILES.logo, { data }); return { ok: true }; });
   ipcMain.handle("qris-load", () => backup.rJSON(FILES.qris) || {});
@@ -146,6 +146,7 @@ app.whenReady().then(() => {
   try {
     database.initDB();
     database.migrateJSONToSQLite();
+    database.migrateMenuToProducts();
     backup.walRecover();
     backup.dailyBackup();
     createWindow();

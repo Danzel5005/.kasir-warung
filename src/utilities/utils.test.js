@@ -141,23 +141,18 @@ describe("utils.js - LocalStorage Helper (LS) & API Wrapper", () => {
       LS("ykk_menu", [{ id: "M1", nama: "Kopi", stok: 10 }]);
 
       const paymentData = {
-        trx: { id: "TRX-NEW", total: 15000 },
-        updatedMenu: [{ id: "M1", nama: "Kopi", stok: 9 }],
-        activeBillId: "BILL-1",
+        trx: { id: "TRX-NEW", total: 15000, items: [{ id: "M1", nama: "Kopi", qty: 1 }] },
       };
 
       const result = await api.processPayment(paymentData);
-      expect(result).toEqual({ ok: true });
+      expect(result.ok).toBe(true);
+      expect(result.stock).toEqual({ M1: 9 }); // stok dihitung di fallback (10 - 1)
 
       const trxs = await api.loadTrx();
       expect(trxs[0].id).toBe("TRX-NEW");
 
       const menu = await api.loadMenu();
       expect(menu[0].stok).toBe(9);
-
-      const bills = await api.loadBills();
-      expect(bills).toHaveLength(1);
-      expect(bills[0].id).toBe("BILL-2");
     });
 
     it("should load default settings and handle save settings", async () => {
@@ -208,7 +203,10 @@ describe("utils.js - LocalStorage Helper (LS) & API Wrapper", () => {
         clearTrx: vi.fn().mockResolvedValue({ ok: true }),
         processPayment: vi.fn().mockResolvedValue({ ok: true, id: "ELEC-1" }),
         loadMenu: vi.fn().mockResolvedValue([{ id: "M1" }]),
-        saveMenu: vi.fn().mockResolvedValue({ ok: true }),
+        upsertMenu: vi.fn().mockResolvedValue({ ok: true }),
+        deleteMenu: vi.fn().mockResolvedValue({ ok: true }),
+        replaceMenu: vi.fn().mockResolvedValue({ ok: true }),
+        applyStock: vi.fn().mockResolvedValue({ ok: true, stock: { M1: 4 } }),
         loadSettings: vi.fn().mockResolvedValue({ printDelay: 100 }),
         getDataPath: vi.fn().mockResolvedValue("/app/data"),
         getPrinters: vi.fn().mockResolvedValue([{ name: "POS-58" }]),

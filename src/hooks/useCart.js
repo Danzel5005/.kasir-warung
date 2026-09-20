@@ -142,7 +142,7 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
   // yang jauh lebih parah dari yang sedang kita selidiki.
   const saveOpenBill = useCallback(async ({ 
     bills, billId, persistBills, setBillId,
-    computeStockDeduction, commitMenu,  // NEW: for stock deduction
+    applyStockView,  // NEW (Langkah 2): stok dihitung di main process
     customer = null, // Selected customer/member snapshot (denormalized into bill)
   }) => {
     if (!items.length || !checkRequiredAdditionals(receiptAdditionals)) { toast_("Isi field wajib dan pesanan dulu", "err"); return; }
@@ -182,7 +182,7 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
         return acc;
       }, {});
       
-      // Compute delta (new - old)
+      // Compute delta (new - old) — dikirim ke main process, bukan dihitung di renderer
       const allItemIds = new Set([...Object.keys(oldItemsById), ...Object.keys(newItemsById)]);
       stockDelta = {};
       for (const id of allItemIds) {
@@ -190,7 +190,7 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
         const newQty = newItemsById[id]?.qty || 0;
         const diff = newQty - oldQty;
         if (diff !== 0) {
-          stockDelta[id] = { qty: diff };
+          stockDelta[id] = diff;
         }
       }
       
@@ -203,8 +203,7 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
     } else {
       // New bill - all items are new stock deduction
       stockDelta = items.reduce((acc, item) => {
-        const existing = acc[item.id] || { qty: 0 };
-        acc[item.id] = { ...existing, qty: existing.qty + (item.qty || 0) };
+        acc[item.id] = (acc[item.id] || 0) - (item.qty || 0);
         return acc;
       }, {});
       
@@ -214,10 +213,12 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
       toast_('Open Bill dibuat', "ok");
     }
     
-    // Deduct stock when saving open bill (only delta for updates)
-    if (computeStockDeduction && commitMenu && stockDelta && Object.keys(stockDelta).length > 0) {
-      const updatedMenu = computeStockDeduction(stockDelta);
-      commitMenu(updatedMenu);
+    // Deduct stock when saving open bill (only delta for updates).
+    // Stok dihitung di main process (Langkah 2) dan persist ke SQLite/JSON;
+    // view di-patch dari hasil { stock } supaya UI tetap akurat.
+    if (stockDelta && Object.keys(stockDelta).length > 0) {
+      const res = await api.applyStock(stockDelta, { type: "openbill", ref: activeBill?.id || billId });
+      if (res?.ok && res.stock && applyStockView) applyStockView(res.stock);
     }
     
     await persistBills(updatedBills);
@@ -255,13 +256,12 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
 // race condition pada setTimeout di loadBillAndPay.
 const processPayment = useCallback(async ({
   generateTrxId, activeShift,
-  computeStockDeduction, commitMenu,
+  applyStockView,  // NEW (Langkah 2): patch view dari { stock } hasil IPC
   appendHistory,
   removeBillLocal,
   onSuccess,
   billIdToClose,
   paymentMethods = [],
-  menu, // Pass current menu for open bill payment (no stock deduction)
   customer = null, // Selected customer/member snapshot (denormalized into trx)
 }) => {
   const t = getNow();
@@ -311,28 +311,15 @@ const processPayment = useCallback(async ({
     customerTelepon: customer?.phone || "",
     ...receiptAdditionalData, // Include receipt additional fields
   };
-  // Check if we're paying an existing open bill (stock was already deducted when bill was created)
-  const isPayingOpenBill = !!billIdToClose;
-  
-  let updatedMenu;
-  if (isPayingOpenBill) {
-    // For open bills, stock was already deducted when bill was created
-    // Just use current menu as-is (no additional deduction)
-    updatedMenu = menu;
-  } else {
-    // For new payments (not from open bill), deduct stock
-    const cartItemsById = Object.values(cart).reduce((acc, item) => {
-      const existing = acc[item.id] || { qty: 0 };
-      acc[item.id] = { ...existing, qty: existing.qty + (item.qty || 0) };
-      return acc;
-    }, {});
-    updatedMenu = computeStockDeduction(cartItemsById);
-  }
-  const result = await api.processPayment({ trx, updatedMenu, activeBillId: billIdToClose });
+  // Stok TIDAK dihitung di renderer (Langkah 2). Main process yang
+  // menghitung & menulis delta di dalam SATU transaksi SQLite bersama
+  // INSERT transaksi. Open bill: stok sudah dikurangi saat bill dibuat,
+  // main process melewatkan deduksi ulang karena activeBillId dikirim.
+  const result = await api.processPayment({ trx, activeBillId: billIdToClose });
 
   if (!result.ok) { toast_("Gagal menyimpan transaksi", "err"); return null; }
 
-  commitMenu(updatedMenu);     // setMenu — commit HANYA setelah IPC sukses
+  if (result.stock && applyStockView) applyStockView(result.stock); // patch view setelah IPC sukses
   appendHistory(trx);          // setHistory(h=>[trx,...h])
   // Remove the paid bill from open bills using explicit billIdToClose
   removeBillLocal(billIdToClose);

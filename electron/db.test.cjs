@@ -47,6 +47,9 @@ class FakeDatabase {
     if (e === "id") return row.id;
     if (e === "data") return row.data;
     if (e === "created_at") return row.created_at;
+    if (e === "menu_id") return row.menu_id;
+    if (e === "kategori") return row.kategori;
+    if (e === "stok") return row.stok;
     if (new RegExp(`^${DATE_EXPR}$`).test(e)) return row.created_at.slice(0, 10);
     const j = new RegExp(`^json_extract\\(data, '\\$\\.(\\w+)'\\)$`).exec(e);
     if (j) { try { return JSON.parse(row.data)?.[j[1]]; } catch { return undefined; } }
@@ -105,9 +108,11 @@ class FakeDatabase {
     const table = /FROM\s+(\w+)/i.exec(sql)?.[1];
     if (!table) throw new Error(`FakeDatabase: tidak menemukan tabel di: ${sql}`);
     this._lastParams = params;
-    this._popped = 0;
-
-    let rows = this._rows(table).filter((row) => this._where(row, sql));
+    // PENTING: tiap baris membaca ulang parameter `?` yang sama, jadi pointer
+    // parameter harus di-reset PER BARIS. Kalau hanya di-reset sekali di sini,
+    // WHERE yang cocok bukan dengan baris pertama akan salah menilai (bug laten
+    // yang muncul begitu ada query `WHERE id = ?` pada tabel berisi >1 baris).
+    let rows = this._rows(table).filter((row) => { this._popped = 0; return this._where(row, sql); });
 
     if (/GROUP BY/i.test(sql)) {
       const grouped = new Map();
@@ -142,6 +147,9 @@ class FakeDatabase {
       const wants = (expr) => new RegExp(`(^|,\\s*)${expr}(\\s*(as\\s+\\w+)?)?\\s*(,|$)`).test(select);
       const projection = {};
       if (wants("id")) projection.id = (row) => row.id;
+      if (wants("menu_id")) projection.menu_id = (row) => row.menu_id;
+      if (wants("kategori")) projection.kategori = (row) => row.kategori;
+      if (wants("stok")) projection.stok = (row) => row.stok;
       if (wants("data")) projection.data = (row) => row.data;
       if (wants("created_at")) projection.created_at = (row) => row.created_at;
       // COUNT(*) as total / as count — dipakai trx-load-filtered.
@@ -214,12 +222,45 @@ class FakeDatabase {
       return { changes: 1 };
     }
 
+    // UPDATE products: dua bentuk (upsertMenuRow) — dengan & tanpa stok.
+    const updStock = /^UPDATE\s+(\w+)\s+SET\s+kategori\s*=\s*\?\s*,\s*stok\s*=\s*\?\s*,\s*data\s*=\s*\?\s+WHERE\s+menu_id\s*=\s*\?$/i.exec(sql);
+    if (updStock) {
+      const rows = this.tables[updStock[1]] || [];
+      const target = rows.find((r) => String(r.menu_id) === String(params[3]));
+      if (!target) return { changes: 0 };
+      target.kategori = params[0]; target.stok = params[1]; target.data = params[2];
+      return { changes: 1 };
+    }
+    const updNoStock = /^UPDATE\s+(\w+)\s+SET\s+kategori\s*=\s*\?\s*,\s*data\s*=\s*\?\s+WHERE\s+menu_id\s*=\s*\?$/i.exec(sql);
+    if (updNoStock) {
+      const rows = this.tables[updNoStock[1]] || [];
+      const target = rows.find((r) => String(r.menu_id) === String(params[2]));
+      if (!target) return { changes: 0 };
+      target.kategori = params[0]; target.data = params[1];
+      return { changes: 1 };
+    }
+    const updStockOnly = /^UPDATE\s+(\w+)\s+SET\s+stok\s*=\s*\?\s+WHERE\s+menu_id\s*=\s*\?$/i.exec(sql);
+    if (updStockOnly) {
+      const rows = this.tables[updStockOnly[1]] || [];
+      const target = rows.find((r) => String(r.menu_id) === String(params[1]));
+      if (!target) return { changes: 0 };
+      target.stok = params[0];
+      return { changes: 1 };
+    }
+
     const del = /^DELETE\s+FROM\s+(\w+)\s+WHERE\s+id\s*=\s*\?$/i.exec(sql);
     if (del) {
       const rows = this.tables[del[1]] || [];
       const before = rows.length;
       this.tables[del[1]] = rows.filter((r) => r.id !== params[0]);
       return { changes: before - this.tables[del[1]].length };
+    }
+    const delMenu = /^DELETE\s+FROM\s+(\w+)\s+WHERE\s+menu_id\s*=\s*\?$/i.exec(sql);
+    if (delMenu) {
+      const rows = this.tables[delMenu[1]] || [];
+      const before = rows.length;
+      this.tables[delMenu[1]] = rows.filter((r) => String(r.menu_id) !== String(params[0]));
+      return { changes: before - this.tables[delMenu[1]].length };
     }
 
     throw new Error(`FakeDatabase: statement tidak didukung: ${sql}`);
@@ -311,9 +352,11 @@ describe("db.cjs: initDB & registerHandlers", () => {
     expect(services.svc.initDB()).toBe(true);
     services.svc.registerHandlers();
     expect(Object.keys(services.registry).sort()).toEqual([
+      "apply-stock", "menu-delete", "menu-load", "menu-replace", "menu-upsert",
       "process-payment", "shifts-load", "shifts-save",
       "trx-clear", "trx-delete", "trx-get-daily-stats", "trx-get-shift-ids",
-      "trx-load", "trx-load-filtered", "trx-restore", "trx-save", "trx-void",
+      "trx-load", "trx-load-filtered", "trx-restore", "trx-restore-cleared",
+      "trx-save", "trx-void",
     ]);
   });
 
@@ -351,7 +394,7 @@ describe("db.cjs: CRUD transaksi (jalur SQLite)", () => {
   it("trx-delete menghapus tepat satu transaksi", () => {
     call("trx-save", { id: "a", total: 1 });
     call("trx-save", { id: "b", total: 2 });
-    expect(call("trx-delete", "a")).toEqual({ ok: true });
+    expect(call("trx-delete", "a")).toMatchObject({ ok: true });
     expect(call("trx-load").map((t) => t.id)).toEqual(["b"]);
   });
 
@@ -370,6 +413,40 @@ describe("db.cjs: CRUD transaksi (jalur SQLite)", () => {
     expect(call("trx-void", "tidak-ada", {})).toMatchObject({ ok: false });
   });
 
+  it("trx-void mengembalikan stok item (baseQty) dan mengembalikan menu terbaru", () => {
+    call("menu-replace", [
+      { id: "m1", nama: "Kopi", stok: 3 },
+      { id: "m2", nama: "Teh", stok: 10 },
+      { id: "m3", nama: "Air", stok: null }, // stok tak terbatas -> dilewati
+    ]);
+    call("trx-save", {
+      id: "v-stok",
+      items: [
+        { id: "m1", qty: 2, baseQty: 2 }, // 3 + 2 = 5
+        { id: "m2", qty: 1 },             // tanpa baseQty -> pakai qty -> 11
+        { id: "m3", qty: 1 },             // stok null -> dilewati
+        { id: "m-hapus", qty: 5 },        // tidak ada di menu -> dilewati
+      ],
+    });
+    const res = call("trx-void", "v-stok", { reason: "refund" });
+    expect(res.ok).toBe(true);
+    const menu = call("menu-load");
+    const byId = Object.fromEntries(menu.map((m) => [m.id, m]));
+    expect(byId.m1.stok).toBe(5);
+    expect(byId.m2.stok).toBe(11);
+    expect(byId.m3.stok).toBe(null);
+  });
+
+  it("trx-void dua kali ditolak supaya stok tidak kembali dua kali", () => {
+    call("menu-replace", [{ id: "m1", nama: "Kopi", stok: 3 }]);
+    call("trx-save", { id: "v2x", items: [{ id: "m1", qty: 2 }] });
+    expect(call("trx-void", "v2x", {}).ok).toBe(true);
+    const second = call("trx-void", "v2x", {});
+    expect(second.ok).toBe(false);
+    const byId = Object.fromEntries(call("menu-load").map((m) => [m.id, m]));
+    expect(byId.m1.stok).toBe(5); // bukan 7
+  });
+
   it("trx-restore mengganti SELURUH isi tabel", () => {
     call("trx-save", { id: "lama", total: 1 });
     expect(call("trx-restore", [{ id: "x", total: 9 }])).toEqual({ ok: true });
@@ -378,7 +455,7 @@ describe("db.cjs: CRUD transaksi (jalur SQLite)", () => {
 
   it("trx-clear mengosongkan tabel", () => {
     call("trx-save", { id: "a", total: 1 });
-    expect(call("trx-clear")).toEqual({ ok: true });
+    expect(call("trx-clear")).toMatchObject({ ok: true });
     expect(call("trx-load")).toEqual([]);
   });
 
@@ -420,6 +497,93 @@ describe("db.cjs: CRUD transaksi (jalur SQLite)", () => {
   });
 });
 
+// Regresi bug "undo hapus bisa menghapus data": dulu undo memakai trx-restore,
+// yang menimpa SELURUH tabel dengan satu halaman riwayat dari renderer. Sekarang
+// undo hapus-satu memakai trx-save (INSERT tunggal) dan undo hapus-semua memakai
+// snapshot penuh yang ditulis main process sebelum DELETE.
+describe("db.cjs: undo hapus transaksi tidak menghapus data lain", () => {
+  beforeEach(() => {
+    services.svc.initDB();
+    services.svc.registerHandlers();
+  });
+  const call = (name, ...args) => services.registry[name](null, ...args);
+
+  it("trx-delete mengembalikan baris yang dihapus supaya bisa di-undo via trx-save", () => {
+    call("trx-save", { id: "a", total: 1 });
+    call("trx-save", { id: "b", total: 2 });
+    const res = call("trx-delete", "a");
+    expect(res.ok).toBe(true);
+    expect(res.trx).toEqual({ id: "a", total: 1 });
+    expect(call("trx-load").map((t) => t.id)).toEqual(["b"]);
+
+    // Undo: INSERT tunggal, bukan restore yang menimpa tabel.
+    call("trx-save", res.trx);
+    expect(call("trx-load").map((t) => t.id).sort()).toEqual(["a", "b"]);
+  });
+
+  it("trx-delete id tak dikenal mengembalikan trx null tanpa melempar", () => {
+    const res = call("trx-delete", "tidak-ada");
+    expect(res.ok).toBe(true);
+    expect(res.trx).toBeNull();
+  });
+
+  it("baris di luar halaman renderer tetap aman: hapus 1 lalu simpan ulang, total tetap", () => {
+    for (let i = 0; i < 3; i += 1) call("trx-save", { id: `t${i}`, total: i });
+    const res = call("trx-delete", "t1");
+    call("trx-save", res.trx); // undo
+    expect(call("trx-load").map((t) => t.id).sort()).toEqual(["t0", "t1", "t2"]);
+  });
+
+  it("trx-clear menulis snapshot SEMUA baris ke jsonBackups lalu mengosongkan tabel", () => {
+    for (let i = 0; i < 3; i += 1) call("trx-save", { id: `t${i}`, total: i });
+    const res = call("trx-clear");
+    expect(res.ok).toBe(true);
+    expect(typeof res.backupFile).toBe("string");
+    expect(res.backupFile).toContain("trx-cleared-");
+    expect(fs.existsSync(res.backupFile)).toBe(true);
+    expect(call("trx-load")).toEqual([]);
+
+    const snap = JSON.parse(fs.readFileSync(res.backupFile, "utf-8"));
+    expect(snap.map((t) => t.id).sort()).toEqual(["t0", "t1", "t2"]);
+  });
+
+  it("trx-restore-cleared mengembalikan SEMUA baris snapshot (bukan cuma satu halaman)", () => {
+    for (let i = 0; i < 3; i += 1) call("trx-save", { id: `t${i}`, total: i });
+    const { backupFile } = call("trx-clear");
+    const res = call("trx-restore-cleared", backupFile);
+    expect(res.ok).toBe(true);
+    expect(res.restored).toBe(3);
+    expect(call("trx-load").map((t) => t.id).sort()).toEqual(["t0", "t1", "t2"]);
+  });
+
+  it("trx-restore-cleared bersifat idempotent (INSERT OR IGNORE)", () => {
+    call("trx-save", { id: "a", total: 1 });
+    const { backupFile } = call("trx-clear");
+    expect(call("trx-restore-cleared", backupFile).restored).toBe(1);
+    expect(call("trx-restore-cleared", backupFile).restored).toBe(0);
+    expect(call("trx-load")).toHaveLength(1);
+  });
+
+  it("trx-restore-cleared menolak file di luar folder jsonBackups", () => {
+    const outside = path.join(dir, "jahat.json");
+    fs.writeFileSync(outside, JSON.stringify([{ id: "x" }]), "utf-8");
+    const res = call("trx-restore-cleared", outside);
+    expect(res.ok).toBe(false);
+    expect(res.error).toMatch(/di luar folder backup/i);
+  });
+
+  it("trx-restore-cleared menolak path traversal lewat '..'", () => {
+    const res = call("trx-restore-cleared", path.join(files.jsonBackups, "..", "transactions.json"));
+    expect(res.ok).toBe(false);
+  });
+
+  it("trx-clear tanpa transaksi tidak membuat file backup", () => {
+    const res = call("trx-clear");
+    expect(res.ok).toBe(true);
+    expect(res.backupFile).toBeNull();
+  });
+});
+
 describe("db.cjs: shifts", () => {
   beforeEach(() => {
     services.svc.initDB();
@@ -441,25 +605,34 @@ describe("db.cjs: process-payment", () => {
   it("jalur SQLite menulis trx, menu, bill, dan memakai WAL", () => {
     services.svc.initDB();
     services.svc.registerHandlers();
-    const res = call("process-payment", { trx: { id: "p1", total: 100 }, updatedMenu: [{ id: "m1" }], activeBillId: "bill-1" });
-    expect(res).toEqual({ ok: true });
+    // Seed satu produk berstok supaya deduksi stok benar-benar terjadi.
+    call("menu-upsert", { id: "m1", nama: "Kopi", stok: 10 });
+    const res = call("process-payment", {
+      trx: { id: "p1", total: 100, items: [{ id: "m1", nama: "Kopi", qty: 2 }] },
+    });
+    expect(res.ok).toBe(true);
+    expect(res.stock).toEqual({ m1: 8 }); // 10 - 2
     expect(call("trx-load").map((t) => t.id)).toEqual(["p1"]);
+    // Menu di tabel products ikut ter-deduksi.
+    expect(call("menu-load").find((m) => m.id === "m1").stok).toBe(8);
     // WAL ditulis lalu dibersihkan setelah transaksi sukses.
     expect(services.wal.map((t) => t.id)).toEqual(["p1"]);
     expect(services.walCleared).toBe(1);
-    expect(services.writes.some((w) => w.file === files.menu)).toBe(true);
   });
 
   it("jalur fallback (tanpa SQLite) memakai JSON store dan tetap sukses", () => {
     services.svc.registerHandlers();
+    fs.writeFileSync(files.menu, JSON.stringify([{ id: "m2", nama: "Teh", stok: 5 }]), "utf-8");
     // Bill aktif ikut ditulis supaya penghapusan bill juga terverifikasi.
     fs.writeFileSync(files.bills, JSON.stringify([{ id: "bill-2" }, { id: "bill-9" }]), "utf-8");
-    const res = call("process-payment", { trx: { id: "p2", total: 50 }, updatedMenu: [{ id: "m2" }], activeBillId: "bill-2" });
-    expect(res).toEqual({ ok: true });
+    const res = call("process-payment", {
+      trx: { id: "p2", total: 50, items: [{ id: "m2", nama: "Teh", qty: 3 }] },
+      activeBillId: "bill-2",
+    });
+    expect(res.ok).toBe(true);
     expect(services.wal).toHaveLength(0);
     expect(fs.existsSync(files.trx)).toBe(true);
     expect(JSON.parse(fs.readFileSync(files.trx, "utf-8")).map((t) => t.id)).toEqual(["p2"]);
-    expect(JSON.parse(fs.readFileSync(files.menu, "utf-8"))).toEqual([{ id: "m2" }]);
     expect(JSON.parse(fs.readFileSync(files.bills, "utf-8")).map((b) => b.id)).toEqual(["bill-9"]);
   });
 });

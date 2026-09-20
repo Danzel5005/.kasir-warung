@@ -54,13 +54,23 @@ function KasirWorkspace() {
   // ── Hooks: panggil semua di sini, App.jsx jadi satu-satunya tempat yang
   // tahu seluruh data flow antar domain. Tidak ada hook yang import hook lain.
   const toastH    = useToast();
-  // historyRefreshRef breaks the declaration-order cycle: voidH is declared
-  // before historyH, but must be able to trigger a history reload after voiding.
+  // historyRefreshRef & menuSetRef break declaration-order cycles: voidH is
+  // declared before both historyH and menuH, but after a void it must be able
+  // to reload history AND push the menu whose stock was just restored.
   const historyRefreshRef = useRef(null);
-  const voidH     = useHistoryVoid({ toast_: toastH.toast_, addUndo: toastH.addUndo, onVoided: () => historyRefreshRef.current?.() });
+  const menuSetRef = useRef(null);
+  const voidH     = useHistoryVoid({
+    toast_: toastH.toast_,
+    addUndo: toastH.addUndo,
+    onVoided: (_id, menu) => {
+      if (Array.isArray(menu) && menu.length) menuSetRef.current?.(menu);
+      historyRefreshRef.current?.();
+    },
+  });
   const licenseH  = useLicense();
   const authH     = useAuth({ getNow, toast_: toastH.toast_ });
   const menuH     = useMenu({ toast_: toastH.toast_, addUndo: toastH.addUndo });
+  menuSetRef.current = menuH.setMenu;
   const billsH    = useBills({ toast_: toastH.toast_, addUndo: toastH.addUndo });
   const cartH     = useCart({ toast_: toastH.toast_, getNow, receiptAdditionals: [] });
   const historyH  = useHistory({ toast_: toastH.toast_, addUndo: toastH.addUndo, getNow, authH });
@@ -216,32 +226,28 @@ function KasirWorkspace() {
   const saveOpenBill = useCallback(() => cartH.saveOpenBill({
     bills: billsH.bills, billId: billsH.billId,
     persistBills: billsH.persistBills, setBillId: billsH.setBillId,
-    computeStockDeduction: menuH.computeStockDeduction,
-    commitMenu: menuH.setMenu,
+    applyStockView: menuH.applyStockView, // Langkah 2: patch view dari { stock } IPC
     customer: customersH.selectedCustomer, // denormalized into the open bill
-  }), [cartH.saveOpenBill, billsH.bills, billsH.billId, billsH.persistBills, billsH.setBillId, menuH.computeStockDeduction, menuH.setMenu, customersH.selectedCustomer]);
+  }), [cartH.saveOpenBill, billsH.bills, billsH.billId, billsH.persistBills, billsH.setBillId, menuH.applyStockView, customersH.selectedCustomer]);
 
   // processPayment butuh potongan dari useHistory, useMenu, useAuth, useBills
   // FIX: Use cartH.activeBill?.id directly to avoid race condition with setTimeout
   const processPayment = useCallback(() => cartH.processPayment({
     generateTrxId: historyH.generateTrxId,
     activeShift: authH.activeShift,
-    computeStockDeduction: menuH.computeStockDeduction,
-    commitMenu: menuH.setMenu,
+    applyStockView: menuH.applyStockView, // Langkah 2: patch view dari { stock } IPC
     // clearCart() also clears the customer selection — a finished sale must not
     // leak the member of the previous customer into the next order.
     appendHistory: (trx) => { historyH.appendHistory(trx); setReceipt(trx); setPayModal(false); cartH.setDrawerOpen(false); cartH.clearCart(); customersH.setSelectedCustomerId(null); },
     removeBillLocal: billsH.removeBillLocal,
     billIdToClose: cartH.activeBill?.id,     // Use activeBill directly instead of ref
     paymentMethods: settingsH.settings.paymentMethods || [], // NEW: payment methods for label resolution
-    menu: menuH.menu, // Pass current menu for open bill payment (no stock deduction)
     customer: customersH.selectedCustomer, // GAP 5: denormalized into trx for receipt
   }), [
     cartH.processPayment, historyH.generateTrxId, authH.activeShift,
-    menuH.computeStockDeduction, menuH.setMenu, historyH.appendHistory,
+    menuH.applyStockView, historyH.appendHistory,
     cartH.setDrawerOpen, cartH.clearCart, billsH.removeBillLocal,
     settingsH.settings.paymentMethods, // NEW deps
-    menuH.menu, // Add menu to deps
     customersH.selectedCustomer, // GAP 5
     customersH.setSelectedCustomerId, // GAP 5
   ]);
@@ -334,15 +340,13 @@ const executeConfirmDel = useCallback(() => {
     else if (confirmDel.type === "bill") {
       // For open bills, cancel and restore stock
       billsH.cancelBill(confirmDel.id, {
-        computeStockRestoration: menuH.computeStockRestoration,
-        computeStockDeduction: menuH.computeStockDeduction,
-        commitMenu: menuH.setMenu,
+        applyStockView: menuH.applyStockView, // Langkah 2: stok via api.applyStock
       });
     }
     else if (confirmDel.type === "allMenu") menuH.clearAllMenu();   // ← new, must be explicit
     else menuH.deleteItem(confirmDel.id);
     setConfirmDel(null);
-  }, [confirmDel, authH.currentUser, toastH.toast_, historyH.clearAllTrx, historyH.deleteTrx, billsH.clearAllBills, billsH.cancelBill, menuH.computeStockRestoration, menuH.computeStockDeduction, menuH.setMenu, menuH.clearAllMenu, menuH.deleteItem]);
+  }, [confirmDel, authH.currentUser, toastH.toast_, historyH.clearAllTrx, historyH.deleteTrx, billsH.clearAllBills, billsH.cancelBill, menuH.applyStockView, menuH.clearAllMenu, menuH.deleteItem]);
  
   const at = historyH.at;
   const doCSV = historyH.doCSV;

@@ -7,6 +7,7 @@ const kasirAPI = {
   deleteTrx:   (id)    => ipcRenderer.invoke("trx-delete", id),
   restoreTrx:  (list)  => ipcRenderer.invoke("trx-restore", list),
   clearTrx:    ()      => ipcRenderer.invoke("trx-clear"),
+  restoreClearedTrx: (backupFile) => ipcRenderer.invoke("trx-restore-cleared", backupFile),
   voidTrx:     (id, data) => ipcRenderer.invoke("trx-void", id, data),
   // New: Filtered & paginated transactions
   loadTrxFiltered: (filters) => ipcRenderer.invoke("trx-load-filtered", filters),
@@ -19,7 +20,10 @@ const kasirAPI = {
   clearBills:   ()      => ipcRenderer.invoke("bills-clear"),
   // Menu
   loadMenu:    ()      => ipcRenderer.invoke("menu-load"),
-  saveMenu:    (list)  => ipcRenderer.invoke("menu-save", list),
+  upsertMenu:  (item)  => ipcRenderer.invoke("menu-upsert", item),
+  deleteMenu:  (id)    => ipcRenderer.invoke("menu-delete", id),
+  replaceMenu: (list)  => ipcRenderer.invoke("menu-replace", list),
+  applyStock:  (deltas, meta) => ipcRenderer.invoke("apply-stock", deltas, meta),
   // Logo
   loadLogo:    ()      => ipcRenderer.invoke("logo-load"),
   saveLogo:    (data)  => ipcRenderer.invoke("logo-save", data),

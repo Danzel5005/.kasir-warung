@@ -35,6 +35,12 @@ const api = {
   async deleteTrx(id)     { if(window.kasirAPI) return window.kasirAPI.deleteTrx(id); LS("ykk_trx",(LS("ykk_trx")||[]).filter(t=>t.id!==id)); },
   async restoreTrx(list)  { if(window.kasirAPI) return window.kasirAPI.restoreTrx(list); LS("ykk_trx",list); },
   async clearTrx()        { if(window.kasirAPI) return window.kasirAPI.clearTrx(); LS("ykk_trx",[]); },
+  // Undo "Hapus Semua": main process menyimpan snapshot penuh sebelum DELETE,
+  // renderer hanya menunjuk file-nya (localStorage tak punya file, jadi no-op).
+  async restoreClearedTrx(backupFile) {
+    if (window.kasirAPI) return window.kasirAPI.restoreClearedTrx(backupFile);
+    return { ok: false, error: "Tidak tersedia di mode browser" };
+  },
   async voidTrx(id, { reason, actor, note }) {
     if(window.kasirAPI) return window.kasirAPI.voidTrx(id, { reason, actor, note });
     const all = (LS("ykk_trx") || []).map(healVoidedTrx);
@@ -101,7 +107,42 @@ const api = {
   async restoreBills(l)   { if(window.kasirAPI) return window.kasirAPI.restoreBills(l); LS("ykk_bills",l); },
   async clearBills()      { if(window.kasirAPI) return window.kasirAPI.clearBills(); LS("ykk_bills",[]); },
   async loadMenu()        { return window.kasirAPI ? await window.kasirAPI.loadMenu()         : LS("ykk_menu"); },
-  async saveMenu(list)    { if(window.kasirAPI) return window.kasirAPI.saveMenu(list); LS("ykk_menu",list); },
+  // Langkah 2: menu pindah ke tabel `products` di main process. Upsert TIDAK
+  // menimpa stok baris yang sudah ada; stok hanya berubah lewat applyStock.
+  async upsertMenu(item)  {
+    if (window.kasirAPI?.upsertMenu) return window.kasirAPI.upsertMenu(item);
+    const list = LS("ykk_menu") || [];
+    const idx = list.findIndex((m) => String(m.id) === String(item?.id));
+    if (idx >= 0) list[idx] = { ...item, stok: list[idx].stok }; else list.push(item);
+    LS("ykk_menu", list);
+    return { ok: true };
+  },
+  async deleteMenu(id)    {
+    if (window.kasirAPI?.deleteMenu) return window.kasirAPI.deleteMenu(id);
+    LS("ykk_menu", (LS("ykk_menu") || []).filter((m) => String(m.id) !== String(id)));
+    return { ok: true };
+  },
+  async replaceMenu(list) {
+    if (window.kasirAPI?.replaceMenu) return window.kasirAPI.replaceMenu(list);
+    LS("ykk_menu", list || []);
+    return { ok: true };
+  },
+  // Satu pintu stok. Deltas = { [menuId]: delta }. Mengembalikan { ok, stock:{id:stok} }.
+  async applyStock(deltas, meta) {
+    if (window.kasirAPI?.applyStock) return window.kasirAPI.applyStock(deltas, meta);
+    const list = LS("ykk_menu") || [];
+    const stock = {};
+    Object.entries(deltas || {}).forEach(([id, delta]) => {
+      const it = list.find((m) => String(m.id) === String(id));
+      if (!it || it.stok === null || it.stok === undefined) return;
+      const d = Number(delta) || 0;
+      if (!d) return;
+      it.stok = Math.max(0, Number(it.stok) + d);
+      stock[id] = it.stok;
+    });
+    LS("ykk_menu", list);
+    return { ok: true, stock };
+  },
   async loadLogo()        { return window.kasirAPI ? await window.kasirAPI.loadLogo()         : LS("ykk_logo"); },
   async saveLogo(data)    { if(window.kasirAPI) return window.kasirAPI.saveLogo(data); LS("ykk_logo",data); },
   async loadCats()        { return window.kasirAPI ? await window.kasirAPI.loadCats()         : (LS("ykk_cats")||[]); },
@@ -128,15 +169,27 @@ const api = {
   async printReceipt(d)   { return window.kasirAPI ? await window.kasirAPI.printReceipt(d)    : {ok:false,error:"Hanya tersedia di aplikasi desktop"}; },
   async loadShifts()      { return window.kasirAPI ? await window.kasirAPI.loadShifts?.()     : (LS("ykk_shifts")||[]); },
   async saveShifts(list)  { if(window.kasirAPI&&window.kasirAPI.saveShifts) return window.kasirAPI.saveShifts(list); LS("ykk_shifts",list); },
-  // Atomic payment — tulis trx + menu + hapus bill sekaligus
+  // Atomic payment — tulis trx + potong stok + hapus bill sekaligus
   async processPayment(data) {
     if(window.kasirAPI) return window.kasirAPI.processPayment(data);
     // Fallback localStorage (dev browser mode)
-    const { trx, updatedMenu, activeBillId } = data;
+    const { trx, activeBillId } = data;
     const a = LS("ykk_trx")||[]; a.unshift(trx); LS("ykk_trx", a);
-    if(updatedMenu) LS("ykk_menu", updatedMenu);
     if(activeBillId) LS("ykk_bills", (LS("ykk_bills")||[]).filter(b=>b.id!==activeBillId));
-    return { ok: true };
+    // Potong stok kalau bukan dari open bill (stok sudah dipotong saat hold).
+    const stock = {};
+    if(!activeBillId && Array.isArray(trx?.items)) {
+      const deltas = {};
+      trx.items.forEach(it => {
+        if(it?.id === undefined || it?.id === null) return;
+        const qty = Number(it.baseQty ?? it.qty) || 0;
+        if(!qty) return;
+        deltas[String(it.id)] = (deltas[String(it.id)] || 0) - qty;
+      });
+      const r = await this.applyStock(deltas, { type: "sale", ref: trx?.id });
+      Object.assign(stock, r?.stock || {});
+    }
+    return { ok: true, stock };
   },
   // QRIS — simpan terpisah dari settings supaya tidak bloat settings.json
   async loadQris()        { return window.kasirAPI ? await window.kasirAPI.loadQris?.()       : (LS("ykk_qris")||{}); },

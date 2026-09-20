@@ -32,7 +32,10 @@ function useHistoryVoid({ toast_, addUndo, onVoided } = {}) {
       setVoidReason("");
       setVoidNote("");
       toast_("Transaksi ditandai void", "ok");
-      onVoided?.(id);
+      // res.menu berisi menu dengan stok yang sudah dikembalikan (Langkah 1).
+      // Kalau tidak ada (mis. transaksi void tanpa item berstok), tetap panggil
+      // tanpa argumen supaya refresh riwayat tetap jalan.
+      onVoided?.(id, res?.menu || null);
       return true;
     } catch (err) {
       toast_(err?.message || "Gagal void transaksi", "err");

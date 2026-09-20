@@ -36,8 +36,10 @@ function useBills({ toast_, addUndo }) {
   }, [addUndo]);
 
   // Close single bill WITHOUT payment (cancel) - restore stock
-  // This is called when user deletes an open bill without paying
-  const cancelBill = useCallback(async (id, { computeStockRestoration, computeStockDeduction, commitMenu }) => {
+  // This is called when user deletes an open bill without paying.
+  // Langkah 2: stok dipulihkan lewat api.applyStock (delta positif),
+  // dihitung dari item bill. Tidak ada perhitungan menu di renderer.
+  const cancelBill = useCallback(async (id, { applyStockView } = {}) => {
     if (!id) return;
     setBills(prev => {
       const billToCancel = prev.find(b => String(b.id) === String(id));
@@ -46,27 +48,30 @@ function useBills({ toast_, addUndo }) {
       const snap = [...prev];
       const updated = prev.filter(b => String(b.id) !== String(id));
       api.saveBills(updated);
-      
-      // Restore stock if computeStockRestoration is provided
-      let restoredMenu = null;
-      if (computeStockRestoration && commitMenu && billToCancel.items) {
-        restoredMenu = computeStockRestoration(billToCancel.items);
-        commitMenu(restoredMenu);
+
+      // Delta positif: kembalikan stok item bill yang dibatalkan.
+      const deltas = (billToCancel.items || []).reduce((acc, item) => {
+        acc[item.id] = (acc[item.id] || 0) + (item.qty || 0);
+        return acc;
+      }, {});
+      if (Object.keys(deltas).length > 0) {
+        api.applyStock(deltas, { type: "cancel", ref: String(id) })
+          .then((res) => { if (res?.ok && res.stock && applyStockView) applyStockView(res.stock); })
+          .catch(() => {});
       }
-      
+
       addUndo("Batalkan Open Bill", async () => {
         await api.saveBills(snap);
         setBills(snap);
-        // Re-deduct stock when undoing the cancellation
-        if (restoredMenu && computeStockDeduction && commitMenu && billToCancel.items) {
-          // Convert bill items to object keyed by item.id
-          const billItemsById = billToCancel.items.reduce((acc, item) => {
-            const existing = acc[item.id] || { qty: 0 };
-            acc[item.id] = { ...existing, qty: existing.qty + (item.qty || 0) };
-            return acc;
-          }, {});
-          const reDeductedMenu = computeStockDeduction(billItemsById);
-          commitMenu(reDeductedMenu);
+        // Re-deduct stock when undoing the cancellation: pakai delta negatif
+        // (kebalikan dari restore di atas).
+        const reDeduct = (billToCancel.items || []).reduce((acc, item) => {
+          acc[item.id] = (acc[item.id] || 0) - (item.qty || 0);
+          return acc;
+        }, {});
+        if (Object.keys(reDeduct).length > 0) {
+          const res = await api.applyStock(reDeduct, { type: "uncancel", ref: String(id) });
+          if (res?.ok && res.stock && applyStockView) applyStockView(res.stock);
         }
       });
       return updated;

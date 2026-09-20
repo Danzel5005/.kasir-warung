@@ -146,15 +146,20 @@ function useHistory({ toast_, addUndo, getNow, authH }) {
       toast_("Hanya admin yang dapat menghapus riwayat transaksi", "err");
       return;
     }
-    const snap = [...history];
-    const snapTotal = totalCount;
-    await api.deleteTrx(id);
+    const res = await api.deleteTrx(id);
+    // Ambil objek transaksi yang BENAR-BENAR dihapus dari main process. Kalau
+    // tidak ada (baris di luar halaman yang dimuat), jatuh ke history sebagai
+    // cadangan. Undo memakai saveTrx (INSERT tunggal) — bukan restoreTrx yang
+    // menimpa SELURUH tabel dengan satu halaman riwayat.
+    const deleted = res?.trx || history.find(t => t.id === id) || null;
     setHistory(h => h.filter(t => t.id !== id));
     setTotalCount(c => c - 1);
-    addUndo("Hapus Transaksi", async () => { 
-      await api.restoreTrx(snap); 
-      setHistory(snap); 
-      setTotalCount(snapTotal);
+    addUndo("Hapus Transaksi", async () => {
+      if (!deleted) return false;
+      await api.saveTrx(deleted);
+      setHistory(h => [deleted, ...h]);
+      setTotalCount(c => c + 1);
+      return true;
     });
   }, [history, totalCount, addUndo, authH, toast_]);
 
@@ -164,17 +169,18 @@ function useHistory({ toast_, addUndo, getNow, authH }) {
       toast_("Hanya admin yang dapat menghapus riwayat transaksi", "err");
       return;
     }
-    const snap = [...history];
-    const snapTotal = totalCount;
-    await api.clearTrx();
+    const res = await api.clearTrx();
+    const backupFile = res?.backupFile || null;
     setHistory([]);
     setTotalCount(0);
-    addUndo("Hapus Semua Riwayat", async () => { 
-      await api.restoreTrx(snap); 
-      setHistory(snap); 
-      setTotalCount(snapTotal);
+    addUndo("Hapus Semua Riwayat", async () => {
+      if (!backupFile) return false;
+      const r = await api.restoreClearedTrx(backupFile);
+      if (!r?.ok) return false;
+      await refresh();
+      return true;
     });
-  }, [history, totalCount, addUndo, authH, toast_]);
+  }, [refresh, addUndo, authH, toast_]);
 
   // CSV timestamp
   const at = useCallback(() => {
