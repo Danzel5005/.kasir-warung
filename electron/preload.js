@@ -4,10 +4,11 @@ const kasirAPI = {
   // Transactions
   loadTrx:     ()      => ipcRenderer.invoke("trx-load"),
   saveTrx:     (t)     => ipcRenderer.invoke("trx-save", t),
-  deleteTrx:   (id)    => ipcRenderer.invoke("trx-delete", id),
+  deleteTrx:   (id, opts) => ipcRenderer.invoke("trx-delete", id, opts),
   restoreTrx:  (list)  => ipcRenderer.invoke("trx-restore", list),
-  clearTrx:    ()      => ipcRenderer.invoke("trx-clear"),
+  clearTrx:    (opts)  => ipcRenderer.invoke("trx-clear", opts),
   restoreClearedTrx: (backupFile) => ipcRenderer.invoke("trx-restore-cleared", backupFile),
+  restorePreview: (q) => ipcRenderer.invoke("trx-restore-preview", q),
   voidTrx:     (id, data) => ipcRenderer.invoke("trx-void", id, data),
   // New: Filtered & paginated transactions
   loadTrxFiltered: (filters) => ipcRenderer.invoke("trx-load-filtered", filters),

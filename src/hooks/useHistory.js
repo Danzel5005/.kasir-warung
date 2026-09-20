@@ -140,18 +140,21 @@ function useHistory({ toast_, addUndo, getNow, authH }) {
   }, [pageSize]);
 
   // Delete transaction
-  const deleteTrx = useCallback(async (id) => {
+  const deleteTrx = useCallback(async (id, { restoreStock = false, applyStockView } = {}) => {
     // Only admin can delete transactions
     if (!isAdmin(authH?.currentUser)) {
       toast_("Hanya admin yang dapat menghapus riwayat transaksi", "err");
       return;
     }
-    const res = await api.deleteTrx(id);
+    const res = await api.deleteTrx(id, { restoreStock });
     // Ambil objek transaksi yang BENAR-BENAR dihapus dari main process. Kalau
     // tidak ada (baris di luar halaman yang dimuat), jatuh ke history sebagai
     // cadangan. Undo memakai saveTrx (INSERT tunggal) — bukan restoreTrx yang
     // menimpa SELURUH tabel dengan satu halaman riwayat.
     const deleted = res?.trx || history.find(t => t.id === id) || null;
+    // Langkah 2b: main mengembalikan peta stok final {id: stok}; patch view.
+    const applied = res?.applied || {};
+    if (Object.keys(applied).length && applyStockView) applyStockView(applied);
     setHistory(h => h.filter(t => t.id !== id));
     setTotalCount(c => c - 1);
     addUndo("Hapus Transaksi", async () => {
@@ -159,18 +162,32 @@ function useHistory({ toast_, addUndo, getNow, authH }) {
       await api.saveTrx(deleted);
       setHistory(h => [deleted, ...h]);
       setTotalCount(c => c + 1);
+      // Kembalikan stok ke kondisi semula: delta dinegasikan (Langkah 2b).
+      if (Object.keys(applied).length) {
+        // Hitung ulang dari trx yang dihapus: delta negatif dari item transaksi
+        // tsb (negasi penuh tak selalu benar karena clamp 0 di main).
+        const reDeduct = (deleted.items || []).reduce((acc, it) => {
+          const q = Math.abs(Number(it.baseQty ?? it.qty) || 0);
+          if (it?.id && q) acc[it.id] = (acc[it.id] || 0) - q;
+          return acc;
+        }, {});
+        const r = await api.applyStock(reDeduct, { type: "un-delete-trx", ref: id });
+        if (r?.ok && r.stock && applyStockView) applyStockView(r.stock);
+      }
       return true;
     });
   }, [history, totalCount, addUndo, authH, toast_]);
 
   // Clear all transactions
-  const clearAllTrx = useCallback(async () => {
+  const clearAllTrx = useCallback(async ({ restoreStock = false, applyStockView } = {}) => {
     if (!isAdmin(authH?.currentUser)) {
       toast_("Hanya admin yang dapat menghapus riwayat transaksi", "err");
       return;
     }
-    const res = await api.clearTrx();
+    const res = await api.clearTrx({ restoreStock });
     const backupFile = res?.backupFile || null;
+    const applied = res?.applied || {};
+    if (Object.keys(applied).length && applyStockView) applyStockView(applied);
     setHistory([]);
     setTotalCount(0);
     addUndo("Hapus Semua Riwayat", async () => {

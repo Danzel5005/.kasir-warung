@@ -143,6 +143,12 @@ function createDatabaseService({ ipcMain, files, ensureDir, rJSON, atomicWrite, 
     if (db) { db.close(); db = null; }
   }
 
+  // Transaksi void dilewati untuk semua operasi stok (Langkah 2b): stok sudah
+  // kembali saat void (Langkah 1), kalau tidak akan dobel.
+  function isTrxVoided(trx) {
+    return !!trx && (trx.status === "voided" || trx.voided === true);
+  }
+
   // Satu pintu untuk stok (Langkah 2). Menerima delta (bukan overwrite),
   // di-clamp ke 0. Mengembalikan peta `{id: stok}` untuk id yang berubah.
   // Diletakkan di scope createDatabaseService supaya bisa dipakai oleh
@@ -275,18 +281,34 @@ function createDatabaseService({ ipcMain, files, ensureDir, rJSON, atomicWrite, 
       try { db.prepare("INSERT INTO transactions (id, data) VALUES (?, ?)").run(trx.id || null, JSON.stringify(trx)); return { ok: true }; }
       catch (err) { console.error("[trx-save] Error:", err.message); return { ok: false, error: err.message }; }
     });
-    ipcMain.handle("trx-delete", (_e, id) => {
+    ipcMain.handle("trx-delete", (_e, id, { restoreStock = false } = {}) => {
+      // Langkah 2b: opsi mengembalikan stok saat transaksi dihapus. Transaksi
+      // void SELALU dilewati (stoknya sudah kembali saat void, Langkah 1).
+      // `applied` = peta {id: stok_akhir} untuk undo (dinegasikan oleh renderer).
       if (!db) {
         const all = rJSON(files.trx) || [];
         const trx = all.find((item) => String(item.id) === String(id)) || null;
         atomicWrite(files.trx, all.filter((item) => String(item.id) !== String(id)));
-        return { ok: true, trx };
+        let applied = {};
+        if (restoreStock && trx && !isTrxVoided(trx)) {
+          const { menu } = restoreStockFromTrx(trx);
+          if (menu && menu.length) atomicWrite(files.menu, menu);
+          applied = stockDeltasFromTrx(trx, 1);
+        }
+        return { ok: true, trx, applied };
       }
       try {
         const row = db.prepare("SELECT data FROM transactions WHERE id = ?").get(id);
         const trx = row ? JSON.parse(row.data) : null;
-        db.prepare("DELETE FROM transactions WHERE id = ?").run(id);
-        return { ok: true, trx };
+        let applied = {};
+        const run = db.transaction(() => {
+          db.prepare("DELETE FROM transactions WHERE id = ?").run(id);
+          if (restoreStock && trx && !isTrxVoided(trx)) {
+            applied = applyStockDelta(stockDeltasFromTrx(trx, 1), { type: "trx-delete", ref: id });
+          }
+        });
+        run();
+        return { ok: true, trx, applied };
       } catch (err) { console.error("[trx-delete] Error:", err.message); return { ok: false, error: err.message }; }
     });
     ipcMain.handle("trx-void", (_e, id, { reason, actor, note } = {}) => {
@@ -333,14 +355,15 @@ function createDatabaseService({ ipcMain, files, ensureDir, rJSON, atomicWrite, 
       try { db.exec("DELETE FROM transactions"); const stmt = db.prepare("INSERT INTO transactions (id, data) VALUES (?, ?)"); db.transaction((items) => items.forEach((item) => stmt.run(item.id || null, JSON.stringify(item))))(list); return { ok: true }; }
       catch (err) { console.error("[trx-restore] Error:", err.message); return { ok: false, error: err.message }; }
     });
-    ipcMain.handle("trx-clear", () => {
+    ipcMain.handle("trx-clear", (_e, { restoreStock = false } = {}) => {
       // Snapshot SELURUH transaksi ke file dulu, supaya undo "Hapus Semua" tidak
       // bergantung pada satu halaman riwayat di renderer. File juga jadi jaring
       // pengaman setelah jendela undo 9 detik lewat.
       let backupFile = null;
+      let all = [];
       try {
         ensureDir();
-        const all = db
+        all = db
           ? db.prepare("SELECT id, data FROM transactions ORDER BY created_at DESC").all().map((row) => JSON.parse(row.data))
           : (rJSON(files.trx) || []);
         if (all.length) {
@@ -350,9 +373,70 @@ function createDatabaseService({ ipcMain, files, ensureDir, rJSON, atomicWrite, 
           atomicWrite(backupFile, all);
         }
       } catch (err) { console.error("[trx-clear] Snapshot error:", err.message); }
-      if (!db) { atomicWrite(files.trx, []); return { ok: true, backupFile }; }
-      try { db.exec("DELETE FROM transactions"); return { ok: true, backupFile }; }
+      // Agregasi stok untuk SEMUA transaksi non-void (bukan cuma satu halaman
+      // history), lalu kembalikan lewat satu pintu applyStockDelta.
+      const aggregateDeltas = () => {
+        const total = {};
+        for (const t of all) {
+          if (!t || isTrxVoided(t)) continue;
+          for (const [id, qty] of Object.entries(stockDeltasFromTrx(t, 1))) {
+            total[id] = (total[id] || 0) + qty;
+          }
+        }
+        return total;
+      };
+      if (!db) {
+        let applied = {};
+        if (restoreStock) {
+          const deltas = aggregateDeltas();
+          const menu = rJSON(files.menu) || [];
+          const byId = new Map(menu.map((m) => [String(m.id), { ...m }]));
+          applied = {};
+          for (const [id, qty] of Object.entries(deltas)) {
+            const m = byId.get(String(id));
+            if (!m) continue;
+            if (m.stok === null || m.stok === undefined) continue;
+            m.stok = Math.max(0, Number(m.stok) + qty);
+            applied[id] = m.stok;
+          }
+          if (menu.length) atomicWrite(files.menu, [...byId.values()]);
+        }
+        atomicWrite(files.trx, []);
+        return { ok: true, backupFile, applied };
+      }
+      try {
+        let applied = {};
+        const run = db.transaction(() => {
+          if (restoreStock) applied = applyStockDelta(aggregateDeltas(), { type: "trx-clear" });
+          db.exec("DELETE FROM transactions");
+        });
+        run();
+        return { ok: true, backupFile, applied };
+      }
       catch (err) { console.error("[trx-clear] Error:", err.message); return { ok: false, error: err.message }; }
+    });
+    // Langkah 2b: preview baca-saja untuk teks konfirmasi ("+N unit dari M
+    // transaksi"). `skipped` = jumlah transaksi yang dilewati (void).
+    ipcMain.handle("trx-restore-preview", (_e, { id, all: allFlag } = {}) => {
+      try {
+        const list = db
+          ? db.prepare("SELECT id, data FROM transactions ORDER BY created_at DESC").all().map((row) => JSON.parse(row.data))
+          : (rJSON(files.trx) || []);
+        const pool = allFlag ? list : list.filter((t) => String(t.id) === String(id));
+        let trxCount = 0, totalQty = 0, skipped = 0;
+        for (const t of pool) {
+          if (!t || isTrxVoided(t)) { skipped += 1; continue; }
+          const deltas = stockDeltasFromTrx(t, 1);
+          const qty = Object.values(deltas).reduce((s, n) => s + Math.abs(n), 0);
+          if (qty === 0) { skipped += 1; continue; }
+          trxCount += 1;
+          totalQty += qty;
+        }
+        return { ok: true, trxCount, totalQty, skipped };
+      } catch (err) {
+        console.error("[trx-restore-preview] Error:", err.message);
+        return { ok: false, error: err.message, trxCount: 0, totalQty: 0, skipped: 0 };
+      }
     });
     ipcMain.handle("trx-restore-cleared", (_e, backupFile) => {
       // Hanya boleh membaca file di dalam jsonBackups (cegah path traversal).

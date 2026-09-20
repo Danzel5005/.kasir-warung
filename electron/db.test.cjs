@@ -356,6 +356,7 @@ describe("db.cjs: initDB & registerHandlers", () => {
       "process-payment", "shifts-load", "shifts-save",
       "trx-clear", "trx-delete", "trx-get-daily-stats", "trx-get-shift-ids",
       "trx-load", "trx-load-filtered", "trx-restore", "trx-restore-cleared",
+      "trx-restore-preview",
       "trx-save", "trx-void",
     ]);
   });
@@ -597,6 +598,74 @@ describe("db.cjs: shifts", () => {
     call("shifts-save", [{ id: "s2", status: "closed" }]);
     expect(call("shifts-load").map((s) => s.id)).toEqual(["s2"]);
   });
+});
+
+describe("db.cjs: Langkah 2b — restore stok saat hapus/clear", () => {
+  beforeEach(() => {
+    services.svc.initDB();
+    services.svc.registerHandlers();
+  });
+
+  const call = (name, ...args) => services.registry[name](null, ...args);
+  const stokOf = (id) => call("menu-load").find((m) => m.id === id)?.stok;
+
+  it("trx-delete dengan {restoreStock:true} menambah stok sebesar baseQty/qty", () => {
+    call("menu-replace", [{ id: "m1", nama: "Kopi", stok: 3 }, { id: "m2", nama: "Teh", stok: 10 }]);
+    call("trx-save", { id: "d1", items: [{ id: "m1", qty: 2, baseQty: 2 }, { id: "m2", qty: 1 }] });
+    const res = call("trx-delete", "d1", { restoreStock: true });
+    expect(res.ok).toBe(true);
+    expect(res.trx.id).toBe("d1");
+    expect(res.applied).toEqual({ m1: 5, m2: 11 });
+    expect(stokOf("m1")).toBe(5);
+    expect(stokOf("m2")).toBe(11);
+    expect(call("trx-load")).toEqual([]);
+  });
+
+  it("trx-delete TANPA opsi tidak mengubah stok", () => {
+    call("menu-replace", [{ id: "m1", nama: "Kopi", stok: 3 }]);
+    call("trx-save", { id: "d2", items: [{ id: "m1", qty: 2 }] });
+    const res = call("trx-delete", "d2", {});
+    expect(res.ok).toBe(true);
+    expect(res.applied).toEqual({});
+    expect(stokOf("m1")).toBe(3);
+  });
+
+  it("trx-delete transaksi VOID tidak menambah stok (hindari dobel)", () => {
+    call("menu-replace", [{ id: "m1", nama: "Kopi", stok: 5 }]);
+    // Void sudah mengembalikan stok 3 -> 5. Hapus dengan restoreStock harus no-op.
+    call("trx-save", { id: "d3", items: [{ id: "m1", qty: 2 }], status: "voided" });
+    const res = call("trx-delete", "d3", { restoreStock: true });
+    expect(res.ok).toBe(true);
+    expect(res.applied).toEqual({});
+    expect(stokOf("m1")).toBe(5);
+  });
+
+  it("trx-clear dengan {restoreStock:true} menambah sebesar Σ transaksi non-void", () => {
+    call("menu-replace", [{ id: "m1", nama: "Kopi", stok: 0 }]);
+    call("trx-save", { id: "c1", items: [{ id: "m1", qty: 2 }] });
+    call("trx-save", { id: "c2", items: [{ id: "m1", qty: 3 }] });
+    call("trx-save", { id: "c3", items: [{ id: "m1", qty: 9 }], status: "voided" }); // dilewati
+    const res = call("trx-clear", { restoreStock: true });
+    expect(res.ok).toBe(true);
+    expect(res.applied).toEqual({ m1: 5 }); // 2 + 3, void dilewati
+    expect(stokOf("m1")).toBe(5);
+    expect(call("trx-load")).toEqual([]);
+  });
+
+  it("trx-restore-preview({id}) menghitung unit & melewati void", () => {
+    call("trx-save", { id: "p1", items: [{ id: "m1", qty: 2 }, { id: "m2", qty: 3 }] });
+    const one = call("trx-restore-preview", { id: "p1" });
+    expect(one).toMatchObject({ ok: true, trxCount: 1, totalQty: 5, skipped: 0 });
+  });
+
+  it("trx-restore-preview({all:true}) mengagregasi seluruh non-void", () => {
+    call("trx-save", { id: "pa", items: [{ id: "m1", qty: 2 }] });
+    call("trx-save", { id: "pb", items: [{ id: "m1", qty: 3 }], status: "voided" });
+    call("trx-save", { id: "pc", items: [{ id: "m1", qty: 4 }] });
+    const all = call("trx-restore-preview", { all: true });
+    expect(all).toMatchObject({ ok: true, trxCount: 2, totalQty: 6, skipped: 1 });
+  });
+
 });
 
 describe("db.cjs: process-payment", () => {

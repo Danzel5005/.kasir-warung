@@ -135,6 +135,77 @@ describe("utils.js - LocalStorage Helper (LS) & API Wrapper", () => {
       expect(await api.loadTrx()).toEqual([]);
     });
 
+    it("deleteTrx with restoreStock adds stock back (browser)", async () => {
+      LS("ykk_menu", [
+        { id: "M1", nama: "Kopi", stok: 3 },
+        { id: "M2", nama: "Teh", stok: 10 },
+      ]);
+      LS("ykk_trx", [
+        { id: "TRX-1", items: [{ id: "M1", qty: 2 }, { id: "M2", baseQty: 1, qty: 6 }] },
+      ]);
+
+      const res = await api.deleteTrx("TRX-1", { restoreStock: true });
+      expect(res.applied).toEqual({ M1: 5, M2: 11 });
+      const menu = await api.loadMenu();
+      expect(menu.find((m) => m.id === "M1").stok).toBe(5);
+      expect(menu.find((m) => m.id === "M2").stok).toBe(11);
+      expect(await api.loadTrx()).toEqual([]);
+    });
+
+    it("deleteTrx without restoreStock leaves stock untouched (browser)", async () => {
+      LS("ykk_menu", [{ id: "M1", nama: "Kopi", stok: 3 }]);
+      LS("ykk_trx", [{ id: "TRX-1", items: [{ id: "M1", qty: 2 }] }]);
+
+      const res = await api.deleteTrx("TRX-1");
+      expect(res.applied).toEqual({});
+      const menu = await api.loadMenu();
+      expect(menu[0].stok).toBe(3);
+    });
+
+    it("deleteTrx restoreStock skips voided transactions and unlimited items (browser)", async () => {
+      LS("ykk_menu", [
+        { id: "M1", nama: "Kopi", stok: 3 },
+        { id: "M2", nama: "Teh", stok: null },
+      ]);
+      LS("ykk_trx", [
+        { id: "V1", status: "voided", items: [{ id: "M1", qty: 5 }] },
+      ]);
+      const voidRes = await api.deleteTrx("V1", { restoreStock: true });
+      expect(voidRes.applied).toEqual({});
+
+      LS("ykk_trx", [{ id: "T2", items: [{ id: "M1", qty: 1 }, { id: "M2", qty: 9 }] }]);
+      const res = await api.deleteTrx("T2", { restoreStock: true });
+      expect(res.applied).toEqual({ M1: 4 });
+    });
+
+    it("clearTrx with restoreStock adds sum of non-void transactions (browser)", async () => {
+      LS("ykk_menu", [{ id: "M1", nama: "Kopi", stok: 1 }]);
+      LS("ykk_trx", [
+        { id: "T1", items: [{ id: "M1", qty: 2 }] },
+        { id: "T2", items: [{ id: "M1", qty: 3 }] },
+        { id: "V1", status: "voided", items: [{ id: "M1", qty: 9 }] },
+      ]);
+
+      const res = await api.clearTrx({ restoreStock: true });
+      expect(res.applied).toEqual({ M1: 6 });
+      expect(await api.loadTrx()).toEqual([]);
+      const menu = await api.loadMenu();
+      expect(menu[0].stok).toBe(6);
+    });
+
+    it("restorePreview counts units & skips void (browser)", async () => {
+      LS("ykk_trx", [
+        { id: "T1", items: [{ id: "M1", qty: 5 }] },
+        { id: "V1", status: "voided", items: [{ id: "M1", qty: 4 }] },
+      ]);
+
+      const one = await api.restorePreview({ id: "T1" });
+      expect(one).toEqual({ ok: true, trxCount: 1, totalQty: 5, skipped: 0 });
+
+      const all = await api.restorePreview({ all: true });
+      expect(all).toEqual({ ok: true, trxCount: 1, totalQty: 5, skipped: 1 });
+    });
+
     it("should process payment atomically in browser mode", async () => {
       // Setup active bills and initial menu
       LS("ykk_bills", [{ id: "BILL-1", meja: "01" }, { id: "BILL-2", meja: "02" }]);

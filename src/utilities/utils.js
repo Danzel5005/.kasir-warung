@@ -29,12 +29,74 @@ const isVoided = (t) => !!t && (t.status === "voided" || t.voided === true);
 // nonVoided — filter helper for any sales total that must exclude voids.
 const nonVoided = (list) => (Array.isArray(list) ? list.filter((t) => !isVoided(t)) : []);
 
+// stockDeltasFromTrxBrowser — mirror of main process stockDeltasFromTrx for the
+// localStorage fallback (Langkah 2b). Unit per item memakai baseQty ?? qty dan
+// item tanpa id / qty 0 dilewati.
+const stockDeltasFromTrxBrowser = (trx, sign = 1) => {
+  const deltas = {};
+  for (const it of trx?.items || []) {
+    const qty = Math.abs(Number(it.baseQty ?? it.qty) || 0);
+    if (!it?.id || qty === 0) continue;
+    deltas[it.id] = (deltas[it.id] || 0) + sign * qty;
+  }
+  return deltas;
+};
+
+
+
 const api = {
   async loadTrx()         { return window.kasirAPI ? (await window.kasirAPI.loadTrx() || []).map(healVoidedTrx) : (LS("ykk_trx")||[]).map(healVoidedTrx); },
   async saveTrx(t)        { if(window.kasirAPI) return window.kasirAPI.saveTrx(t); const a=LS("ykk_trx")||[]; a.push(t); LS("ykk_trx",a); },
-  async deleteTrx(id)     { if(window.kasirAPI) return window.kasirAPI.deleteTrx(id); LS("ykk_trx",(LS("ykk_trx")||[]).filter(t=>t.id!==id)); },
+  // Langkah 2b: opts.restoreStock meminta main menambah stok saat transaksi
+  // dihapus. Di mode browser kita hitung sendiri delta positif dari item.
+  async deleteTrx(id, opts) {
+    if (window.kasirAPI) return window.kasirAPI.deleteTrx(id, opts);
+    const all = LS("ykk_trx") || [];
+    const trx = all.find((t) => String(t.id) === String(id)) || null;
+    LS("ykk_trx", all.filter((t) => String(t.id) !== String(id)));
+    let applied = {};
+    if (opts?.restoreStock && trx && !isVoided(trx)) {
+      const r = await api.applyStock(stockDeltasFromTrxBrowser(trx, 1), { type: "trx-delete", ref: id });
+      applied = r?.stock || {};
+    }
+    return { ok: true, trx, applied };
+  },
   async restoreTrx(list)  { if(window.kasirAPI) return window.kasirAPI.restoreTrx(list); LS("ykk_trx",list); },
-  async clearTrx()        { if(window.kasirAPI) return window.kasirAPI.clearTrx(); LS("ykk_trx",[]); },
+  async clearTrx(opts)    {
+    if (window.kasirAPI) return window.kasirAPI.clearTrx(opts);
+    const all = (LS("ykk_trx") || []).map(healVoidedTrx);
+    let applied = {};
+    if (opts?.restoreStock) {
+      const agg = {};
+      for (const t of all) {
+        if (isVoided(t)) continue;
+        for (const [id, d] of Object.entries(stockDeltasFromTrxBrowser(t, 1))) {
+          agg[id] = (agg[id] || 0) + d;
+        }
+      }
+      const r = await api.applyStock(agg, { type: "trx-clear" });
+      applied = r?.stock || {};
+    }
+    LS("ykk_trx", []);
+    return { ok: true, backupFile: null, applied };
+  },
+  // Langkah 2b: baca-saja — jumlah transaksi & unit yang akan dikembalikan,
+  // supaya modal konfirmasi bisa menampilkan "+N unit dari M transaksi".
+  async restorePreview(q) {
+    if (window.kasirAPI) return window.kasirAPI.restorePreview(q);
+    const all = (LS("ykk_trx") || []);
+    const pool = q?.all ? all : all.filter((t) => String(t.id) === String(q?.id));
+    let trxCount = 0, totalQty = 0, skipped = 0;
+    for (const t of pool) {
+      if (!t || isVoided(t)) { skipped += 1; continue; }
+      const deltas = stockDeltasFromTrxBrowser(t, 1);
+      const qty = Object.values(deltas).reduce((s, n) => s + Math.abs(n), 0);
+      if (qty === 0) { skipped += 1; continue; }
+      trxCount += 1;
+      totalQty += qty;
+    }
+    return { ok: true, trxCount, totalQty, skipped };
+  },
   // Undo "Hapus Semua": main process menyimpan snapshot penuh sebelum DELETE,
   // renderer hanya menunjuk file-nya (localStorage tak punya file, jadi no-op).
   async restoreClearedTrx(backupFile) {

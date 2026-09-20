@@ -327,15 +327,17 @@ const printReceipt = useCallback(async (trx) => {
   // confirmDel dispatcher — menggantikan switch-case yang dulu inline di modal konfirmasi
   // PENTING: membaca confirmDel langsung dari closure. Wajib di deps, atau
   // dispatcher akan selalu mengeksekusi confirmDel dari render pertama (null).
-const executeConfirmDel = useCallback(() => {
+const executeConfirmDel = useCallback((restoreStock = false) => {
     if (!confirmDel) return;
     if (!isAdmin(authH.currentUser) && ["all", "trx", "allBills", "bill", "allMenu", "item"].includes(confirmDel.type)) {
       toastH.toast_("Hanya admin yang dapat melakukan tindakan ini", "err");
       setConfirmDel(null);
       return;
     }
-    if (confirmDel.type === "all") historyH.clearAllTrx();
-    else if (confirmDel.type === "trx") historyH.deleteTrx(confirmDel.id);
+    // Langkah 2b: tipe trx/all menerima opsi restoreStock. applyStockView
+    // dipakai untuk mem-patch tampilan stok setelah main mengembalikan peta.
+    if (confirmDel.type === "all") historyH.clearAllTrx({ restoreStock, applyStockView: menuH.applyStockView });
+    else if (confirmDel.type === "trx") historyH.deleteTrx(confirmDel.id, { restoreStock, applyStockView: menuH.applyStockView });
     else if (confirmDel.type === "allBills") billsH.clearAllBills();
     else if (confirmDel.type === "bill") {
       // For open bills, cancel and restore stock
