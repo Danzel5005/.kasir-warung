@@ -159,7 +159,9 @@ function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName,
     const catLabel = i.kategori ? getCategoryName(i.kategori, cats) : "";
     const itemTotal = fmt(i.harga * i.qty);
     const unitPrice = fmt(i.harga);
-    const qtyCatName = catLabel ? `${i.qty} ${catLabel} ${i.nama}` : `${i.qty}x ${i.nama}`;
+    // Langkah 3: unitLabel menandai satuan baris (mis. "2x Dus Teh").
+    const unitLabel = i.unitLabel ? ` ${i.unitLabel}` : "";
+    const qtyCatName = catLabel ? `${i.qty} ${catLabel} ${i.nama}${unitLabel}` : `${i.qty}x ${i.nama}${unitLabel}`;
     return `<div class="item">
       <div class="item-row1"><span>${qtyCatName}</span><span>${itemTotal}</span></div>
       <div class="item-row2"><span style="color: white;">_______</span><span>${unitPrice}</span></div>
@@ -268,7 +270,8 @@ function buildPreviewHTML(receiptAdditionalValues, items, logo, receiptAdditiona
     const catLabel = i.kategori ? getCategoryName(i.kategori, cats) : "";
     const itemTotal = fmt(i.harga * i.qty);
     const unitPrice = fmt(i.harga);
-    const qtyCatName = catLabel ? `${i.qty} ${catLabel} ${i.nama}` : `${i.qty}x ${i.nama}`;
+    const unitLabel = i.unitLabel ? ` ${i.unitLabel}` : "";
+    const qtyCatName = catLabel ? `${i.qty} ${catLabel} ${i.nama}${unitLabel}` : `${i.qty}x ${i.nama}${unitLabel}`;
     return `<div class="item">
       <div class="item-row1"><span>${qtyCatName}</span><span>${itemTotal}</span></div>
       <div class="item-row2"><span>${unitPrice}</span></div>

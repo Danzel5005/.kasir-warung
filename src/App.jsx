@@ -421,7 +421,7 @@ const executeConfirmDel = useCallback((restoreStock = false) => {
             customerEnabled={settingsH.settings.customerEnabled !== false}
             items={cartH.items} subtotal={cartH.subtotal} service={cartH.service} discount={cartH.discount}
             pajak={cartH.pajak} total={cartH.total} activeBill={cartH.activeBill}
-            addToCart={cartH.addToCart} decCart={cartH.decCart} delCart={cartH.delCart} clearCart={cartH.clearCart}
+            addToCart={cartH.addToCart} decCart={cartH.decCart} delCart={cartH.delCart} clearCart={cartH.clearCart} setUnit={cartH.setUnit}
             saveOpenBill={saveOpenBill} printPreview={printPreview} printingPreview={printingPreview} setPayModal={setPayModal}
             searchRef={searchRef}
             checkRequiredAdditionals={cartH.checkRequiredAdditionals}

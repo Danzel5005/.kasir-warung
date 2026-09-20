@@ -77,6 +77,78 @@ export default function ItemModal({ menuH, photoRef, fmt: fmtProp }) {
         </div>
 
         {/* Estimasi laba */}
+        {/* Langkah 3: multi-satuan */}
+        <div style={{ borderTop:`1px solid ${BD}`, paddingTop:10, marginBottom:8 }}>
+          <div style={{ ...row, marginBottom:5 }}>
+            <label style={{ fontSize:TYPOGRAPHY.label.fontSize, color:MT, fontWeight:700 }}>SATUAN DASAR</label>
+          </div>
+          <input
+            type="text"
+            placeholder='Contoh: pcs / botol'
+            value={menuH.form.satuan || ""}
+            onChange={e => menuH.setForm(f => ({ ...f, satuan:e.target.value }))}
+            style={{ ...inp, marginBottom:6 }}
+          />
+          <div style={{ ...row, marginBottom:5 }}>
+            <span style={{ fontSize:TYPOGRAPHY.label.fontSize, color:MT, fontWeight:700 }}>SATUAN TAMBAHAN</span>
+            <button
+              onClick={() => menuH.setForm(f => ({ ...f, units:[...(f.units||[]), { key:"", label:"", factor:"", harga:"" }] }))}
+              style={{ fontSize:TYPOGRAPHY.label.fontSize, padding:"2px 8px", borderRadius:RADIUS.sm, border:`1px solid ${G}`, background:COLOR_PALETTE.primaryLight, color:G, cursor:"pointer", fontFamily:"inherit", fontWeight:700 }}
+            >+ Satuan</button>
+          </div>
+          {(menuH.form.units || []).length === 0 && (
+            <div style={{ fontSize:TYPOGRAPHY.label.fontSize, color:MT, fontStyle:"italic", marginBottom:4 }}>
+              Belum ada. Item tanpa satuan tambahan tetap seperti biasa.
+            </div>
+          )}
+          {(menuH.form.units || []).map((u, idx) => (
+            <div key={idx} style={{ display:"grid", gridTemplateColumns:"1fr 1.4fr 0.8fr 1fr 20px", gap:4, marginBottom:4, alignItems:"center" }}>
+              <input type="text" placeholder="kode" value={u.key}
+                onChange={e => menuH.setForm(f => { const a=[...f.units]; a[idx]={...a[idx], key:e.target.value}; return {...f, units:a}; })} style={{ ...inp, fontSize:TYPOGRAPHY.label.fontSize, padding:"4px 5px" }} />
+              <input type="text" placeholder="label" value={u.label}
+                onChange={e => menuH.setForm(f => { const a=[...f.units]; a[idx]={...a[idx], label:e.target.value}; return {...f, units:a}; })} style={{ ...inp, fontSize:TYPOGRAPHY.label.fontSize, padding:"4px 5px" }} />
+              <input type="number" min="2" placeholder="faktor" value={u.factor}
+                onChange={e => menuH.setForm(f => { const a=[...f.units]; a[idx]={...a[idx], factor:e.target.value}; return {...f, units:a}; })} style={{ ...inp, fontSize:TYPOGRAPHY.label.fontSize, padding:"4px 5px" }} />
+              <input type="text" placeholder="harga" value={u.harga}
+                onChange={e => menuH.setForm(f => { const a=[...f.units]; a[idx]={...a[idx], harga:e.target.value.replace(/\D/g,"")}; return {...f, units:a}; })} style={{ ...inp, fontSize:TYPOGRAPHY.label.fontSize, padding:"4px 5px" }} />
+              <button onClick={() => menuH.setForm(f => ({ ...f, units:f.units.filter((_,i)=>i!==idx) }))}
+                style={{ background:"none", border:"none", cursor:"pointer", color:"#ccc", fontSize:12 }}>&times;</button>
+            </div>
+          ))}
+          <div style={{ fontSize:9, color:MT, marginBottom:2 }}>
+            Faktor = jumlah satuan dasar per 1 satuan ini (min. 2). Key dipakai di strukt/invoice.
+          </div>
+        </div>
+
+        {/* Langkah 3: tier harga */}
+        <div style={{ borderTop:`1px solid ${BD}`, paddingTop:10, marginBottom:12 }}>
+          <div style={{ ...row, marginBottom:5 }}>
+            <label style={{ fontSize:TYPOGRAPHY.label.fontSize, color:MT, fontWeight:700 }}>TIER HARGA (satuan dasar)</label>
+            <button
+              onClick={() => menuH.setForm(f => ({ ...f, priceTiers:[...(f.priceTiers||[]), { minQty:"", harga:"" }] }))}
+              style={{ fontSize:TYPOGRAPHY.label.fontSize, padding:"2px 8px", borderRadius:RADIUS.sm, border:`1px solid ${G}`, background:COLOR_PALETTE.primaryLight, color:G, cursor:"pointer", fontFamily:"inherit", fontWeight:700 }}
+            >+ Tier</button>
+          </div>
+          {(menuH.form.priceTiers || []).length === 0 && (
+            <div style={{ fontSize:TYPOGRAPHY.label.fontSize, color:MT, fontStyle:"italic" }}>
+              Belum ada. Harga mengikuti harga jual untuk semua kuantitas.
+            </div>
+          )}
+          {(menuH.form.priceTiers || []).map((tr, idx) => (
+            <div key={idx} style={{ display:"grid", gridTemplateColumns:"1fr 1fr 20px", gap:4, marginBottom:4, alignItems:"center" }}>
+              <input type="number" min="1" placeholder="min. qty" value={tr.minQty}
+                onChange={e => menuH.setForm(f => { const a=[...f.priceTiers]; a[idx]={...a[idx], minQty:e.target.value}; return {...f, priceTiers:a}; })} style={{ ...inp, fontSize:TYPOGRAPHY.label.fontSize, padding:"4px 5px" }} />
+              <input type="text" placeholder="harga/pcs" value={tr.harga}
+                onChange={e => menuH.setForm(f => { const a=[...f.priceTiers]; a[idx]={...a[idx], harga:e.target.value.replace(/\D/g,"")}; return {...f, priceTiers:a}; })} style={{ ...inp, fontSize:TYPOGRAPHY.label.fontSize, padding:"4px 5px" }} />
+              <button onClick={() => menuH.setForm(f => ({ ...f, priceTiers:f.priceTiers.filter((_,i)=>i!==idx) }))}
+                style={{ background:"none", border:"none", cursor:"pointer", color:"#ccc", fontSize:12 }}>&times;</button>
+            </div>
+          ))}
+          <div style={{ fontSize:9, color:MT }}>
+            Tier aktif otomatis kalau total qty (satuan dasar) satu baris &ge; min. qty.
+          </div>
+        </div>
+
         {menuH.form.harga && (
           <div style={{ fontSize:TYPOGRAPHY.label.fontSize, color:G, marginBottom:10, textAlign:"right", fontWeight:600 }}>
             Jual: {fmtFn(parseInt(menuH.form.harga) || 0)} · Modal: {fmtFn(parseInt(menuH.form.modal) || 0)} · Est. laba/item: {fmtFn((parseInt(menuH.form.harga) || 0) - (parseInt(menuH.form.modal) || 0))}

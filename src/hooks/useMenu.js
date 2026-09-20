@@ -16,7 +16,9 @@ function useMenu({ toast_, addUndo }) {
   // modal tambah/edit item — murni milik domain menu
   const [itemModal, setItemModal]   = useState(false);
   const [editTarget, setEditTarget] = useState(null);
-  const [form, setForm] = useState({ menuId: "", nama: "", harga: "", modal: "", kategori: "kopi", desc: "", stok: "" });
+  // Langkah 3: `satuan`, `units`, `priceTiers` ikut di form supaya editor
+  // multi-satuan & tier bisa dipasang di ItemModal.
+  const [form, setForm] = useState({ menuId: "", nama: "", harga: "", modal: "", kategori: "kopi", desc: "", stok: "", satuan: "", units: [], priceTiers: [] });
 
   // modal kelola kategori
   const [catModal, setCatModal]       = useState(false);
@@ -41,14 +43,20 @@ function useMenu({ toast_, addUndo }) {
   // ── Menu CRUD
   // PENTING: membaca cats[0] LANGSUNG dari closure. Wajib [cats] di deps.
   const openAdd = useCallback(() => {
-    setForm({ menuId: "", nama: "", harga: "", modal: "", kategori: cats[0]?.key || "kopi", desc: "", foto: null, stok: "" });
+    setForm({ menuId: "", nama: "", harga: "", modal: "", kategori: cats[0]?.key || "kopi", desc: "", foto: null, stok: "", satuan: "", units: [], priceTiers: [] });
     setEditTarget(null);
     setItemModal(true);
   }, [cats]);
 
   // deps kosong aman: `item` datang sebagai argumen panggilan, tidak baca state luar.
   const openEdit = useCallback((item) => {
-    setForm({ menuId: item.menuId || "", nama: item.nama, harga: String(item.harga), modal: String(item.modal || 0), kategori: item.kategori, desc: item.desc || "", stok: item.stok === null ? "" : String(item.stok) });
+    setForm({
+      menuId: item.menuId || "", nama: item.nama, harga: String(item.harga), modal: String(item.modal || 0),
+      kategori: item.kategori, desc: item.desc || "", stok: item.stok === null ? "" : String(item.stok),
+      satuan: item.satuan || "",
+      units: Array.isArray(item.units) ? item.units.map(u => ({ ...u })) : [],
+      priceTiers: Array.isArray(item.priceTiers) ? item.priceTiers.map(t => ({ ...t })) : [],
+    });
     setEditTarget(item);
     setItemModal(true);
   }, []);
@@ -73,9 +81,40 @@ function useMenu({ toast_, addUndo }) {
     }
 
     const stok = form.stok === "" ? null : parseInt(form.stok) || 0;
+
+    // ── Langkah 3: normalisasi + validasi satuan & tier ────────────────
+    // Validasi: factor satuan >= 2; minQty tier naik dan unik; peringatan
+    // (bukan blokir) kalau harga tier >= harga dasar.
+    const satuan = (form.satuan || "").trim();
+    const units = (form.units || [])
+      .map(u => ({
+        key: String(u.key || "").trim().toLowerCase().replace(/\s+/g, "_"),
+        label: String(u.label || "").trim(),
+        factor: parseInt(u.factor) || 0,
+        harga: parseInt(u.harga) || 0,
+        ...(u.modal !== undefined && u.modal !== "" ? { modal: parseInt(u.modal) || 0 } : {}),
+      }))
+      .filter(u => u.key && u.label);
+    for (const u of units) {
+      if (u.factor < 2) { toast_(`Faktor satuan "${u.label}" minimal 2`, "err"); return; }
+    }
+    const unitKeys = units.map(u => u.key);
+    if (new Set(unitKeys).size !== unitKeys.length) { toast_("Kode satuan duplikat", "err"); return; }
+
+    const priceTiers = (form.priceTiers || [])
+      .map(t => ({ minQty: parseInt(t.minQty) || 0, harga: parseInt(t.harga) || 0 }))
+      .filter(t => t.minQty > 0 && t.harga > 0)
+      .sort((a, b) => a.minQty - b.minQty);
+    for (let i = 1; i < priceTiers.length; i++) {
+      if (priceTiers[i].minQty === priceTiers[i - 1].minQty) { toast_("minQty tier harus unik", "err"); return; }
+    }
+    if (priceTiers.some(t => t.harga >= harga)) {
+      toast_("Harga tier >= harga dasar, tier tidak akan dipakai", "err");
+    }
+
     const record = editTarget
-      ? { ...editTarget, menuId: menuId || undefined, nama, harga, modal, kategori: form.kategori, desc: form.desc.trim(), stok }
-      : { id: `c_${Date.now()}`, menuId: menuId || undefined, nama, harga, modal, kategori: form.kategori, desc: form.desc.trim(), stok };
+      ? { ...editTarget, menuId: menuId || undefined, nama, harga, modal, kategori: form.kategori, desc: form.desc.trim(), stok, satuan, units, priceTiers }
+      : { id: `c_${Date.now()}`, menuId: menuId || undefined, nama, harga, modal, kategori: form.kategori, desc: form.desc.trim(), stok, satuan, units, priceTiers };
     // upsert di main process; stok baris yang sudah ada TIDAK ditimpa
     // (Langkah 2). Field `stok` dari form hanya berlaku untuk item baru.
     await api.upsertMenu(record);

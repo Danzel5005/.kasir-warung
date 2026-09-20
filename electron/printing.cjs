@@ -103,7 +103,12 @@ function createPrintingService({ app, ipcMain, BrowserWindow, dialog, dataDir, e
       kvLine(printer, "PELANGGAN", `${trx.customerNama}${phone ? ` (${phone})` : ""}`);
     }
     kvLine(printer, "METODE", trx.metodeBayarLabel || trx.metodeBayar || ""); printer.drawLine();
-    trx.items.forEach((item) => { kvLine(printer, `${item.qty}x ${getCategoryLabel(item.kategori, cats)} ${item.nama}`, fmtRp(item.harga * item.qty)); printer.println(`   ${fmtRp(item.harga)}`); });
+    trx.items.forEach((item) => {
+      // Langkah 3: unitLabel menandai satuan baris (mis. "2x Dus Teh").
+      const unitTag = item.unitLabel ? ` ${item.unitLabel}` : "";
+      kvLine(printer, `${item.qty}x ${getCategoryLabel(item.kategori, cats)} ${item.nama}${unitTag}`, fmtRp(item.harga * item.qty));
+      printer.println(`   ${fmtRp(item.harga)}`);
+    });
     printer.drawLine(); kvLine(printer, "SubTotal", fmtRp(trx.subtotal)); printer.bold(true); kvLine(printer, "TOTAL", fmtRp(trx.total || trx.subtotal)); printer.bold(false);
     if (trx.metodeBayar === "cash") { kvLine(printer, "Bayar", fmtRp(trx.bayar)); printer.println(cashPaymentNote(trx.bayar, trx.total) || "LUNAS"); }
     printer.drawLine(); printer.alignCenter(); printer.println("Barang yang sudah dibeli tidak bisa"); printer.println("dikembalikan"); printer.println("Terimakasih"); printer.cut();

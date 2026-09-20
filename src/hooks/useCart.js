@@ -1,6 +1,17 @@
 import { useState, useCallback } from "react";
 import { calcPrice } from "../utilities/calculations.js";
 import { api } from "../utilities/utils.js";
+import { resolveLine, stockQty, cartKeyFor, unitOptions } from "../utilities/units.js";
+
+// Beri label satuan pada baris (dipakai struk HTML & ESC/POS). Satuan dasar
+// tidak diberi label supaya struk lama tidak berubah.
+function withUnitLabel(items) {
+  return items.map(i => {
+    if (!i.unit) return i;
+    const u = unitOptions(i).find(o => String(o.key) === String(i.unit));
+    return { ...i, unitLabel: u ? (u.label || u.key) : i.unit };
+  });
+}
 
 // useCart — cart, activeBill (KEPUTUSAN EKSPLISIT USER: activeBill tetap di
 // sini, BUKAN di useBills, karena dia selalu direset bersamaan dengan
@@ -66,37 +77,74 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
   const addToCart = useCallback((item, additionals = null) => {
   // Check if stock is depleted
   if (item.stok === 0) { toast_(`Stok "${item.nama}" habis`, "err"); return; }
-  
-  const cartKey = additionals 
-    ? `${item.id}_${JSON.stringify(additionals)}` 
-    : item.id;
+
+  // Langkah 3: satuan dasar → cartKey = id (kompatibel data lama);
+  // satuan lain → id@unitKey. `additionals` digabung setelahnya supaya
+  // varian additionals + satuan tidak bertabrakan.
+  const unitKey = item.unit || "";
+  const baseKey = additionals
+    ? `${cartKeyFor(item.id, unitKey)}_${JSON.stringify(additionals)}`
+    : cartKeyFor(item.id, unitKey);
+
+  // Satu baris keranjang menyimpan qty dalam SATUAN DASAR supaya
+  // `harga * qty` (kalkulasi/struk/laporan) tetap konsisten. Untuk satuan
+  // lain, 1 "klik" = factor satuan dasar.
+  const perUnitBaseQty = stockQty({ ...item, units: item.units }, 1, unitKey);
 
   // Calculate current total quantity of this item in cart (across all additionals variations)
   // We need to read current cart state, so we use a functional update with a check
   setCart(c => {
-    // Sum up all quantities for this item ID across different additionals
+    // Sum up all BASE quantities for this item ID across additionals & satuan
     const currentTotalQty = Object.values(c)
       .filter(cartItem => cartItem.id === item.id)
-      .reduce((sum, cartItem) => sum + (cartItem.qty || 0), 0);
-    
-    // Check if adding one more would exceed stock
-    if (item.stok !== null && currentTotalQty >= item.stok) {
+      .reduce((sum, cartItem) => sum + stockQty(cartItem), 0);
+
+    // Check if adding one more would exceed stock (stok selalu satuan dasar)
+    if (item.stok !== null && currentTotalQty + perUnitBaseQty > item.stok) {
       toast_(`Stok "${item.nama}" tidak mencukupi (tersisa ${item.stok - currentTotalQty})`, "err");
       return c; // Return unchanged cart
     }
-    
-    return { 
-      ...c, 
-      [cartKey]: { 
-        ...item, 
+
+    return {
+      ...c,
+      [baseKey]: {
+        ...item,
         id: item.id, // Keep original id for stock tracking
-        cartKey: cartKey, // Store unique cart key
-        qty: (c[cartKey]?.qty || 0) + 1,
+        cartKey: baseKey, // Store unique cart key
+        unit: unitKey, // "" = satuan dasar
+        qty: (c[baseKey]?.qty || 0) + perUnitBaseQty,
         additionals: additionals || undefined,
-      } 
+      }
     };
   });
 }, [toast_]);
+
+  // Langkah 3: ganti satuan sebuah baris keranjang tanpa kehilangan qty.
+  // Qty lama dikonversi ke satuan dasar lalu dibagi factor satuan baru.
+  // Kalau hasilnya bukan bilangan bulat (mis. 2 dus → pack tidak pas),
+  // pembulatan ke atas supaya stok tidak pernah kurang dipotong.
+  const setUnit = useCallback((cartKey, unitKey) => {
+    setCart(c => {
+      const line = c[cartKey];
+      if (!line) return c;
+      const oldKey = line.unit || "";
+      if (String(oldKey) === String(unitKey || "")) return c;
+
+      const baseQty = stockQty(line);
+      const opts = unitOptions(line);
+      const target = opts.find(o => String(o.key) === String(unitKey || "")) || opts[0];
+      const factor = target.factor || 1;
+      const newQty = Math.max(factor, Math.ceil(baseQty / factor) * factor);
+
+      const nextKey = cartKeyFor(line.id, unitKey || "");
+      if (c[nextKey]) return c; // jangan gabung paksa, biarkan baris terpisah
+
+      const n = { ...c };
+      delete n[cartKey];
+      n[nextKey] = { ...line, unit: unitKey || "", cartKey: nextKey, qty: newQty };
+      return n;
+    });
+  }, []);
 
   // deps kosong aman: functional update penuh, tidak baca state luar sama sekali.
   // Note: id parameter is now cartKey which may include additionals in the format "itemId_{...}"
@@ -170,15 +218,17 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
     let updatedBills;
     let stockDelta = null;
     if (activeBill) {
-      // Calculate stock delta: new items - old items
+      // Calculate stock delta: new items - old items.
+      // Langkah 3: qty dinormalkan ke SATUAN DASAR lewat stockQty(item)
+      // supaya delta stok benar untuk baris bersatuan (mis. 2 dus = 48).
       const oldItemsById = (activeBill.items || []).reduce((acc, item) => {
         const existing = acc[item.id] || { qty: 0 };
-        acc[item.id] = { ...existing, qty: existing.qty + (item.qty || 0) };
+        acc[item.id] = { ...existing, qty: existing.qty + stockQty(item) };
         return acc;
       }, {});
       const newItemsById = items.reduce((acc, item) => {
         const existing = acc[item.id] || { qty: 0 };
-        acc[item.id] = { ...existing, qty: existing.qty + (item.qty || 0) };
+        acc[item.id] = { ...existing, qty: existing.qty + stockQty(item) };
         return acc;
       }, {});
       
@@ -196,18 +246,18 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
       
       updatedBills = bills.map(b =>
         String(b.id) === String(activeBill.id)
-          ? { ...b, items: [...items], updatedAt: t.timestamp, ...customerData, ...receiptAdditionalData }
+          ? { ...b, items: withUnitLabel(items), updatedAt: t.timestamp, ...customerData, ...receiptAdditionalData }
           : b
       );
       toast_('Open Bill diperbarui', "ok");
     } else {
-      // New bill - all items are new stock deduction
+      // New bill - all items are new stock deduction (dalam satuan dasar)
       stockDelta = items.reduce((acc, item) => {
-        acc[item.id] = (acc[item.id] || 0) - (item.qty || 0);
+        acc[item.id] = (acc[item.id] || 0) - stockQty(item);
         return acc;
       }, {});
       
-      const bill = { id: billId, items: [...items], createdAt: t.timestamp, updatedAt: t.timestamp, status: "open", ...customerData, ...receiptAdditionalData };
+      const bill = { id: billId, items: withUnitLabel(items), createdAt: t.timestamp, updatedAt: t.timestamp, status: "open", ...customerData, ...receiptAdditionalData };
       updatedBills = [...bills, bill];
       setBillId(n => n + 1);
       toast_('Open Bill dibuat', "ok");
@@ -229,7 +279,9 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
   // deps: needs receiptAdditionals to read current receipt additionals config
   const loadBillToCart = useCallback((bill) => {
     const c = {};
-    bill.items.forEach(i => { c[i.id] = { ...i }; });
+    // Langkah 3: pakai cartKey kalau ada, supaya varian satuan/additionals
+    // tidak saling menimpa (bug ini sudah ada untuk additionals).
+    bill.items.forEach(i => { c[i.cartKey || i.id] = { ...i }; });
     setCart(c);
     // Load receipt additional values from bill
     if (receiptAdditionals) {
@@ -295,7 +347,7 @@ const processPayment = useCallback(async ({
   
   const trxId = generateTrxId();
   const trx = {
-    id: trxId, ...t, items: [...items],
+    id: trxId, ...t, items: withUnitLabel(items),
     subtotal, pajak: p, service: s, discount: d, total: tot,
     metodeBayar: metode,
     metodeBayarLabel: metodeLabel, // NEW: store label in transaction
@@ -333,6 +385,7 @@ const processPayment = useCallback(async ({
     items, subtotal, pajak, service, discount, total, pricingConfig, paidNum, kembalian, canPay,
     setDrawerOpen, updateReceiptAdditionalValue, setMetode, setPaid,
     addToCart, decCart, delCart, clearCart,
+    setUnit, resolveLine,
     saveOpenBill, loadBillToCart, processPayment, checkRequiredAdditionals, getCanPay,
     setReceiptAdditionals,
     setPricingConfig,

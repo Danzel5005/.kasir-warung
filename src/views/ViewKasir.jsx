@@ -3,6 +3,7 @@ import { fmt } from "../utilities/receipt.js";
 import { G, OR, W, LT, BD, TX, MT, inp, row } from "../constants/design.js";
 import StockBadge from "../components/StockBadge.jsx";
 import AdditionalsModal from "../components/modals/AdditionalsModal.jsx";
+import { unitOptions } from "../utilities/units.js";
 
 // ViewKasir — sidebar kategori, search, grid menu, FAB, dan cart drawer.
 // Props per-field (bukan {menuH, cartH} utuh) supaya React.memo efektif.
@@ -15,7 +16,7 @@ function ViewKasir({
   customerPicker = null,
   customerEnabled = true,
   items, subtotal, service, pajak, discount, total, activeBill,
-  addToCart, decCart, delCart, clearCart,
+  addToCart, decCart, delCart, clearCart, setUnit,
   // App.jsx wrapper functions (sudah di-useCallback di App.jsx)
   saveOpenBill, printPreview, printingPreview, setPayModal,
   // validation
@@ -181,6 +182,9 @@ function ViewKasir({
           :items.map((item,idx)=>{
             const cartKey = item.cartKey || item.id;
             const additionalStr = formatAdditionals(item.additionals);
+            const uOpts = unitOptions(item);
+            const hasUnits = uOpts.length > 1;
+            const activeUnit = uOpts.find(o=>String(o.key)===String(item.unit||"")) || uOpts[0];
             return(
               <div key={`${cartKey}_${idx}`} style={{padding:"7px 12px",borderBottom:`1px solid ${LT}`,background:item.additionals?"#f9faf9":W}}>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 60px 46px 60px 20px",gap:3,alignItems:"center",marginBottom:item.additionals?4:0}}>
@@ -200,6 +204,25 @@ function ViewKasir({
                 {additionalStr && (
                   <div style={{fontSize:8,color:"#888",marginLeft:32,marginTop:2,fontStyle:"italic"}}>
                     {additionalStr}
+                  </div>
+                )}
+                {hasUnits && (
+                  <div style={{display:"flex",gap:3,alignItems:"center",marginLeft:32,marginTop:3,flexWrap:"wrap"}}>
+                    {uOpts.map(o=>{
+                      const on = String(o.key)===String(item.unit||"");
+                      return(
+                        <button key={o.key||"base"} onClick={()=>setUnit&&setUnit(cartKey,o.key)} title={o.factor>1?`1 ${o.label||o.key} = ${o.factor}`:""}
+                          style={{fontSize:8,padding:"1px 6px",borderRadius:8,cursor:"pointer",fontFamily:"inherit",
+                            border:`1px solid ${on?G:BD}`,background:on?"#e8f5ee":W,color:on?G:MT,fontWeight:on?700:500}}>
+                          {o.label||o.key||"dasar"}
+                        </button>
+                      );
+                    })}
+                    {activeUnit&&activeUnit.factor>1&&(
+                      <span style={{fontSize:8,color:MT,fontStyle:"italic"}}>
+                        {Math.ceil((item.qty||0)/activeUnit.factor)} {activeUnit.label||activeUnit.key}
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
