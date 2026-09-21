@@ -87,6 +87,7 @@ const kasirAPI = {
     ipcRenderer.on("update-available", listener);
     return () => ipcRenderer.removeListener("update-available", listener);
   },
+  checkUpdate: () => ipcRenderer.invoke("update-check")
 };
 
 contextBridge.exposeInMainWorld("kasirAPI", kasirAPI);

@@ -151,14 +151,8 @@ app.whenReady().then(() => {
     backup.dailyBackup();
     createWindow();
   } catch (err) { console.error("[Main] Error during startup:", err); }
-  // Cek versi terbaru: best-effort, tidak pernah menggagalkan startup.
-  checkForUpdate()
-    .then((result) => {
-      if (!result?.hasUpdate) return;
-      const [win] = BrowserWindow.getAllWindows();
-      if (win) win.webContents.send("update-available", result);
-    })
-    .catch((err) => console.warn("[Update] Pemeriksaan versi dilewati:", err?.message || err));
+  const updateCheck = checkForUpdate().catch(() => null);
+  ipcMain.handle("update-check", () => updateCheck);
   app.on("activate", () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
 });
 

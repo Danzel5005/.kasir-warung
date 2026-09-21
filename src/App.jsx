@@ -174,10 +174,9 @@ function KasirWorkspace() {
   // ── Info update: main process mengecek versi sekali saat app ready dan
   // mengirim event bila ada versi lebih baru. Gagal/kosong = tidak ada banner.
   useEffect(() => {
-    if (!window.kasirAPI?.onUpdateAvailable) return;
-    return window.kasirAPI.onUpdateAvailable((info) => {
-      if (info?.hasUpdate) setUpdateInfo(info);
-    });
+    window.kasirAPI?.checkUpdate?.()
+      .then((info) => { if (info?.hasUpdate) setUpdateInfo(info); })
+      .catch(() => {});
   }, []);
 
   // ── Load data (sekali saat mount) — distribusikan ke tiap hook
