@@ -272,7 +272,7 @@ background: items.length && checkRequiredAdditionals(receiptAdditionals) && !pri
 color: items.length && checkRequiredAdditionals(receiptAdditionals) && !printingPreview ? G : MT,
 cursor: items.length && checkRequiredAdditionals(receiptAdditionals) && !printingPreview ? "pointer" : "not-allowed",
 fontFamily:"inherit", fontSize:10, fontWeight:700}}>
-{printingPreview ? "Mencetak..." : "Print Preview"}
+{printingPreview ? "Mencetak..." : "Cetak Invoice"}
 </button>
               <button onClick={
                 ()=>checkRequiredAdditionals(receiptAdditionals)&&stockErrors.length===0&&setPayModal(true)
