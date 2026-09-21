@@ -10,6 +10,7 @@ const kasirAPI = {
   restoreClearedTrx: (backupFile) => ipcRenderer.invoke("trx-restore-cleared", backupFile),
   restorePreview: (q) => ipcRenderer.invoke("trx-restore-preview", q),
   voidTrx:     (id, data) => ipcRenderer.invoke("trx-void", id, data),
+settleTrx: (id, actor) => ipcRenderer.invoke("trx-settle", id, actor),
   // New: Filtered & paginated transactions
   loadTrxFiltered: (filters) => ipcRenderer.invoke("trx-load-filtered", filters),
   getTrxDailyStats: (filters) => ipcRenderer.invoke("trx-get-daily-stats", filters),
@@ -67,6 +68,7 @@ const kasirAPI = {
   getPrinters:   ()    => ipcRenderer.invoke("get-printers"),
   printReceiptEscPos: (data) => ipcRenderer.invoke("print-receipt-escpos", data),
   printReceipt:  (data)=> ipcRenderer.invoke("print-receipt", data),
+    exportReportPdf: (data)=>ipcRenderer.invoke("export-report-pdf", data),
   // Shifts
   loadShifts:  ()      => ipcRenderer.invoke("shifts-load"),
   saveShifts:  (list)  => ipcRenderer.invoke("shifts-save", list),

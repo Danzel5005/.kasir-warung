@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 import { DEFAULT_RECEIPT_ADDITIONALS } from "../constants/receiptAdditionals.js";
+import { DEFAULT_ADVANCED_FEATURES, normalizeAdvancedFeatures } from "../constants/advancedFeatures.js";
 import {
   createPrinterHandlers,
   createWarungHandlers,
@@ -10,6 +11,7 @@ import {
   createPricingHandlers,
   createExpenseCategoryHandlers,
   createLogoHandlers,
+  createAdvancedFeatureHandlers,
 } from "./settings/index.js";
 
 // Default payment methods — Tunai and Qris always available initially
@@ -47,6 +49,7 @@ function useSettings({ toast_, onChange }) {
     pajak: { enabled: false, value: 0 },
     service: { enabled: false, value: 0 },
     customerEnabled: true,
+    advancedFeatures: DEFAULT_ADVANCED_FEATURES,
   });
   const [settingsModal, setSettingsModal] = useState(false);
   const [printerModal, setPrinterModal] = useState(false);
@@ -86,6 +89,10 @@ function useSettings({ toast_, onChange }) {
     if (!s.warungPhone) s.warungPhone = "";
     // Customer/member feature — enabled by default, must be a boolean
     if (typeof s.customerEnabled !== "boolean") s.customerEnabled = true;
+    // Fitur Tingkat Lanjut — selalu objek yang sudah dinormalisasi (semua
+    // kunci ada, nilai non-boolean diperbaiki). Ini juga jalur migrasi untuk
+    // settings lama yang belum punya field ini sama sekali.
+    s.advancedFeatures = normalizeAdvancedFeatures(s.advancedFeatures);
     // Receipt paper width — migrate older settings; invalid values fall back to 80mm
     const pw = Math.round(Number(s.receiptPaperWidthMm));
     if (!Number.isFinite(pw) || pw < 30 || pw > 210) s.receiptPaperWidthMm = 80;
@@ -128,6 +135,7 @@ function useSettings({ toast_, onChange }) {
     ...createReceiptFieldHandlers(deps),
     ...createWarungHandlers(deps),
     ...createPricingHandlers(deps),
+    ...createAdvancedFeatureHandlers(deps),
   };
 }
 

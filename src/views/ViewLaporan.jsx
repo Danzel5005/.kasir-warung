@@ -3,7 +3,10 @@ import { csvByDay, TRX_HEADER, trxRow, csvLaporan, csvSalesRate, csvPerMenu, csv
 import { fmt, fmtNum } from "../utilities/receipt.js";
 import { METODE_LABELS } from "../constants/payments.js";
 import { G, OR, W, LT, BD, TX, MT, METODE_COLORS } from "../constants/design.js";
-import { isVoided } from "../utilities/utils.js";
+import { isVoided, api } from "../utilities/utils.js";
+import { buildInsights } from "../utilities/insights.js";
+import { buildCashFlow } from "../utilities/cashflow.js";
+import { buildReportHTML } from "../utilities/reportHtml.js";
 
 // ViewLaporan — laporan keuangan & penjualan per shift, dengan CSV export.
 function ViewLaporan({
@@ -18,8 +21,7 @@ function ViewLaporan({
   openingCash = 0,
   totalExpenses = 0,
   onOpenExpenseModal,
-  onOpenCashModal,
-}) {
+  onOpenCashModal, advancedFeatures, isAdvancedActive, warungName, warungAddress, warungPhone, currentUser, toast_, }) {
   const selShift = shifts.find(s=>s.id===selectedShiftId) || activeShift;
   const reportShiftId = selectedShiftId === "all" ? undefined : selectedShiftId || activeShift?.id;
   const [shiftTrx, setShiftTrx] = useState([]);
@@ -44,10 +46,12 @@ function ViewLaporan({
       ? `Shift ${selShift.shiftNum} — ${selShift.hari} ${selShift.tgl} ${selShift.bln} ${selShift.thn} · ${selShift.operator}`
       : "Pilih shift di atas";
 
-  const rev=shiftTrx.reduce((s,t)=>s+t.total,0);
+  const paidOf=(t)=>{const total=Number(t?.total||0);const bayar=t?.bayar??t?.paid;const paid=bayar==null?total:Number(bayar);return Math.max(0,Math.min(paid,total));};
+const revList=shiftTrx.reduce((s,t)=>s+Number(t?.total||0),0);
+const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
   const mod=shiftTrx.reduce((s,t)=>{t.items.forEach(i=>{s+=(i.modal||0)*i.qty;});return s;},0);
   const sub=shiftTrx.reduce((s,t)=>s+t.subtotal,0);
-  const laba=rev-mod;
+  const laba=revList-mod;
   const hasModal=shiftTrx.some(t=>t.items.some(i=>i.modal>0));
   const selectedShiftList = selectedShiftId === "all"
     ? shifts
@@ -61,6 +65,47 @@ function ViewLaporan({
   const netProfit = laba - reportTotalExpenses;
   // Saldo kas shift mencakup kas awal, pendapatan, dan pengeluaran shift.
   const cashBalance = reportOpeningCash + rev - reportTotalExpenses;
+  const advFeatures = advancedFeatures || {};
+  const advOn = (key) => (advFeatures.enabled === true) && (advFeatures[key] === true);
+  const showPdfReport = advOn("pdfReport");
+  const showInsights = advOn("insights");
+  const canViewCost = !advOn("canViewCost") || (currentUser && currentUser.role === "admin");
+ const showCashFlow = advOn("cashFlow");
+  const labelOf = (key) => {
+    const k = String(key || "cash").trim();
+    const m = (paymentMethods || []).find((x) => String(x.key || "").trim() === k);
+    if (m && m.label) return m.label;
+    return METODE_LABELS[k] || k;
+  };
+  const insights = showInsights ? buildInsights(shiftTrx, { labelOf }) : null;
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const handleExportPdf = async () => {
+    if (isExportingPdf) return;
+    setIsExportingPdf(true);
+    try {
+      const html = buildReportHTML({
+        warungName,
+        warungAddress,
+        warungPhone,
+        shiftLabel,
+        generatedAt: new Date().toLocaleString("id-ID"),
+        rev, mod, sub, netProfit, totalExpenses: reportTotalExpenses,
+        hasModal, showCost: canViewCost,
+        insights, transactions: shiftTrx,
+      });
+      const safeShift = String(shiftLabel || "laporan").replace(/[^a-zA-Z0-9]+/g, "-");
+      const res = await api.exportReportPdf({ html, defaultName: `Laporan-${safeShift}.pdf` });
+      if (res && res.ok) {
+        (toast_ || (() => {}))("Laporan PDF disimpan", "ok");
+      } else if (res && res.error && res.error !== "Dibatalkan") {
+        (toast_ || (() => {}))(res.error || "Gagal menyimpan PDF", "err");
+      }
+    } catch (err) {
+      (toast_ || (() => {}))(err.message || "Gagal menyimpan PDF", "err");
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
   const [detailType, setDetailType] = useState(null);
   const [selectedExpenseCategory, setSelectedExpenseCategory] = useState(null);
   const [selectedIncomeMethod, setSelectedIncomeMethod] = useState(null);
@@ -70,6 +115,33 @@ function ViewLaporan({
     const found = expenseCategories.find((cat) => String(cat.key || "").trim() === normalizedKey);
     return found?.label || normalizedKey;
   };
+  const cashFlow = showCashFlow ? buildCashFlow(shiftTrx, selectedShiftList, getExpenseCategoryLabel, labelOf) : null;
+//Pelunasan manual (buku hutang): tandai piutang pelanggan jadi lunas.
+  const handleSettleDebt = async (debt) => {
+    const name = String(debt?.name || "").trim();
+    if (!name) return;
+    const targets = (shiftTrx || []).filter((t) => {
+      if (!t || isVoided(t)) return false;
+      const tName = String(t.customerNama || t.customer || "Pelanggan Umum").trim() || "Pelanggan Umum";
+      if (tName !== name) return false;
+      const total = Number(t.total || 0);
+      const bayar = Number(t.bayar ?? t.paid ?? total);
+      return total - bayar > 0;
+    });
+    if (!targets.length) { if (toast_) toast_("Tidak ada piutang untuk ditandai lunas.", "info"); return; }
+    if (typeof window !== "undefined" && window.confirm && !window.confirm(`Tandai lunas piutang "${name}" sebesar ${fmt(debt.total)}`)) return;
+    try {
+      for (const t of targets) {
+        await api.settleTrx(t.id, currentUser?.username || null);
+      }
+      const reloaded = await loadAllForReport(reportShiftId);
+      setShiftTrx((reloaded || []).filter((t) => !isVoided(t)));
+      if (toast_) toast_(`Piutang "${name}" ditandai lunas.`, "success");
+    } catch (e) {
+      if (toast_) toast_(`Gagal melunasi: ${e?.message || e}`, "error");
+    }
+  };
+
 
   const resolvePaymentMethodLabel = (trx) => {
     const key = String(trx?.metodeBayar || "cash").trim();
@@ -105,7 +177,7 @@ function ViewLaporan({
         const key = String(trx?.metodeBayar || "cash").trim();
         const label = resolvePaymentMethodLabel(trx);
         const existing = acc.find((entry) => entry.key === key || entry.label === label);
-        const total = Number(trx.total || 0);
+        const total = paidOf(trx);
 
         if (existing) {
           existing.total += total;
@@ -157,7 +229,17 @@ function ViewLaporan({
           </button>
           <button onClick={onOpenExpenseModal} style={{padding:"8px 12px",background:W,color:G,border:`1px solid ${BD}`,borderRadius:8,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700}}>
             Masukan Pengeluaran
+          </button>        
+        {showPdfReport && (
+          <button
+            type="button"
+            onClick={handleExportPdf}
+            disabled={isExportingPdf}
+            style={{padding:"8px 12px",background:G,color:"#fff",border:`1px solid ${G}`,borderRadius:8,cursor:isExportingPdf?"wait":"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700,opacity:isExportingPdf?0.7:1}}
+          >
+            {isExportingPdf ? "Menyiapkan..." : "Ekspor PDF"}
           </button>
+        )}
         </div>
       </div>
 
@@ -255,6 +337,157 @@ function ViewLaporan({
         </div>
       )}
 
+      {showInsights && insights && (
+        <div style={{marginBottom:20}}>
+          <div style={{fontSize:11,fontWeight:700,color:G,marginBottom:10}}>Analitik Penjualan</div>
+          {!insights.hasData ? (
+            <div style={{fontSize:11,color:MT}}>Belum ada transaksi untuk dianalisis pada periode ini.</div>
+          ) : (
+            <div style={{display:"grid",gap:12}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:8}}>
+                <div style={{background:W,border:`1px solid ${BD}`,borderRadius:9,padding:"12px 14px"}}>
+                  <div style={{fontSize:10,color:MT,marginBottom:4}}>Jam Ramai</div>
+                  <div style={{fontSize:15,fontWeight:700,color:G}}>{insights.busiest ? `${insights.busiest.label}` : "-"}</div>
+                  <div style={{fontSize:9,color:MT,marginTop:2}}>{insights.busiest ? `${insights.busiest.count} transaksi` : ""}</div>
+                </div>
+                <div style={{background:W,border:`1px solid ${BD}`,borderRadius:9,padding:"12px 14px"}}>
+                  <div style={{fontSize:10,color:MT,marginBottom:4}}>Rata-rata / Order</div>
+                  <div style={{fontSize:15,fontWeight:700,color:G}}>{fmt(insights.average.average)}</div>
+                  <div style={{fontSize:9,color:MT,marginTop:2}}>{insights.average.count} transaksi</div>
+                </div>
+              </div>
+              {insights.mix && insights.mix.length > 0 && (
+                <div style={{background:W,border:`1px solid ${BD}`,borderRadius:9,padding:"12px 14px"}}>
+                  <div style={{fontSize:11,fontWeight:700,color:TX,marginBottom:8}}>Metode Pembayaran</div>
+                  <div style={{display:"grid",gap:6}}>
+                    {insights.mix.map((m) => (
+                      <div key={m.key} style={{display:"flex",justifyContent:"space-between",gap:10,fontSize:11,color:TX}}>
+                        <span>{m.label}</span>
+                        <span style={{color:MT}}>{m.count}x · {fmt(m.revenue)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {insights.top && insights.top.length > 0 && (
+                <div style={{background:W,border:`1px solid ${BD}`,borderRadius:9,padding:"12px 14px"}}>
+                  <div style={{fontSize:11,fontWeight:700,color:TX,marginBottom:8}}>Menu Terlaris</div>
+                  <div style={{display:"grid",gap:6}}>
+                    {insights.top.map((item, idx) => (
+                      <div key={idx} style={{display:"flex",justifyContent:"space-between",gap:10,fontSize:11,color:TX}}>
+                        <span>{idx + 1}. {item.nama}</span>
+                        <span style={{color:MT}}>{item.qty}x · {fmt(item.revenue)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {showCashFlow && cashFlow && (
+        <div style={{marginBottom:20}}>
+          <div style={{fontSize:11,fontWeight:700,color:G,marginBottom:10}}>Arus Kas</div>
+          {!cashFlow.hasData ? (
+            <div style={{background:W,border:`1px solid ${BD}`,borderRadius:9,padding:"12px 14px",color:MT,fontSize:12}}>Belum ada data arus kas pada periode ini.</div>
+          ) : (
+            <div style={{display:"grid",gap:12}}>
+              <div style={{display:"grid",gap:12,gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))"}}>
+                <div style={{background:W,border:`1px solid ${BD}`,borderRadius:9,padding:"12px 14px"}}>
+                  <div style={{fontSize:11,color:MT,marginBottom:4}}>Pemasukan</div>
+                  <div style={{fontSize:15,fontWeight:700,color:G}}>{fmt(cashFlow.grossIncome)}</div>
+                </div>
+                <div style={{background:W,border:`1px solid ${BD}`,borderRadius:9,padding:"12px 14px"}}>
+                  <div style={{fontSize:11,color:MT,marginBottom:4}}>Pengeluaran</div>
+                  <div style={{fontSize:15,fontWeight:700,color:"#dc2626"}}>{fmt(cashFlow.totalExpense)}</div>
+                </div>
+                <div style={{background:W,border:`1px solid ${BD}`,borderRadius:9,padding:"12px 14px"}}>
+                  <div style={{fontSize:11,color:MT,marginBottom:4}}>Laba Bersih</div>
+                  <div style={{fontSize:15,fontWeight:700,color:cashFlow.netProfit >= 0 ? G : "#dc2626"}}>{fmt(cashFlow.netProfit)}</div>
+                </div>
+                <div style={{background:W,border:`1px solid ${BD}`,borderRadius:9,padding:"12px 14px"}}>
+                  <div style={{fontSize:11,color:MT,marginBottom:4}}>Margin</div>
+                  <div style={{fontSize:15,fontWeight:700,color:TX}}>{Number(cashFlow.margin || 0).toFixed(2)}%</div>
+                </div>
+              </div>
+              {cashFlow.incomeBySource && cashFlow.incomeBySource.length > 0 && (
+                <div style={{background:W,border:`1px solid ${BD}`,borderRadius:9,padding:"12px 14px"}}>
+                  <div style={{fontSize:11,fontWeight:700,color:TX,marginBottom:8}}>Pemasukan per Sumber</div>
+                  <div style={{display:"grid",gap:6}}>
+                    {cashFlow.incomeBySource.map((item, idx) => (
+                      <div key={idx} style={{display:"flex",justifyContent:"space-between",fontSize:12,color:TX}}>
+                        <span>{item.label}</span>
+                        <span style={{color:MT}}>{fmt(item.total)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {cashFlow.expenseBySource && cashFlow.expenseBySource.length > 0 && (
+                <div style={{background:W,border:`1px solid ${BD}`,borderRadius:9,padding:"12px 14px"}}>
+                  <div style={{fontSize:11,fontWeight:700,color:TX,marginBottom:8}}>Pengeluaran per Kategori</div>
+                  <div style={{display:"grid",gap:6}}>
+                    {cashFlow.expenseBySource.map((item, idx) => (
+                      <div key={idx} style={{display:"flex",justifyContent:"space-between",fontSize:12,color:TX}}>
+                        <span>{item.label}</span>
+                        <span style={{color:MT}}>{fmt(item.total)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {cashFlow.outstanding > 0 && (
+                <div style={{background:W,border:`1px solid ${BD}`,borderRadius:9,padding:"12px 14px"}}>
+                  <div style={{fontSize:11,fontWeight:700,color:TX,marginBottom:8}}>Piutang</div>
+                  <div style={{display:"grid",gap:6}}>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:TX}}>
+                      <span>Total belum dibayar</span>
+                      <span style={{color:"#dc2626"}}>{fmt(cashFlow.outstanding)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+               
+            </div>
+          )}
+        </div>
+      )}      {showCashFlow && (
+        <div style={{marginBottom:20}}>
+          <div style={{fontSize:11,fontWeight:700,color:G,marginBottom:10}}>Buku Hutang</div>
+          {!cashFlow || cashFlow.debts.length === 0 ? (
+            <div style={{background:W,border:`1px solid ${BD}`,borderRadius:9,padding:"12px 14px",color:MT,fontSize:12}}>Tidak ada piutang pada periode ini. Semua transaksi tunai sudah lunas.</div>
+          ) : (
+            <div style={{background:W,border:`1px solid ${BD}`,borderRadius:9,padding:"12px 14px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:11,fontWeight:700,color:TX,marginBottom:8}}>
+                <span>Piutang per Pelanggan</span>
+                <span style={{color:"#dc2626"}}>{fmt(cashFlow.outstanding)}</span>
+              </div>
+              <div style={{display:"grid",gap:6}}>
+                {cashFlow.debts.map((d, idx) => (
+                  <div key={idx} style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:12,color:TX,gap:8}}>
+                    <span>
+                      {d.name}
+                      <span style={{color:MT}}> ({d.count} transaksi)</span>
+                    </span>
+                    <span style={{display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{color:"#dc2626"}}>{fmt(d.total)}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleSettleDebt(d)}
+                        style={{background:G,color:"#fff",border:"none",borderRadius:6,padding:"4px 10px",fontSize:11,fontWeight:600,cursor:"pointer"}}
+                      >Tandai Lunas</button>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+
       {selectedExpenseCategory && (
         <div onClick={() => setSelectedExpenseCategory(null)} style={{position:"fixed", inset:0, background:"rgba(17,24,39,0.28)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:50, padding:16}}>
           <div onClick={(e) => e.stopPropagation()} style={{width:"min(420px, 92vw)", background:W, border:`1px solid ${BD}`, borderRadius:12, boxShadow:"0 18px 50px rgba(0,0,0,0.18)", padding:"14px 16px"}}>
@@ -287,7 +520,7 @@ function ViewLaporan({
                 <div key={`${trx.id || idx}-${trx.createdAt || idx}`} style={{background:"#eef8f0", border:`1px solid #cfead6`, borderRadius:8, padding:"10px 12px"}}>
                   <div style={{fontSize:9,color:MT,marginBottom:4}}>{trx.hari || "-"} · {trx.tgl || "-"} {trx.bln || "-"} {trx.thn || ""}</div>
                   <div style={{fontSize:12,fontWeight:700,color:TX}}>{resolvePaymentMethodLabel(trx)}</div>
-                  <div style={{fontSize:11,color:G, fontWeight:700, marginTop:4}}>{fmt(Number(trx.total || 0))}</div>
+                  <div style={{fontSize:11,color:G, fontWeight:700, marginTop:4}}>{fmt(paidOf(trx))}</div>
                 </div>
               ))}
             </div>

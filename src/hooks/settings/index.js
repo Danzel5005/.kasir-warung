@@ -6,3 +6,4 @@ export { createReceiptFieldHandlers } from "./receiptFields.js";
 export { createPricingHandlers } from "./pricing.js";
 export { createExpenseCategoryHandlers } from "./expenseCategories.js";
 export { createLogoHandlers } from "./logo.js";
+export { createAdvancedFeatureHandlers } from "./advancedFeatures.js";

@@ -49,7 +49,19 @@ const api = {
   async saveTrx(t)        { if(window.kasirAPI) return window.kasirAPI.saveTrx(t); const a=LS("ykk_trx")||[]; a.push(t); LS("ykk_trx",a); },
   // Langkah 2b: opts.restoreStock meminta main menambah stok saat transaksi
   // dihapus. Di mode browser kita hitung sendiri delta positif dari item.
-  async deleteTrx(id, opts) {
+  //Pelunasan (settlement): tandai piutang transaksi jadi lunas (bayar = total).
+  //Tidak mengubah total pendapatan (penjualan sudah tercatat saat transaksi dibuat).
+  async settleTrx(id, actor) {
+    if (window.kasirAPI && window.kasirAPI.settleTrx) return window.kasirAPI.settleTrx(id, actor);
+    const all = LS("ykk_trx") || [];
+    const updated = all.map((t) => String(t.id) === String(id)
+      ? { ...t, bayar: Number(t.total || 0), settled: true, settledAt: new Date().toISOString(), settledBy: actor || null }
+      : t);
+    LS("ykk_trx", updated);
+    return { ok: true };
+  },
+
+async deleteTrx(id, opts) {
     if (window.kasirAPI) return window.kasirAPI.deleteTrx(id, opts);
     const all = LS("ykk_trx") || [];
     const trx = all.find((t) => String(t.id) === String(id)) || null;
@@ -290,7 +302,8 @@ const api = {
   async backupOpenFolder(){ return window.kasirAPI?.backupOpenFolder ? safeIpc("Buka folder data", () => window.kasirAPI.backupOpenFolder()) : { ok:false, error:"Hanya tersedia di aplikasi desktop" }; },
   async backupRelaunch()  { return window.kasirAPI?.backupRelaunch ? safeIpc("Muat ulang aplikasi", () => window.kasirAPI.backupRelaunch()) : { ok:false, error:"Hanya tersedia di aplikasi desktop" }; },
   async getPrinters()     { return window.kasirAPI ? await window.kasirAPI.getPrinters()      : []; },
-  async printReceipt(d)   { return window.kasirAPI ? await window.kasirAPI.printReceipt(d)    : {ok:false,error:"Hanya tersedia di aplikasi desktop"}; },
+  async printReceipt(d)   { return window.kasirAPI ? await window.kasirAPI.printReceipt(d)    : {ok:false,error:"Hanya tersedia di aplikasi desktop"}; },
+  async exportReportPdf(d) { return (window.kasirAPI) ? await window.kasirAPI.exportReportPdf(d) : { ok: false, error: "Hanya tersedia aplikasi desktop" }; },
   async loadShifts()      { return window.kasirAPI ? await window.kasirAPI.loadShifts?.()     : (LS("ykk_shifts")||[]); },
   async saveShifts(list)  { if(window.kasirAPI&&window.kasirAPI.saveShifts) return window.kasirAPI.saveShifts(list); LS("ykk_shifts",list); },
   // Atomic payment — tulis trx + potong stok + hapus bill sekaligus

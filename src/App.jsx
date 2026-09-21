@@ -486,7 +486,7 @@ const executeConfirmDel = useCallback((restoreStock = false) => {
             openingCash={openingCash}
             totalExpenses={totalExpenses}
             onOpenExpenseModal={() => setExpenseModal(true)}
-            onOpenCashModal={() => setOpeningCashModal(true)}          />
+            onOpenCashModal={() => setOpeningCashModal(true)} advancedFeatures={settingsH.settings.advancedFeatures} isAdvancedActive={settingsH.isAdvancedActive} warungName={settingsH.settings.warungName} warungAddress={settingsH.settings.warungAddress} warungPhone={settingsH.settings.warungPhone} currentUser={authH.currentUser} toast_={toastH.toast_}          />
         )}
 
         {/* ══════ KELOLA MENU VIEW ════════════════════════════════════════ */}

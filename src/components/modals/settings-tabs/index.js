@@ -8,3 +8,4 @@ export * from "./ReceiptSettingsTab.jsx";
 export * from "./PricingSettingsTab.jsx";
 export * from "./BackupSettingsTab.jsx";
 export * from "./UsersSettingsTab.jsx";
+export * from "./AdvancedSettingsTab.jsx";

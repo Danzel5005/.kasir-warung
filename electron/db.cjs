@@ -463,7 +463,32 @@ function createDatabaseService({ ipcMain, files, ensureDir, rJSON, atomicWrite, 
         return { ok: false, error: err.message };
       }
     });
-    ipcMain.handle("trx-restore", (_e, list) => {
+    ipcMain.handle("trx-settle", (_e, id, actor) => {
+  const patch = { settled: true, settledAt: new Date().toISOString(), settledBy: actor != null ? actor : null };
+  if (!db) {
+    const all = rJSON(files.trx) || [];
+    const found = all.find((t) => String(t.id) === String(id));
+    if (!found) return { ok: false, error: "Transaksi tidak ditemukan" };
+    if (found.status === "voided" || found.voided === true) return { ok: false, error: "Transaksi sudah void" };
+    const updated = all.map((t) => String(t.id) === String(id) ? Object.assign({}, t, patch, { bayar: Number(t.total || 0) }) : t);
+    atomicWrite(files.trx, updated);
+    return { ok: true };
+  }
+  try {
+    const row = db.prepare("SELECT data FROM transactions WHERE id = ?").get(id);
+    if (!row) return { ok: false, error: "Transaksi tidak ditemukan" };
+    const current = JSON.parse(row.data);
+    if (current.status === "voided" || current.voided === true) return { ok: false, error: "Transaksi sudah void" };
+    const merged = Object.assign({}, current, patch, { bayar: Number(current.total || 0) });
+    db.prepare("UPDATE transactions SET data = ? WHERE id = ?").run(JSON.stringify(merged), id);
+    return { ok: true };
+  } catch (err) {
+    console.error("[trx-settle] Error:", err.message);
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle("trx-restore", (_e, list) => {
       if (!db) { atomicWrite(files.trx, list); return { ok: true }; }
       try { db.exec("DELETE FROM transactions"); const stmt = db.prepare("INSERT INTO transactions (id, data) VALUES (?, ?)"); db.transaction((items) => items.forEach((item) => stmt.run(item.id || null, JSON.stringify(item))))(list); return { ok: true }; }
       catch (err) { console.error("[trx-restore] Error:", err.message); return { ok: false, error: err.message }; }

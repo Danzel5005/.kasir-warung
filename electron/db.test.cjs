@@ -381,7 +381,7 @@ describe("db.cjs: initDB & registerHandlers", () => {
       "trx-clear", "trx-delete", "trx-get-daily-stats", "trx-get-shift-ids",
       "trx-load", "trx-load-filtered", "trx-restore", "trx-restore-cleared",
       "trx-restore-preview",
-      "trx-save", "trx-void",
+      "trx-save", "trx-settle", "trx-void",
     ]);
   });
 

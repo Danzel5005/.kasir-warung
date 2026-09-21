@@ -120,7 +120,53 @@ function createPrintingService({ app, ipcMain, BrowserWindow, dialog, dataDir, e
     if (!driver?.printDirect) throw new Error("Driver printer RAW tidak tersedia");
     for (let offset = 0; offset < buffer.length; offset += 512) { await printDirect(driver, printerName, buffer.subarray(offset, Math.min(offset + 512, buffer.length))); if (offset + 512 < buffer.length) await new Promise((resolve) => setTimeout(resolve, 25)); }
   };
-  ipcMain.handle("print-receipt-escpos", async (_e, { trx, printerName, paperWidthMm, warungName, warungAddress, warungPhone, operatorName, cats = [], customerEnabled = true }) => {
+  
+ipcMain.handle("export-report-pdf", async (_e, { html, defaultName }) => {
+    ensureDir();
+    const reportFile = path.join(dataDir, "report-print.html");
+    fs.writeFileSync(reportFile, html || "", "utf-8");
+    const win = new BrowserWindow({
+      show: false,
+      width: PAGE_WIDTH_MM * 3.78,
+      height: PAGE_HEIGHT_MM * 3.78,
+      webPreferences: { offscreen: true, javascript: false },
+    });
+    win.loadFile(reportFile);
+    return new Promise((resolve) => {
+      win.webContents.once("did-finish-load", () => {
+        setTimeout(async () => {
+          try {
+            const pdfBuffer = await win.webContents.printToPDF({
+              printBackground: true,
+              preferCSSPageSize: true,
+              pageSize: "A4",
+              scale: 1,
+              margins: { top: 0, bottom: 0, left: 0, right: 0 },
+            });
+            const safeName = (defaultName || "laporan").replace(/[\\/:*?"<>|]/g, "-");
+            const defPath = path.join(app.getPath("desktop"), safeName.endsWith(".pdf") ? safeName : safeName + ".pdf");
+            const { canceled, filePath } = await dialog.showSaveDialog(win, {
+              title: "Simpan Laporan sebagai PDF",
+              defaultPath: defPath,
+              filters: [{ name: "PDF Files", extensions: ["pdf"] }],
+            });
+            win.close();
+            if (canceled || !filePath) return resolve({ ok: false, error: "Dibatalkan" });
+            fs.writeFileSync(filePath, pdfBuffer);
+            return resolve({ ok: true, filePath });
+          } catch (err) {
+            win.close();
+            return resolve({ ok: false, error: err.message });
+          }
+        }, 250);
+      });
+      win.webContents.once("did-fail-load", (_event, _code, description) => {
+        setTimeout(() => win.close(), 500);
+        resolve({ ok: false, error: description || "Gagal memuat halaman laporan" });
+      });
+    });
+  });
+ipcMain.handle("print-receipt-escpos", async (_e, { trx, printerName, paperWidthMm, warungName, warungAddress, warungPhone, operatorName, cats = [], customerEnabled = true }) => {
     const selectedName = printerName || "auto";
     try {
       const paperW = normalizePaperWidthMm(paperWidthMm);
