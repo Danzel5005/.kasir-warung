@@ -10,7 +10,7 @@ The following changes are required to integrate void transaction feature:
 
 ```jsx
 {canDelete && <button onClick={handleVoidOrDelete(t)} style={{ background: "none", border: "none", cursor: "pointer", color: t.status === "voided" ? "#ccc" : "#4b4b4b", fontSize: 24, padding: 0 }}>
-  {t.status === "voided" ? "🚫" : "&times;"}
+  {t.status === "voided" ? "" : "&times;"}
 </button>}
 ```
 
