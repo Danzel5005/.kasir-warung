@@ -21,6 +21,8 @@ import { useHistory } from "./hooks/useHistory.js";
 import { useBarcodeScanner } from "./hooks/useBarcodeScanner.js";
 import { useCustomers } from "./hooks/useCustomers.js";
 import { useAdvancedData } from "./hooks/useAdvancedData.js";
+import { loyalDiscountRules } from "./utilities/loyalty.js";
+import { LOYALTY_TIER_BASIS, normalizeLoyaltyTierBasis } from "./constants/advancedFeatures.js";
 import { useShiftCashFlow } from "./hooks/useShiftCashFlow.js";
 import { row } from "./constants/design.js";
 import { canAccessView, isAdmin } from "./utilities/permissions.js";
@@ -120,6 +122,44 @@ function KasirWorkspace() {
     if (view === "fitur-lanjutan" && !settingsH.settings.advancedFeatures?.enabled) setView("menu");
   }, [authH.currentUser, view]);
 
+  // ── Loyalty Tier → Diskon otomatis (Fase 1).
+  // Basis tier bisa dipilih di Settings:
+  //   - "transaction" (default): TOTAL TRANSAKSI SAAT INI (subtotal keranjang)
+  //   - "lifetime": TOTAL BELANJA KUMULATIF pelanggan terpilih
+  // Diskon otomatis diterapkan HANYA kalau: flag advancedFeatures.loyalty
+  // menyala, pelanggan dipilih, dan tier punya diskon > 0. Rule di-scope
+  // "global" sehingga dihitung calcPrice bersama diskon lain dari settings.
+  // Baseline dipakai apa adanya (sebelum diskon) supaya tier tidak berubah
+  // karena diskonnya sendiri (tidak ada feedback loop).
+  useEffect(() => {
+    const loyaltyOn = !!settingsH.settings.advancedFeatures?.loyalty;
+    const customer = customersH.selectedCustomer;
+    const basis = normalizeLoyaltyTierBasis(settingsH.settings.loyaltyTierBasis);
+    const basisTotal = (basis === LOYALTY_TIER_BASIS.LIFETIME)
+      ? (customerTotals[customer?.id] || 0)
+      : cartH.subtotal;
+    const baseDiscounts = settingsH.settings.discounts || [];
+    const loyaltyRules = (loyaltyOn && customer)
+      ? loyalDiscountRules(basisTotal, advDataH.loyaltyTiers)
+      : [];
+    cartH.setPricingConfig({
+      discounts: [...baseDiscounts, ...loyaltyRules],
+      pajak: settingsH.settings.pajak || { enabled: false, value: 0 },
+      service: settingsH.settings.service || { enabled: false, value: 0 },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    settingsH.settings.advancedFeatures?.loyalty,
+    settingsH.settings.discounts,
+    settingsH.settings.pajak,
+    settingsH.settings.service,
+    settingsH.settings.loyaltyTierBasis,
+    customersH.selectedCustomer,
+    customerTotals,
+    advDataH.loyaltyTiers,
+    cartH.subtotal,
+  ]);
+
   // ── confirmDel: SENGAJA tetap di App.jsx, bukan di salah satu hook.
   // Dipakai lintas domain (hapus trx/bill/item/kategori) dengan shape
   // {type, id}. Memilikinya di satu hook tertentu akan membuat hook itu
@@ -173,6 +213,10 @@ function KasirWorkspace() {
 
   const [dataPath, setDataPath] = useState("");
 
+  // ── Total belanja kumulatif per pelanggan (untuk basis tier "lifetime").
+  // Dimuat lewat IPC agregat agar tidak perlu memuat seluruh riwayat transaksi.
+  const [customerTotals, setCustomerTotals] = useState({});
+
   const logoRef   = settingsH.logoRef;
   const searchRef = useRef();
   useBarcodeScanner({
@@ -213,6 +257,25 @@ function KasirWorkspace() {
       setDataPath(dp);
     })();
   }, []);
+
+  // ── Muat total belanja kumulatif pelanggan (basis tier "lifetime").
+  // Di-refresh setiap jumlah riwayat transaksi bertambah (mis. setelah bayar)
+  // supaya tier pelanggan langsung mengikuti total terbaru.
+  const loadCustomerTotalsMap = useCallback(async () => {
+    try {
+      const rows = (await api.loadCustomerTotals()) || [];
+      const map = {};
+      for (const r of rows) {
+        if (!r?.customerId) continue;
+        map[r.customerId] = Number(r.total) || 0;
+      }
+      setCustomerTotals(map);
+    } catch {
+      /* biarkan kosong — tier basis lifetime jatuh ke 0 / Bronze */
+    }
+  }, []);
+
+  useEffect(() => { loadCustomerTotalsMap(); }, [loadCustomerTotalsMap, historyH.history.length]);
 
   // ── Hotkeys
   useEffect(() => {
@@ -437,6 +500,16 @@ const executeConfirmDel = useCallback((restoreStock = false) => {
             receiptAdditionalValues={cartH.receiptAdditionalValues} receiptAdditionals={cartH.receiptAdditionals} updateReceiptAdditionalValue={cartH.updateReceiptAdditionalValue}
             customerPicker={<CustomerPicker customers={customersH.customers} selectedCustomer={customersH.selectedCustomer} setSelectedCustomerId={customersH.setSelectedCustomerId} upsertCustomer={customersH.upsertCustomer} />}
             customerEnabled={settingsH.settings.customerEnabled !== false}
+            loyaltyTier={
+              (settingsH.settings.advancedFeatures?.loyalty && customersH.selectedCustomer)
+                ? advDataH.tierForTotal(
+                    normalizeLoyaltyTierBasis(settingsH.settings.loyaltyTierBasis) === LOYALTY_TIER_BASIS.LIFETIME
+                      ? (customerTotals[customersH.selectedCustomer?.id] || 0)
+                      : cartH.subtotal,
+                    advDataH.loyaltyTiers,
+                  )
+                : null
+            }
             items={cartH.items} subtotal={cartH.subtotal} service={cartH.service} discount={cartH.discount}
             pajak={cartH.pajak} total={cartH.total} activeBill={cartH.activeBill}
             addToCart={cartH.addToCart} decCart={cartH.decCart} delCart={cartH.delCart} clearCart={cartH.clearCart} setUnit={cartH.setUnit}

@@ -46,3 +46,23 @@ export function tierDiscount(total = 0, tiers = DEFAULT_LOYALTY_TIERS) {
   const pct = Number(tier?.discountPct || 0);
   return { tier, pct, amount: Math.round((Number(total || 0) * pct) / 100) };
 }
+
+// Bangun rule diskon bergaya `calculations.js` dari tier pelanggan, supaya bisa
+// disuntikkan ke pricingConfig.discounts dan dihitung oleh calcPrice bersama
+// diskon lain (di-scope "global" = seluruh keranjang). Mengembalikan [] kalau
+// tier tidak valid / diskon 0 (tidak ada perubahan sama sekali).
+export function loyalDiscountRules(total = 0, tiers = DEFAULT_LOYALTY_TIERS) {
+  const { tier, pct } = tierDiscount(total, tiers);
+  if (!tier || pct <= 0) return [];
+  return [{
+    id: `loyalty_${tier.key}`,
+    enabled: true,
+    type: "percentage",
+    value: pct,
+    scope: "global",
+    target: "",
+    minQty: 1,
+    perChunk: false,
+    chunkQty: 1,
+  }];
+}

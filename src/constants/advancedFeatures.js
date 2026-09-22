@@ -36,6 +36,23 @@ export const DEFAULT_ADVANCED_FEATURES = {
   cashFlow: false,     
 };
 
+// Basis perhitungan loyalty tier — dipilih user di Pengaturan (Fitur Lanjutan).
+//   "transaction" : tier dihitung dari total transaksi yang sedang dibuat
+//   "lifetime"    : tier dihitung dari total belanja kumulatif pelanggan
+export const LOYALTY_TIER_BASIS = {
+  TRANSACTION: "transaction",
+  LIFETIME: "lifetime",
+};
+
+export const DEFAULT_LOYALTY_TIER_BASIS = LOYALTY_TIER_BASIS.TRANSACTION;
+
+// Kembalikan basis yang valid; nilai tak dikenal jatuh ke default.
+export function normalizeLoyaltyTierBasis(value) {
+  return value === LOYALTY_TIER_BASIS.LIFETIME
+    ? LOYALTY_TIER_BASIS.LIFETIME
+    : DEFAULT_LOYALTY_TIER_BASIS;
+}
+
 // Normalisasi objek advancedFeatures dari settings tersimpan. Field yang tidak
 // dikenal dibuang; field yang hilang diisi default. Nilai non-boolean diperbaiki.
 export function normalizeAdvancedFeatures(input) {

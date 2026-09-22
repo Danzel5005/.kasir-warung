@@ -1,5 +1,5 @@
 import { G, W, LT, BD, MT, TX, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../../constants/design.js";
-import { ADVANCED_FEATURE_GROUPS, DEFAULT_ADVANCED_FEATURES } from "../../../constants/advancedFeatures.js";
+import { ADVANCED_FEATURE_GROUPS, DEFAULT_ADVANCED_FEATURES, LOYALTY_TIER_BASIS, normalizeLoyaltyTierBasis } from "../../../constants/advancedFeatures.js";
 
 // ToggleSwitch — saklar gaya iOS minimal, tanpa dependensi. Dipakai untuk
 // saklar induk maupun tiap sub-fitur supaya tidak ada dua gaya kontrol.
@@ -76,6 +76,41 @@ export function AdvancedSettingsTab({ settingsH }) {
           </div>
         </div>
       ))}
+
+      {/* Opsi basis loyalty tier — hanya muncul saat fitur Loyalty Tier aktif. */}
+      {adv.loyalty && (
+        <div style={{ padding: "10px 12px", background: W, border: `1px solid ${BD}`, borderRadius: RADIUS.md, marginBottom: 14 }}>
+          <div style={{ fontSize: TYPOGRAPHY.small.fontSize, fontWeight: 700, color: TX }}>Basis Loyalty Tier</div>
+          <div style={{ fontSize: TYPOGRAPHY.label.fontSize, color: MT, marginTop: 2, marginBottom: 8 }}>
+            Tentukan dari mana total belanja untuk menghitung tingkatan pelanggan.
+          </div>
+          {[
+            { value: LOYALTY_TIER_BASIS.TRANSACTION, label: "Total transaksi saat ini", desc: "Tier dihitung dari nilai pesanan yang sedang dibuat." },
+            { value: LOYALTY_TIER_BASIS.LIFETIME, label: "Total belanja pelanggan (lifetime)", desc: "Tier dihitung dari akumulasi seluruh transaksi pelanggan terpilih." },
+          ].map((opt) => {
+            const active = normalizeLoyaltyTierBasis(settingsH.settings.loyaltyTierBasis) === opt.value;
+            return (
+              <label
+                key={opt.value}
+                style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 10px", marginBottom: 6, border: `1px solid ${active ? "#a8d5b8" : BD}`, background: active ? COLOR_PALETTE.primaryLight : W, borderRadius: RADIUS.md, cursor: "pointer" }}
+              >
+                <input
+                  type="radio"
+                  id={`loyalty-basis-${opt.value}`}
+                  name="loyaltyTierBasis"
+                  checked={active}
+                  onChange={() => settingsH.setLoyaltyTierBasis(opt.value)}
+                  style={{ marginTop: 2 }}
+                />
+                <span style={{ flex: 1 }}>
+                  <span style={{ display: "block", fontSize: TYPOGRAPHY.small.fontSize, fontWeight: 700, color: active ? G : TX }}>{opt.label}</span>
+                  <span style={{ display: "block", fontSize: TYPOGRAPHY.label.fontSize, color: MT, marginTop: 2 }}>{opt.desc}</span>
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      )}
     </div>
   </div>;
 }

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import { hppFromResep, hppForMenus, marginFromResep, bahanDeltasFromItems } from "./resepHpp.js";
+import { calcPrice } from "./calculations.js";
 import {
   DEFAULT_BAHAN_BAKU,
   normalizeBahan,
@@ -19,7 +20,13 @@ import {
   normalizeLoyaltyTiers,
   tierForTotal,
   tierDiscount,
+  loyalDiscountRules,
 } from "./loyalty.js";
+import {
+  LOYALTY_TIER_BASIS,
+  DEFAULT_LOYALTY_TIER_BASIS,
+  normalizeLoyaltyTierBasis,
+} from "../constants/advancedFeatures.js";
 
 const bahan = [
   { id: "b1", nama: "Kopi", satuan: "gram", stok: 1000, minStok: 100, hargaSatuan: 0.5 },
@@ -273,5 +280,69 @@ describe("loyalty.js", () => {
   it("tierDiscount handles zero total", () => {
     const d = tierDiscount(0);
     expect(d.amount).toBe(0);
+  });
+
+  it("loyalDiscountRules empty when tier discount 0 (Bronze)", () => {
+    expect(loyalDiscountRules(0)).toEqual([]);
+    expect(loyalDiscountRules(100000)).toEqual([]); // masih Bronze, 0%
+  });
+
+  it("loyalDiscountRules makes a global percentage rule from the tier", () => {
+    const rules = loyalDiscountRules(1000000); // Silver 2%
+    expect(rules).toHaveLength(1);
+    expect(rules[0]).toMatchObject({
+      id: "loyalty_silver",
+      enabled: true,
+      type: "percentage",
+      value: 2,
+      scope: "global",
+      minQty: 1,
+      perChunk: false,
+    });
+  });
+
+  it("loyalDiscountRules composes with calcPrice", () => {
+    const subtotal = 1000000; // Silver 2%
+    const rules = loyalDiscountRules(subtotal);
+    const res = calcPrice(subtotal, { discounts: rules, items: [{ id: "x", kategori: "kopi", harga: subtotal, qty: 1 }] });
+    expect(res.discount).toBe(20000);
+    expect(res.total).toBe(980000);
+  });
+});
+
+describe("loyalty tier basis", () => {
+  const tierTotal = (basis, subtotal, customerTotals, customerId) =>
+    basis === LOYALTY_TIER_BASIS.LIFETIME
+      ? (customerTotals[customerId] || 0)
+      : subtotal;
+
+  it("normalizeLoyaltyTierBasis returns lifetime only for exact 'lifetime'", () => {
+    expect(normalizeLoyaltyTierBasis("lifetime")).toBe(LOYALTY_TIER_BASIS.LIFETIME);
+    expect(normalizeLoyaltyTierBasis("transaction")).toBe(LOYALTY_TIER_BASIS.TRANSACTION);
+    expect(normalizeLoyaltyTierBasis(undefined)).toBe(DEFAULT_LOYALTY_TIER_BASIS);
+    expect(normalizeLoyaltyTierBasis("garbage")).toBe(LOYALTY_TIER_BASIS.TRANSACTION);
+    expect(DEFAULT_LOYALTY_TIER_BASIS).toBe(LOYALTY_TIER_BASIS.TRANSACTION);
+  });
+
+  it("transaction basis ignores lifetime totals (small cart stays Bronze)", () => {
+    const totals = { c1: 3000000 }; // lifetime gold
+    const base = tierTotal(LOYALTY_TIER_BASIS.TRANSACTION, 100000, totals, "c1");
+    expect(base).toBe(100000);
+    expect(loyalDiscountRules(base)).toEqual([]); // Bronze, no discount
+  });
+
+  it("lifetime basis lifts a small cart to the customer's cumulative tier", () => {
+    const totals = { c1: 3000000 }; // gold 5%
+    const base = tierTotal(LOYALTY_TIER_BASIS.LIFETIME, 100000, totals, "c1");
+    expect(base).toBe(3000000);
+    const rules = loyalDiscountRules(base);
+    expect(rules).toHaveLength(1);
+    expect(rules[0]).toMatchObject({ id: "loyalty_gold", value: 5, scope: "global" });
+  });
+
+  it("lifetime basis defaults to 0 (no discount) for unknown customer", () => {
+    const base = tierTotal(LOYALTY_TIER_BASIS.LIFETIME, 100000, {}, "ghost");
+    expect(base).toBe(0);
+    expect(loyalDiscountRules(base)).toEqual([]);
   });
 });

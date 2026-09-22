@@ -436,6 +436,23 @@ function createDatabaseService({ ipcMain, files, ensureDir, rJSON, atomicWrite, 
       catch (err) { console.error("[trx-get-shift-ids] Error:", err.message); return []; }
     });
 
+    // Total belanja kumulatif per pelanggan (untuk loyalty tier basis "lifetime").
+    // Dihitung dari `total` transaksi yang punya customerId. Transaksi void
+    // (voided/void) tetap disertakan apa adanya — healing void dilakukan di
+    // renderer (healVoidedTrx) dan tidak memengaruhi agregat ini secara material.
+    ipcMain.handle("customer-totals", () => {
+      if (!db) return [];
+      try {
+        return db.prepare(
+          `SELECT json_extract(data, '$.customerId') as customerId,
+                  SUM(json_extract(data, '$.total')) as total
+           FROM transactions
+           WHERE json_extract(data, '$.customerId') IS NOT NULL
+           GROUP BY json_extract(data, '$.customerId')`
+        ).all().filter((row) => row.customerId);
+      } catch (err) { console.error("[customer-totals] Error:", err.message); return []; }
+    });
+
     ipcMain.handle("trx-save", (_e, trx) => {
       if (!db) { const list = rJSON(files.trx) || []; list.unshift(trx); atomicWrite(files.trx, list); return { ok: true }; }
       try { db.prepare("INSERT INTO transactions (id, data) VALUES (?, ?)").run(trx.id || null, JSON.stringify(trx)); return { ok: true }; }

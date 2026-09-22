@@ -15,6 +15,7 @@ function ViewKasir({
   receiptAdditionalValues, receiptAdditionals, updateReceiptAdditionalValue,
   customerPicker = null,
   customerEnabled = true,
+  loyaltyTier = null,
   items, subtotal, service, pajak, discount, total, activeBill,
   addToCart, decCart, delCart, clearCart, setUnit,
   // App.jsx wrapper functions (sudah di-useCallback di App.jsx)
@@ -235,6 +236,14 @@ function ViewKasir({
         {items.length>0&&(
           <div style={{padding:"10px 13px",borderTop:`1px solid ${BD}`}}>
             <div style={{...row,fontSize:11,color:MT,marginBottom:3}}><span>Subtotal</span><span style={{fontWeight:600,color:TX}}>{fmt(subtotal)}</span></div>
+            {loyaltyTier && (
+              <div style={{...row,fontSize:11,color:G,marginBottom:3}}>
+                <span>
+                  <span style={{display:"inline-block",background:"#eaf6ee",border:"1px solid #a8d5b8",borderRadius:4,padding:"0 5px",fontWeight:700,fontSize:10,color:G}}>{loyaltyTier.label}</span>
+                  {loyaltyTier.discountPct > 0 ? ` · diskon ${loyaltyTier.discountPct}%` : " · tanpa diskon"}
+                </span>
+              </div>
+            )}
             {discount > 0 && <div style={{...row,fontSize:11,color:G,marginBottom:3}}><span>Diskon</span><span style={{fontWeight:600}}>-{fmt(discount)}</span></div>}
             <div style={{...row,borderTop:`1px solid ${BD}`,paddingTop:7,marginBottom:9}}>
               <span style={{fontSize:14,fontWeight:700}}>Total</span>

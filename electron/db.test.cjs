@@ -375,7 +375,8 @@ describe("db.cjs: initDB & registerHandlers", () => {
     expect(services.svc.initDB()).toBe(true);
     services.svc.registerHandlers();
     expect(Object.keys(services.registry).sort()).toEqual([
-      "apply-stock", "menu-bulk-upsert", "menu-delete", "menu-load", "menu-replace", "menu-upsert",
+      "apply-stock", "customer-totals",
+      "menu-bulk-upsert", "menu-delete", "menu-load", "menu-replace", "menu-upsert",
       "process-payment", "shifts-load", "shifts-save",
       "stock-in", "stock-movements", "stock-opname", "stock-set",
       "trx-clear", "trx-delete", "trx-get-daily-stats", "trx-get-shift-ids",

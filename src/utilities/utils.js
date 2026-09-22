@@ -311,6 +311,18 @@ async deleteTrx(id, opts) {
   async saveSupplier(list){ if(window.kasirAPI?.saveSupplier) return window.kasirAPI.saveSupplier(list); LS("ykk_supplier", list); return { ok: true }; },
   async loadLoyaltyTiers(){ if(window.kasirAPI?.loadLoyaltyTiers) return await window.kasirAPI.loadLoyaltyTiers(); return (LS("ykk_loyalty_tiers") || []); },
   async saveLoyaltyTiers(list){ if(window.kasirAPI?.saveLoyaltyTiers) return window.kasirAPI.saveLoyaltyTiers(list); LS("ykk_loyalty_tiers", list); return { ok: true }; },
+  // Total belanja kumulatif per pelanggan (untuk loyalty tier basis "lifetime").
+  // Fallback browser: agregasi dari ykk_trx bila IPC tidak tersedia.
+  async loadCustomerTotals(){
+    if(window.kasirAPI?.customerTotals) return await window.kasirAPI.customerTotals();
+    const map = {};
+    for(const t of (LS("ykk_trx") || [])){
+      const cid = t?.customerId;
+      if(!cid) continue;
+      map[cid] = (map[cid] || 0) + (Number(t?.total) || 0);
+    }
+    return Object.keys(map).map((customerId) => ({ customerId, total: map[customerId] }));
+  },
   async loadSettings()    { return window.kasirAPI ? await window.kasirAPI.loadSettings()     : (LS("ykk_settings")||{}); },
   async saveSettings(d)   { if(window.kasirAPI) return window.kasirAPI.saveSettings(d); LS("ykk_settings",d); },
   async getDataPath()     { return window.kasirAPI ? await window.kasirAPI.getDataPath()      : "localStorage"; },

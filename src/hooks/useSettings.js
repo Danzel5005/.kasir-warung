@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 import { DEFAULT_RECEIPT_ADDITIONALS } from "../constants/receiptAdditionals.js";
-import { DEFAULT_ADVANCED_FEATURES, normalizeAdvancedFeatures } from "../constants/advancedFeatures.js";
+import { DEFAULT_ADVANCED_FEATURES, normalizeAdvancedFeatures, DEFAULT_LOYALTY_TIER_BASIS, normalizeLoyaltyTierBasis } from "../constants/advancedFeatures.js";
 import {
   createPrinterHandlers,
   createWarungHandlers,
@@ -50,6 +50,7 @@ function useSettings({ toast_, onChange }) {
     service: { enabled: false, value: 0 },
     customerEnabled: true,
     advancedFeatures: DEFAULT_ADVANCED_FEATURES,
+    loyaltyTierBasis: DEFAULT_LOYALTY_TIER_BASIS,
   });
   const [settingsModal, setSettingsModal] = useState(false);
   const [printerModal, setPrinterModal] = useState(false);
@@ -93,6 +94,8 @@ function useSettings({ toast_, onChange }) {
     // kunci ada, nilai non-boolean diperbaiki). Ini juga jalur migrasi untuk
     // settings lama yang belum punya field ini sama sekali.
     s.advancedFeatures = normalizeAdvancedFeatures(s.advancedFeatures);
+    // Basis loyalty tier — migrasi settings lama (belum punya field ini).
+    s.loyaltyTierBasis = normalizeLoyaltyTierBasis(s.loyaltyTierBasis);
     // Receipt paper width — migrate older settings; invalid values fall back to 80mm
     const pw = Math.round(Number(s.receiptPaperWidthMm));
     if (!Number.isFinite(pw) || pw < 30 || pw > 210) s.receiptPaperWidthMm = 80;

@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { api } from "../../utilities/utils.js";
+import { normalizeLoyaltyTierBasis, LOYALTY_TIER_BASIS } from "../../constants/advancedFeatures.js";
 
 // Factory for warung identity handlers (name/address/phone). NOT a hook.
 export function createWarungHandlers({ settings, setSettings, toast_, onChange }) {
@@ -39,5 +40,22 @@ export function createWarungHandlers({ settings, setSettings, toast_, onChange }
     toast_(next ? "Fitur pelanggan diaktifkan" : "Fitur pelanggan dimatikan", "ok");
   }, [settings, toast_, onChange]);
 
-  return { setWarungName, setWarungAddress, setWarungPhone, setCustomerEnabled };
+  // Basis loyalty tier: "transaction" (total transaksi saat ini) atau
+  // "lifetime" (total belanja kumulatif pelanggan). Hanya relevan saat fitur
+  // loyalty menyala; perubahan langsung memengaruhi diskon di keranjang.
+  const setLoyaltyTierBasis = useCallback(async (basis) => {
+    const next = normalizeLoyaltyTierBasis(basis);
+    const s = { ...settings, loyaltyTierBasis: next };
+    await api.saveSettings(s);
+    setSettings(s);
+    onChange?.(s);
+    toast_(
+      next === LOYALTY_TIER_BASIS.LIFETIME
+        ? "Basis tier: total belanja pelanggan (lifetime)"
+        : "Basis tier: total transaksi saat ini",
+      "ok"
+    );
+  }, [settings, toast_, onChange]);
+
+  return { setWarungName, setWarungAddress, setWarungPhone, setCustomerEnabled, setLoyaltyTierBasis };
 }

@@ -48,6 +48,7 @@ settleTrx: (id, actor) => ipcRenderer.invoke("trx-settle", id, actor),
   authCreateUser:     (payload) => ipcRenderer.invoke("auth-create-user", payload),
   loadCustomers: () => ipcRenderer.invoke("customers-load"),
   saveCustomers: (list) => ipcRenderer.invoke("customers-save", list),
+  customerTotals: () => ipcRenderer.invoke("customer-totals"),
 
     // Advanced feature storage (resep/HPP, bahan baku, supplier, loyalty tiers)
     loadResep: () => ipcRenderer.invoke("resep-load"),

@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { api } from "../utilities/utils.js";
 import { DEFAULT_BAHAN_BAKU, normalizeBahan, lowStockBahan, totalNilaiBahan, applyBahanDelta } from "../utilities/bahanBaku.js";
 import { DEFAULT_SUPPLIER, normalizeSupplier, findSupplier, supplierLabel } from "../utilities/supplier.js";
-import { DEFAULT_LOYALTY_TIERS, normalizeLoyaltyTiers, tierForTotal, tierDiscount } from "../utilities/loyalty.js";
+import { DEFAULT_LOYALTY_TIERS, normalizeLoyaltyTiers, tierForTotal, tierDiscount, loyalDiscountRules } from "../utilities/loyalty.js";
 import { hppFromResep, hppForMenus, marginFromResep, bahanDeltasFromItems } from "../utilities/resepHpp.js";
 
 function normalizeResep(input) {
@@ -206,6 +206,7 @@ export function useAdvancedData({ toast_ }) {
     supplierLabel,
     tierForTotal,
     tierDiscount,
+    loyalDiscountRules,
     hppFromResep,
   };
 }
