@@ -122,6 +122,11 @@ function KasirWorkspace() {
     if (view === "fitur-lanjutan" && !settingsH.settings.advancedFeatures?.enabled) setView("menu");
   }, [authH.currentUser, view]);
 
+  // ── Total belanja kumulatif per pelanggan (untuk basis tier "lifetime").
+  // Dimuat lewat IPC agregat agar tidak perlu memuat seluruh riwayat transaksi.
+  // Dideklarasi SEBELUM efek loyalty di bawah yang memakainya (hindari TDZ).
+  const [customerTotals, setCustomerTotals] = useState({});
+
   // ── Loyalty Tier → Diskon otomatis (Fase 1).
   // Basis tier bisa dipilih di Settings:
   //   - "transaction" (default): TOTAL TRANSAKSI SAAT INI (subtotal keranjang)
@@ -212,10 +217,6 @@ function KasirWorkspace() {
   const [printingPreview, setPrintingPreview] = useState(false);
 
   const [dataPath, setDataPath] = useState("");
-
-  // ── Total belanja kumulatif per pelanggan (untuk basis tier "lifetime").
-  // Dimuat lewat IPC agregat agar tidak perlu memuat seluruh riwayat transaksi.
-  const [customerTotals, setCustomerTotals] = useState({});
 
   const logoRef   = settingsH.logoRef;
   const searchRef = useRef();
