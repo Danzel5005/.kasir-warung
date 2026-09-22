@@ -202,6 +202,24 @@ async deleteTrx(id, opts) {
     LS("ykk_menu", list || []);
     return { ok: true };
   },
+  // Import Excel: upsert banyak item sekaligus (fallback browser). Sama seperti
+  // upsertMenu: baris existing tidak menimpa stok, baris baru set stok apa adanya.
+  async bulkUpsertMenu(items) {
+    if (window.kasirAPI?.bulkUpsertMenu) return window.kasirAPI.bulkUpsertMenu(items);
+    const list = LS("ykk_menu") || [];
+    const byId = new Map(list.map((m) => [String(m.id), m]));
+    let applied = 0;
+    let skipped = 0;
+    for (const item of Array.isArray(items) ? items : []) {
+      if (!item || item.id === undefined || item.id === null) { skipped += 1; continue; }
+      const key = String(item.id);
+      const existing = byId.get(key);
+      byId.set(key, existing ? { ...item, stok: existing.stok } : item);
+      applied += 1;
+    }
+    LS("ykk_menu", [...byId.values()]);
+    return { ok: true, applied, skipped };
+  },
   // Satu pintu stok. Deltas = { [menuId]: delta }. Mengembalikan { ok, stock:{id:stok} }.
   async applyStock(deltas, meta) {
     if (window.kasirAPI?.applyStock) return window.kasirAPI.applyStock(deltas, meta);

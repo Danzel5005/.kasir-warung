@@ -128,7 +128,7 @@ toast_ = null,                        // optional feedback hook
           />
         </div>
       )}
-      <AdvancedDataPanel settings={{ advancedFeatures }} advancedData={advancedData} menu={menu} toast_={toast_} />
+      <AdvancedDataPanel settings={{ advancedFeatures }} advancedData={advancedData} menu={menu} cats={cats} toast_={toast_} />
         {catKeys.map(catKey => {
           const items_ = groupedItems[catKey];
           return(

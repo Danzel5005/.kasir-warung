@@ -132,6 +132,25 @@ function createDatabaseService({ ipcMain, files, ensureDir, rJSON, atomicWrite, 
     })(items);
   }
 
+  // Upsert BANYAK item dalam SATU transaksi. Dipakai import Excel supaya
+  // ratusan baris tidak jadi ratusan transaksi SQLite terpisah (lambat &
+  // tidak atomic). Reuse upsertMenuRow supaya aturan "baris existing tidak
+  // menimpa stok" otomatis ikut berlaku untuk semua baris import.
+  // Return: { applied, skipped } — jumlah baris yang di-upsert / dilewati.
+  function bulkUpsertMenu(items) {
+    const list = Array.isArray(items) ? items : [];
+    let applied = 0;
+    let skipped = 0;
+    const run = db.transaction((rows) => {
+      for (const item of rows) {
+        if (!item || item.id === undefined || item.id === null) { skipped += 1; continue; }
+        if (upsertMenuRow(item)) applied += 1; else skipped += 1;
+      }
+    });
+    run(list);
+    return { applied, skipped };
+  }
+
   function migrateMenuToProducts() {
     if (!db) return { migrated: 0 };
     try {
@@ -255,6 +274,34 @@ function createDatabaseService({ ipcMain, files, ensureDir, rJSON, atomicWrite, 
       if (!db) { atomicWrite(files.menu, list || []); return { ok: true }; }
       try { replaceMenuList(list); return { ok: true, menu: loadMenuList() }; }
       catch (err) { console.error("[menu-replace] Error:", err.message); return { ok: false, error: err.message }; }
+    });
+    // Import Excel: upsert banyak baris dalam satu transaksi. Fallback JSON
+    // (tanpa SQLite) meniru aturan upsertMenuRow: baris existing tidak menimpa
+    // stok, baris baru set stok apa adanya.
+    ipcMain.handle("menu-bulk-upsert", (_e, items) => {
+      const list = Array.isArray(items) ? items : [];
+      if (!db) {
+        try {
+          const menu = rJSON(files.menu) || [];
+          const byId = new Map(menu.map((m) => [String(m.id), m]));
+          let applied = 0;
+          let skipped = 0;
+          for (const item of list) {
+            if (!item || item.id === undefined || item.id === null) { skipped += 1; continue; }
+            const key = String(item.id);
+            const existing = byId.get(key);
+            if (existing) byId.set(key, { ...item, stok: existing.stok });
+            else byId.set(key, item);
+            applied += 1;
+          }
+          atomicWrite(files.menu, [...byId.values()]);
+          return { ok: true, applied, skipped };
+        } catch (err) { console.error("[menu-bulk-upsert] Error:", err.message); return { ok: false, error: err.message }; }
+      }
+      try {
+        const { applied, skipped } = bulkUpsertMenu(list);
+        return { ok: true, applied, skipped, menu: loadMenuList() };
+      } catch (err) { console.error("[menu-bulk-upsert] Error:", err.message); return { ok: false, error: err.message }; }
     });
     // Renderer memakai ini untuk hold/cancel open bill (temuan 1: stok bill
     // dulu hanya di state React, hilang saat restart).
