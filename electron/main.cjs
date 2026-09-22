@@ -49,6 +49,10 @@ const FILES = {
   qris: path.join(DATA_DIR, "qris.json"),
   users: path.join(DATA_DIR, "users.json"),
   customers: path.join(DATA_DIR, "customers.json"),
+      resep: path.join(DATA_DIR, "resep.json"),
+      bahanBaku: path.join(DATA_DIR, "bahan-baku.json"),
+      supplier: path.join(DATA_DIR, "supplier.json"),
+      loyaltyTiers: path.join(DATA_DIR, "loyalty-tiers.json"),
   wal: path.join(DATA_DIR, "trx.wal"),
   backups: path.join(DATA_DIR, "backups"),
   db: path.join(DATA_DIR, "kasir.db"),
@@ -80,6 +84,16 @@ function registerFileHandlers() {
   ipcMain.handle("users-save", (_e, list) => { backup.atomicWrite(FILES.users, list); return { ok: true }; });
   ipcMain.handle("customers-load", () => backup.rJSON(FILES.customers) || []);
   ipcMain.handle("customers-save", (_e, list) => { backup.atomicWrite(FILES.customers, list); return { ok: true }; });
+
+  // Advanced feature storage (resep/HPP, bahan baku, supplier, loyalty tiers)
+  ipcMain.handle("resep-load", () => backup.rJSON(FILES.resep) || {});
+  ipcMain.handle("resep-save", (_e, data) => { backup.atomicWrite(FILES.resep, data); return { ok: true }; });
+  ipcMain.handle("bahan-baku-load", () => backup.rJSON(FILES.bahanBaku) || []);
+  ipcMain.handle("bahan-baku-save", (_e, list) => { backup.atomicWrite(FILES.bahanBaku, list); return { ok: true }; });
+  ipcMain.handle("supplier-load", () => backup.rJSON(FILES.supplier) || []);
+  ipcMain.handle("supplier-save", (_e, list) => { backup.atomicWrite(FILES.supplier, list); return { ok: true }; });
+  ipcMain.handle("loyalty-tiers-load", () => backup.rJSON(FILES.loyaltyTiers) || []);
+  ipcMain.handle("loyalty-tiers-save", (_e, list) => { backup.atomicWrite(FILES.loyaltyTiers, list); return { ok: true }; });
   ipcMain.handle("csv-save", async (_e, { filename, content }) => {
     const { filePath, canceled } = await dialog.showSaveDialog({ title: "Simpan File CSV", defaultPath: filename, filters: [{ name: "CSV Files", extensions: ["csv"] }] });
     if (canceled || !filePath) return { ok: false };

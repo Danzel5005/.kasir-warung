@@ -51,7 +51,7 @@ function withUnitLabel(items) {
 // terlibat dalam race condition Tahap 2. Dependency array di bawah
 // diverifikasi dengan sangat hati-hati: salah satu deps hilang di sini
 // bisa MENCIPTAKAN stale closure baru, bukan cuma gagal mencegah yang lama.
-function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals = [], menu = [] }) {
+function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals = [], menu = [], applyBahanUsage = null }) {
   const [cart, setCart]         = useState({});
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [receiptAdditionalValues, setReceiptAdditionalValues] = useState({}); // { "nomor_meja": "5", "jumlah_pax": "2" }
@@ -296,6 +296,13 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
           stockDelta[id] = diff;
         }
       }
+
+      // Bahan baku: kembalikan pemakaian bill lama lalu potong sesuai keranjang
+      // terkini. Dua langkah agar perubahan komposisi item tetap akurat.
+      if (applyBahanUsage) {
+        applyBahanUsage(activeBill.items || [], 1);
+        applyBahanUsage(items, -1);
+      }
       
       updatedBills = bills.map(b =>
         String(b.id) === String(activeBill.id)
@@ -309,6 +316,9 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
         acc[item.id] = (acc[item.id] || 0) - lineBaseQty(item);
         return acc;
       }, {});
+
+      // Bahan baku: potong sesuai resep untuk seluruh item bill baru.
+      if (applyBahanUsage) applyBahanUsage(items, -1);
       
       const bill = { id: billId, items: withUnitLabel(items), createdAt: t.timestamp, updatedAt: t.timestamp, status: "open", ...customerData, ...receiptAdditionalData };
       updatedBills = [...bills, bill];
@@ -327,7 +337,7 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
     await persistBills(updatedBills);
     clearCart();
     setDrawerOpen(false);
-  }, [items, receiptAdditionalValues, receiptAdditionals, activeBill, toast_, getNow, clearCart, stockErrors]);
+  }, [items, receiptAdditionalValues, receiptAdditionals, activeBill, toast_, getNow, clearCart, stockErrors, applyBahanUsage]);
 
   // deps: needs receiptAdditionals to read current receipt additionals config
   const loadBillToCart = useCallback((bill) => {
@@ -430,13 +440,16 @@ const processPayment = useCallback(async ({
   if (!result.ok) { toast_("Gagal menyimpan transaksi", "err"); return null; }
 
   if (result.stock && applyStockView) applyStockView(result.stock); // patch view setelah IPC sukses
+  // Bahan baku: potong sesuai resep hanya untuk penjualan langsung (bukan
+  // pelunasan open bill — stok bahan sudah dipotong saat bill dibuat).
+  if (applyBahanUsage && !billIdToClose) applyBahanUsage(trx.items, -1);
   appendHistory(trx);          // setHistory(h=>[trx,...h])
   // Remove the paid bill from open bills using explicit billIdToClose
   removeBillLocal(billIdToClose);
   clearCart();
   if (onSuccess) onSuccess(trx);
   return trx;
-}, [items, subtotal, pricingConfig, metode, paidNum, kembalian, cart, toast_, getNow, clearCart, stockErrors]);
+}, [items, subtotal, pricingConfig, metode, paidNum, kembalian, cart, toast_, getNow, clearCart, stockErrors, applyBahanUsage]);
 
   return {
     cart, drawerOpen, receiptAdditionalValues, receiptAdditionals, metode, paid, activeBill,

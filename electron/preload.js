@@ -47,6 +47,16 @@ settleTrx: (id, actor) => ipcRenderer.invoke("trx-settle", id, actor),
   authCreateUser:     (payload) => ipcRenderer.invoke("auth-create-user", payload),
   loadCustomers: () => ipcRenderer.invoke("customers-load"),
   saveCustomers: (list) => ipcRenderer.invoke("customers-save", list),
+
+    // Advanced feature storage (resep/HPP, bahan baku, supplier, loyalty tiers)
+    loadResep: () => ipcRenderer.invoke("resep-load"),
+    saveResep: (data) => ipcRenderer.invoke("resep-save", data),
+    loadBahanBaku: () => ipcRenderer.invoke("bahan-baku-load"),
+    saveBahanBaku: (list) => ipcRenderer.invoke("bahan-baku-save", list),
+    loadSupplier: () => ipcRenderer.invoke("supplier-load"),
+    saveSupplier: (list) => ipcRenderer.invoke("supplier-save", list),
+    loadLoyaltyTiers: () => ipcRenderer.invoke("loyalty-tiers-load"),
+    saveLoyaltyTiers: (list) => ipcRenderer.invoke("loyalty-tiers-save", list),
   // Categories
   loadCats:    ()      => ipcRenderer.invoke("cats-load"),
   saveCats:    (list)  => ipcRenderer.invoke("cats-save", list),

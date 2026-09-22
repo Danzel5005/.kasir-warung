@@ -42,3 +42,34 @@ export function marginFromResep(hargaJual = 0, resep = [], bahanList = []) {
   const profit = jual - hpp;
   return { hpp, profit, marginPct: jual > 0 ? profit / jual : 0 };
 }
+
+// bahanDeltasFromItems — konversi item penjualan (cart/trx) menjadi delta
+// pemakaian bahan baku berdasarkan resep. Untuk tiap item yang punya resep,
+// setiap baris resep (bahanId, qty) dikalikan dengan qty yang terjual (dalam
+// satuan dasar), lalu diagregasi per bahanId.
+//
+// items   : [{ id, qty, baseQty? }] (qty selalu satuan dasar; baseQty dipakai
+//           kalau ada, mengikuti logika stockDeltasFromTrx).
+// resep   : map menuId -> [{ bahanId, qty }].
+// sign    : -1 = potong stok (penjualan), +1 = kembalikan stok (void/hapus).
+// Return  : { [bahanId]: delta }.
+export function bahanDeltasFromItems(items = [], resep = {}, sign = -1) {
+  const deltas = {};
+  if (!Array.isArray(items)) return deltas;
+  const resepMap = resep && typeof resep === "object" && !Array.isArray(resep) ? resep : {};
+  for (const it of items) {
+    const menuId = String(it?.id ?? "").trim();
+    if (!menuId) continue;
+    const lines = Array.isArray(resepMap[menuId]) ? resepMap[menuId] : null;
+    if (!lines || lines.length === 0) continue;
+    const soldQty = Math.abs(Number(it?.baseQty ?? it?.qty) || 0);
+    if (soldQty === 0) continue;
+    for (const line of lines) {
+      const bahanId = String(line?.bahanId || "").trim();
+      const perUnit = Number(line?.qty || 0);
+      if (!bahanId || perUnit <= 0) continue;
+      deltas[bahanId] = (deltas[bahanId] || 0) + sign * soldQty * perUnit;
+    }
+  }
+  return deltas;
+}

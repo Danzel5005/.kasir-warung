@@ -3,6 +3,8 @@ import { fmt } from "../utilities/receipt.js";
 import { G, W, BD, MT, row, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../constants/design.js";
 import StockBadge from "../components/StockBadge.jsx";
 import StockAlertPanel from "../components/StockAlertPanel.jsx";
+import AdvancedDataPanel from "../components/AdvancedDataPanel.jsx";
+import { isAdvancedFeatureOn } from "../constants/advancedFeatures.js";
 import StockInModal from "../components/modals/StockInModal.jsx";
 import OpnameModal from "../components/modals/OpnameModal.jsx";
 import { csvRestock } from "../utilities/csvbuild.js";
@@ -17,7 +19,9 @@ function ViewKelola({
   setConfirmDel,                        // App.jsx local
   search, setSearch,                    // search from menuH
   lowStockThreshold = DEFAULT_LOW_STOCK_THRESHOLD,
-  toast_ = null,                        // optional feedback hook
+advancedFeatures,
+advancedData,
+toast_ = null,                        // optional feedback hook
 }) {
   const [stockInItem, setStockInItem] = useState(null);
   const [opnameOpen, setOpnameOpen] = useState(false);
@@ -64,7 +68,9 @@ function ViewKelola({
   }, [groupedItems]);
 
   // Export the low-stock restock list as CSV (Windows-friendly, BOM added by saveCSV).
-  const exportRestock = (restockRows) => {
+  const showResepHpp = isAdvancedFeatureOn({ advancedFeatures }, "resepHpp");
+
+ const exportRestock = (restockRows) => {
     if (!restockRows || restockRows.length === 0) return;
     const d = new Date();
     const pad = (n) => String(n).padStart(2, "0");
@@ -108,6 +114,7 @@ function ViewKelola({
          </button>)}
         </div>
       </div>
+<div style={{flex:1,overflowY:"auto",padding:"10px 16px"}}>
       {menu.length > 0 && (
         <div style={{padding:"10px 16px 0",flexShrink:0}}>
           <StockAlertPanel
@@ -121,7 +128,7 @@ function ViewKelola({
           />
         </div>
       )}
-      <div style={{flex:1,overflowY:"auto",padding:"10px 16px"}}>
+      <AdvancedDataPanel settings={{ advancedFeatures }} advancedData={advancedData} menu={menu} toast_={toast_} />
         {catKeys.map(catKey => {
           const items_ = groupedItems[catKey];
           return(
@@ -135,6 +142,7 @@ function ViewKelola({
                       {item.desc&&<div style={{fontSize:TYPOGRAPHY.label.fontSize,color:MT,marginBottom:2}}>{item.desc}</div>}
                       <div style={{fontSize:TYPOGRAPHY.small.fontSize,fontWeight:700,color:G}}>{fmt(item.harga)}</div>
                       <div style={{fontSize:TYPOGRAPHY.label.fontSize,color:MT}}>Modal: {item.modal?fmt(item.modal):<span style={{color:"#e8a040"}}>Belum diisi</span>}</div>
+{showResepHpp&&advancedData&&advancedData.hppFor(item.id)!=null&&(()=>{const h=advancedData.hppFor(item.id);const m=advancedData.marginFor(item.id,item.harga);return(<div style={{fontSize:TYPOGRAPHY.label.fontSize,color:MT}}>HPP: {fmt(h)}{m&&<span style={{color:m.profit>=0?G:"#d32f2f"}}> &middot; margin {(Number(m.marginPct) * 100).toFixed(0)}%</span>}</div>);})()}
                       <div style={{display:"flex",gap:5,marginTop:6}}>
                         <button onClick={()=>openEdit(item)} style={{flex:1,background:COLOR_PALETTE.infoLight,color:COLOR_PALETTE.info,border:"none",borderRadius:RADIUS.sm,padding:"4px 0",cursor:"pointer",fontFamily:"inherit",fontSize:TYPOGRAPHY.label.fontSize,fontWeight:600}}>Edit</button>
                         {item.stok !== null && item.stok !== undefined && (

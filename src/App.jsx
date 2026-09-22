@@ -20,6 +20,7 @@ import { useCart } from "./hooks/useCart.js";
 import { useHistory } from "./hooks/useHistory.js";
 import { useBarcodeScanner } from "./hooks/useBarcodeScanner.js";
 import { useCustomers } from "./hooks/useCustomers.js";
+import { useAdvancedData } from "./hooks/useAdvancedData.js";
 import { useShiftCashFlow } from "./hooks/useShiftCashFlow.js";
 import { row } from "./constants/design.js";
 import { canAccessView, isAdmin } from "./utilities/permissions.js";
@@ -59,9 +60,15 @@ function KasirWorkspace() {
   // to reload history AND push the menu whose stock was just restored.
   const historyRefreshRef = useRef(null);
   const menuSetRef = useRef(null);
+  // bahanUsageRef — bahan baku dipotong di renderer (resep+bahan ada di sini),
+  // tetapi useCart dibuat SEBELUM useAdvancedData. Ref memutus siklus urutan
+  // deklarasi itu (pola sama seperti historyRefreshRef/menuSetRef).
+  const bahanUsageRef = useRef(null);
+  const applyBahanUsage = useCallback((items, sign) => bahanUsageRef.current?.(items, sign), []);
   const voidH     = useHistoryVoid({
     toast_: toastH.toast_,
     addUndo: toastH.addUndo,
+    applyBahanUsage,
     onVoided: (_id, menu) => {
       if (Array.isArray(menu) && menu.length) menuSetRef.current?.(menu);
       historyRefreshRef.current?.();
@@ -71,11 +78,16 @@ function KasirWorkspace() {
   const authH     = useAuth({ getNow, toast_: toastH.toast_ });
   const menuH     = useMenu({ toast_: toastH.toast_, addUndo: toastH.addUndo });
   menuSetRef.current = menuH.setMenu;
-  const billsH    = useBills({ toast_: toastH.toast_, addUndo: toastH.addUndo });
-  const cartH     = useCart({ toast_: toastH.toast_, getNow, receiptAdditionals: [], menu: menuH.menu });
-  const historyH  = useHistory({ toast_: toastH.toast_, addUndo: toastH.addUndo, getNow, authH });
+  const billsH    = useBills({ toast_: toastH.toast_, addUndo: toastH.addUndo, applyBahanUsage });
+  const cartH     = useCart({
+    toast_: toastH.toast_, getNow, receiptAdditionals: [], menu: menuH.menu,
+    applyBahanUsage,
+  });
+  const historyH  = useHistory({ toast_: toastH.toast_, addUndo: toastH.addUndo, getNow, authH, applyBahanUsage });
   historyRefreshRef.current = historyH.refresh;
   const customersH = useCustomers({ toast_: toastH.toast_ });
+  const advDataH = useAdvancedData({ toast_: toastH.toast_ });
+  bahanUsageRef.current = advDataH.applyBahanUsage;
   // settingsH needs cartH to be defined first for onChange callback
   const settingsH = useSettings({ 
     toast_: toastH.toast_, 
@@ -182,9 +194,10 @@ function KasirWorkspace() {
   // ── Load data (sekali saat mount) — distribusikan ke tiap hook
   useEffect(() => {
     (async () => {
-      const [trxs, savedMenu, savedLogo, savedBills, savedCats, savedSettings, dp, savedShifts, savedUsers, savedCustomers] = await Promise.all([
+      const [trxs, savedMenu, savedLogo, savedBills, savedCats, savedSettings, dp, savedShifts, savedUsers, savedCustomers, savedResep, savedBahanBaku, savedSupplier, savedLoyalty] = await Promise.all([
         api.loadTrx(), api.loadMenu(), api.loadLogo(), api.loadBills(),
         api.loadCats(), api.loadSettings(), api.getDataPath(), api.loadShifts(), api.loadUsers(), api.loadCustomers(),
+        api.loadResep(), api.loadBahanBaku(), api.loadSupplier(), api.loadLoyaltyTiers(),
       ]);
       historyH.loadInitial(trxs, voidH.openVoidModal);
       menuH.loadInitial(savedMenu, savedCats);
@@ -192,6 +205,7 @@ function KasirWorkspace() {
       billsH.loadInitial(savedBills);
       authH.loadInitial(savedShifts, savedUsers);
       customersH.loadInitial(savedCustomers);
+        advDataH.loadInitial(savedResep, savedBahanBaku, savedSupplier, savedLoyalty);
       setDataPath(dp);
     })();
   }, []);
@@ -486,7 +500,8 @@ const executeConfirmDel = useCallback((restoreStock = false) => {
             openingCash={openingCash}
             totalExpenses={totalExpenses}
             onOpenExpenseModal={() => setExpenseModal(true)}
-            onOpenCashModal={() => setOpeningCashModal(true)} advancedFeatures={settingsH.settings.advancedFeatures} isAdvancedActive={settingsH.isAdvancedActive} warungName={settingsH.settings.warungName} warungAddress={settingsH.settings.warungAddress} warungPhone={settingsH.settings.warungPhone} currentUser={authH.currentUser} toast_={toastH.toast_}          />
+            onOpenCashModal={() => setOpeningCashModal(true)} advancedFeatures={settingsH.settings.advancedFeatures} isAdvancedActive={settingsH.isAdvancedActive} warungName={settingsH.settings.warungName} warungAddress={settingsH.settings.warungAddress} warungPhone={settingsH.settings.warungPhone} currentUser={authH.currentUser} toast_={toastH.toast_}
+              advancedData={advDataH} />
         )}
 
         {/* ══════ KELOLA MENU VIEW ════════════════════════════════════════ */}
@@ -498,8 +513,10 @@ const executeConfirmDel = useCallback((restoreStock = false) => {
             setConfirmDel={setConfirmDel}
             search={menuH.search} setSearch={menuH.setSearch}
             lowStockThreshold={Number(settingsH.settings.lowStockThreshold) > 0 ? Number(settingsH.settings.lowStockThreshold) : undefined}
-            toast_={toastH.toast_}
-          />
+              advancedFeatures={settingsH.settings.advancedFeatures} isAdvancedActive={settingsH.isAdvancedActive}
+              advancedData={advDataH}
+              toast_={toastH.toast_}
+            />
         )}
       </div>
 

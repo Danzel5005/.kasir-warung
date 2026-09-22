@@ -21,7 +21,7 @@ function ViewLaporan({
   openingCash = 0,
   totalExpenses = 0,
   onOpenExpenseModal,
-  onOpenCashModal, advancedFeatures, isAdvancedActive, warungName, warungAddress, warungPhone, currentUser, toast_, }) {
+  onOpenCashModal, advancedFeatures, isAdvancedActive, warungName, warungAddress, warungPhone, currentUser, toast_, advancedData, }) {
   const selShift = shifts.find(s=>s.id===selectedShiftId) || activeShift;
   const reportShiftId = selectedShiftId === "all" ? undefined : selectedShiftId || activeShift?.id;
   const [shiftTrx, setShiftTrx] = useState([]);
@@ -69,7 +69,23 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
   const advOn = (key) => (advFeatures.enabled === true) && (advFeatures[key] === true);
   const showPdfReport = advOn("pdfReport");
   const showInsights = advOn("insights");
-  const canViewCost = !advOn("canViewCost") || (currentUser && currentUser.role === "admin");
+  const canViewCost=!advOn("canViewCost")||(currentUser&&currentUser.role==="admin");
+  const showResepHpp=advOn("resepHpp");
+  // Estimasi HPP dari resep (untuk item yang belum punya modal manual).
+  const resepMissingCount={n:0};
+  const hppResep=showResepHpp&&advancedData&&advancedData.hppFor
+    ? shiftTrx.reduce((s,t)=>{
+        (t.items||[]).forEach(it=>{
+          const manual=Number(it.modal||0);
+          if(manual>0)return;
+          const h=advancedData.hppFor(it.id);
+          if(h==null){resepMissingCount.n++;return;}
+          s+=Number(h||0)*Number(it.qty||0);
+        });
+        return s;
+      },0)
+    : 0;
+  const hasHppResep=showResepHpp&&hppResep>0;
  const showCashFlow = advOn("cashFlow");
   const labelOf = (key) => {
     const k = String(key || "cash").trim();
@@ -90,7 +106,9 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
         shiftLabel,
         generatedAt: new Date().toLocaleString("id-ID"),
         rev, mod, sub, netProfit, totalExpenses: reportTotalExpenses,
-        hasModal, showCost: canViewCost,
+                hasModal,
+        showCost: canViewCost,
+        hppResep: showResepHpp && hasHppResep ? { total: hppResep, missing: resepMissingCount.n } : null,
         insights, transactions: shiftTrx,
       });
       const safeShift = String(shiftLabel || "laporan").replace(/[^a-zA-Z0-9]+/g, "-");
@@ -267,6 +285,7 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
           {l:"Total Pengeluaran",v:fmt(reportTotalExpenses),c:"#e84040",s:`${(selShift?.expenses || []).length || 0} catatan`,key:"expense"},
           {l:"Total Modal",v:hasModal?fmt(mod):"Belum diinput",c:"#b87a00",s:hasModal?`dari sub ${fmt(sub)}`:"-",key:"modal"},
           {l:"Laba Bersih",v:fmt(netProfit),c:netProfit>=0?G:"#e84040",s:hasModal?`margin ${sub>0?((netProfit/(sub||1))*100).toFixed(1):0}%`:"-",key:"profit"},
+            ...(showResepHpp?[{l:"HPP dari Resep",v:hasHppResep?fmt(hppResep):"Belum ada resep",c:"#1a5fb4",s:hasHppResep?`${resepMissingCount.n>0?`${resepMissingCount.n} item tanpa resep`:"estimasi otomatis"}`:"-",key:"hppresep"}]:[]),
         ].map((s,i)=>{
           const cardStyle = {background:W,border:`1px solid ${BD}`,borderRadius:9,padding:"12px 14px",boxShadow:"0 1px 4px rgba(0,0,0,0.04)",textAlign:"left",fontFamily:"inherit",cursor:"default",width:"100%",height:"100%"};
           const content = (

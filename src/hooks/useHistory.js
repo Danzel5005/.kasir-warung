@@ -5,7 +5,7 @@ import { isAdmin } from "../utilities/permissions.js";
 // useHistory — transaksi history dengan server-side filtering & pagination untuk skalabilitas
 // collapse-by-day UI state, delete + undo, dan CSV download generic.
 // Juga mendukung view mode per shift (shiftIdFilter).
-function useHistory({ toast_, addUndo, getNow, authH }) {
+function useHistory({ toast_, addUndo, getNow, authH, applyBahanUsage = null }) {
   // ── State untuk pagination & filtering
   const [history, setHistory] = useState([]);       // current page transactions
   const [totalCount, setTotalCount] = useState(0);  // total matching transactions
@@ -155,6 +155,9 @@ function useHistory({ toast_, addUndo, getNow, authH }) {
     // Langkah 2b: main mengembalikan peta stok final {id: stok}; patch view.
     const applied = res?.applied || {};
     if (Object.keys(applied).length && applyStockView) applyStockView(applied);
+    // Bahan baku: kembalikan pemakaian bila stok diminta dipulihkan.
+    const restorable = restoreStock && deleted && deleted.status !== "voided" && !deleted.voided;
+    if (restorable && applyBahanUsage) applyBahanUsage(deleted.items || [], 1);
     setHistory(h => h.filter(t => t.id !== id));
     setTotalCount(c => c - 1);
     addUndo("Hapus Transaksi", async () => {
@@ -173,10 +176,11 @@ function useHistory({ toast_, addUndo, getNow, authH }) {
         }, {});
         const r = await api.applyStock(reDeduct, { type: "un-delete-trx", ref: id });
         if (r?.ok && r.stock && applyStockView) applyStockView(r.stock);
+        if (applyBahanUsage) applyBahanUsage(deleted.items || [], -1);
       }
       return true;
     });
-  }, [history, totalCount, addUndo, authH, toast_]);
+  }, [history, totalCount, addUndo, authH, toast_, applyBahanUsage]);
 
   // Clear all transactions
   const clearAllTrx = useCallback(async ({ restoreStock = false, applyStockView } = {}) => {
@@ -188,6 +192,12 @@ function useHistory({ toast_, addUndo, getNow, authH }) {
     const backupFile = res?.backupFile || null;
     const applied = res?.applied || {};
     if (Object.keys(applied).length && applyStockView) applyStockView(applied);
+    // Bahan baku: kembalikan pemakaian seluruh transaksi non-void bila diminta.
+    if (restoreStock && applyBahanUsage && Array.isArray(res?.cleared)) {
+      for (const t of res.cleared) {
+        if (t && t.status !== "voided" && !t.voided) applyBahanUsage(t.items || [], 1);
+      }
+    }
     setHistory([]);
     setTotalCount(0);
     addUndo("Hapus Semua Riwayat", async () => {
@@ -197,7 +207,7 @@ function useHistory({ toast_, addUndo, getNow, authH }) {
       await refresh();
       return true;
     });
-  }, [refresh, addUndo, authH, toast_]);
+  }, [refresh, addUndo, authH, toast_, applyBahanUsage]);
 
   // CSV timestamp
   const at = useCallback(() => {

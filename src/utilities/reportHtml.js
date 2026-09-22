@@ -44,9 +44,10 @@ function buildReportHTML(opts = {}) {
     sub = 0,
     netProfit = 0,
     totalExpenses = 0,
-    hasModal = false,
-    showCost = true,
-    insights = null,
+      hasModal = false,
+  showCost = true,
+  hppResep = null,
+  insights = null,
     transactions = [],
   } = opts;
 
@@ -60,11 +61,21 @@ function buildReportHTML(opts = {}) {
       v: hasModal ? rupiah(mod) : "Belum diinput",
       s: hasModal ? `dari sub ${rupiah(sub)}` : "-",
     });
-    summaryCards.push({
+        summaryCards.push({
       l: "Laba Bersih",
       v: rupiah(netProfit),
       s: hasModal && sub > 0 ? `margin ${((netProfit / sub) * 100).toFixed(1)}%` : "-",
     });
+    if (hppResep && hppResep.total > 0) {
+      summaryCards.push({
+        l: "HPP dari Resep",
+        v: rupiah(hppResep.total),
+        s:
+          hppResep.missing > 0
+            ? `${hppResep.missing} item tanpa resep`
+            : "estimasi otomatis",
+      });
+    }
   }
 
   const cardsHtml = summaryCards

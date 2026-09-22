@@ -34,3 +34,25 @@ export function totalNilaiBahan(list = []) {
     .map(normalizeBahan)
     .reduce((sum, b) => sum + b.stok * b.hargaSatuan, 0);
 }
+
+// applyBahanDelta — terapkan delta pemakaian ke daftar bahan baku.
+// deltas: { [bahanId]: delta }. Stok di-clamp ke >= 0 (mirror applyStockDelta
+// di main process untuk stok menu). Fungsi murni: mengembalikan list BARU.
+//   { list, changed } — changed: true bila ada nilai yang benar-benar berubah.
+export function applyBahanDelta(list = [], deltas = {}, now = "") {
+  const src = Array.isArray(list) ? list : [];
+  const map = deltas && typeof deltas === "object" ? deltas : {};
+  let changed = false;
+  const next = src.map((raw) => {
+    const b = normalizeBahan(raw);
+    const d = map[b.id];
+    if (d === undefined || d === null) return b;
+    const delta = Number(d) || 0;
+    if (delta === 0) return b;
+    const after = Math.max(0, b.stok + delta);
+    if (after === b.stok) return b; // sudah 0 & makin dipotong → tak berubah
+    changed = true;
+    return { ...b, stok: after, updatedAt: now || b.updatedAt };
+  });
+  return { list: next, changed };
+}

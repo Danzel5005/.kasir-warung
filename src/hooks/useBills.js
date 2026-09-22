@@ -7,7 +7,7 @@ import { api } from "../utilities/utils.js";
 // saveOpenBill & loadBillToCart juga TIDAK di sini — mereka menulis ke
 // state cart secara langsung, jadi tinggal di useCart untuk menghindari
 // dua hook saling menulis ke state satu sama lain.
-function useBills({ toast_, addUndo }) {
+function useBills({ toast_, addUndo, applyBahanUsage = null }) {
   const [bills, setBills] = useState([]);
   const [billId, setBillId] = useState(1);
 
@@ -59,6 +59,8 @@ function useBills({ toast_, addUndo }) {
           .then((res) => { if (res?.ok && res.stock && applyStockView) applyStockView(res.stock); })
           .catch(() => {});
       }
+      // Bahan baku: kembalikan pemakaian item bill yang dibatalkan.
+      if (applyBahanUsage) applyBahanUsage(billToCancel.items || [], 1);
 
       addUndo("Batalkan Open Bill", async () => {
         await api.saveBills(snap);
@@ -73,10 +75,12 @@ function useBills({ toast_, addUndo }) {
           const res = await api.applyStock(reDeduct, { type: "uncancel", ref: String(id) });
           if (res?.ok && res.stock && applyStockView) applyStockView(res.stock);
         }
+        // Bahan baku: potong kembali pemakaian saat undo pembatalan.
+        if (applyBahanUsage) applyBahanUsage(billToCancel.items || [], -1);
       });
       return updated;
     });
-  }, [addUndo]);
+  }, [addUndo, applyBahanUsage]);
 
   // Clear all bills
   const clearAllBills = useCallback(async () => {

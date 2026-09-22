@@ -90,7 +90,7 @@ async deleteTrx(id, opts) {
       applied = r?.stock || {};
     }
     LS("ykk_trx", []);
-    return { ok: true, backupFile: null, applied };
+    return { ok: true, backupFile: null, applied, cleared: all };
   },
   // Langkah 2b: baca-saja — jumlah transaksi & unit yang akan dikembalikan,
   // supaya modal konfirmasi bisa menampilkan "+N unit dari M transaksi".
@@ -121,7 +121,8 @@ async deleteTrx(id, opts) {
     const patch = { status: "voided", voided: true, voidedAt: new Date().toISOString(), voidedBy: actor || null, voidReason: reason || null, voidNote: note || "" };
     const updated = all.map(t => mergeVoidStatus(t, { id, data: patch }));
     LS("ykk_trx", updated);
-    return { ok: true };
+    const found = all.find((t) => String(t.id) === String(id));
+    return { ok: true, items: Array.isArray(found?.items) ? found.items : [] };
   },
   
   // New: Filtered & paginated transactions (localStorage fallback)
@@ -282,7 +283,16 @@ async deleteTrx(id, opts) {
   async loadLogo()        { return window.kasirAPI ? await window.kasirAPI.loadLogo()         : LS("ykk_logo"); },
   async saveLogo(data)    { if(window.kasirAPI) return window.kasirAPI.saveLogo(data); LS("ykk_logo",data); },
   async loadCats()        { return window.kasirAPI ? await window.kasirAPI.loadCats()         : (LS("ykk_cats")||[]); },
-  async saveCats(list)    { if(window.kasirAPI) return window.kasirAPI.saveCats(list); LS("ykk_cats",list); },
+  async saveCats(list) { if(window.kasirAPI) return window.kasirAPI.saveCats(list); LS("ykk_cats",list); },
+
+  async loadResep(){ if(window.kasirAPI?.loadResep) return await window.kasirAPI.loadResep(); return (LS("ykk_resep") || {}); },
+  async saveResep(v){ if(window.kasirAPI?.saveResep) return window.kasirAPI.saveResep(v); LS("ykk_resep", v); return { ok: true }; },
+  async loadBahanBaku(){ if(window.kasirAPI?.loadBahanBaku) return await window.kasirAPI.loadBahanBaku(); return (LS("ykk_bahan_baku") || []); },
+  async saveBahanBaku(list){ if(window.kasirAPI?.saveBahanBaku) return window.kasirAPI.saveBahanBaku(list); LS("ykk_bahan_baku", list); return { ok: true }; },
+  async loadSupplier(){ if(window.kasirAPI?.loadSupplier) return await window.kasirAPI.loadSupplier(); return (LS("ykk_supplier") || []); },
+  async saveSupplier(list){ if(window.kasirAPI?.saveSupplier) return window.kasirAPI.saveSupplier(list); LS("ykk_supplier", list); return { ok: true }; },
+  async loadLoyaltyTiers(){ if(window.kasirAPI?.loadLoyaltyTiers) return await window.kasirAPI.loadLoyaltyTiers(); return (LS("ykk_loyalty_tiers") || []); },
+  async saveLoyaltyTiers(list){ if(window.kasirAPI?.saveLoyaltyTiers) return window.kasirAPI.saveLoyaltyTiers(list); LS("ykk_loyalty_tiers", list); return { ok: true }; },
   async loadSettings()    { return window.kasirAPI ? await window.kasirAPI.loadSettings()     : (LS("ykk_settings")||{}); },
   async saveSettings(d)   { if(window.kasirAPI) return window.kasirAPI.saveSettings(d); LS("ykk_settings",d); },
   async getDataPath()     { return window.kasirAPI ? await window.kasirAPI.getDataPath()      : "localStorage"; },
@@ -302,7 +312,8 @@ async deleteTrx(id, opts) {
   async backupOpenFolder(){ return window.kasirAPI?.backupOpenFolder ? safeIpc("Buka folder data", () => window.kasirAPI.backupOpenFolder()) : { ok:false, error:"Hanya tersedia di aplikasi desktop" }; },
   async backupRelaunch()  { return window.kasirAPI?.backupRelaunch ? safeIpc("Muat ulang aplikasi", () => window.kasirAPI.backupRelaunch()) : { ok:false, error:"Hanya tersedia di aplikasi desktop" }; },
   async getPrinters()     { return window.kasirAPI ? await window.kasirAPI.getPrinters()      : []; },
-  async printReceipt(d)   { return window.kasirAPI ? await window.kasirAPI.printReceipt(d)    : {ok:false,error:"Hanya tersedia di aplikasi desktop"}; },
+  async printReceipt(d)   { return window.kasirAPI ? await window.kasirAPI.printReceipt(d)    : {ok:false,error:"Hanya tersedia di aplikasi desktop"}; },
+
   async exportReportPdf(d) { return (window.kasirAPI) ? await window.kasirAPI.exportReportPdf(d) : { ok: false, error: "Hanya tersedia aplikasi desktop" }; },
   async loadShifts()      { return window.kasirAPI ? await window.kasirAPI.loadShifts?.()     : (LS("ykk_shifts")||[]); },
   async saveShifts(list)  { if(window.kasirAPI&&window.kasirAPI.saveShifts) return window.kasirAPI.saveShifts(list); LS("ykk_shifts",list); },
