@@ -519,6 +519,7 @@ const executeConfirmDel = useCallback((restoreStock = false) => {
             search={menuH.search} setSearch={menuH.setSearch}
             lowStockThreshold={Number(settingsH.settings.lowStockThreshold) > 0 ? Number(settingsH.settings.lowStockThreshold) : undefined}
               advancedFeatures={settingsH.settings.advancedFeatures} isAdvancedActive={settingsH.isAdvancedActive}
+              advancedData={advDataH}
               toast_={toastH.toast_}
             />
         )}

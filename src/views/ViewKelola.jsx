@@ -19,6 +19,7 @@ function ViewKelola({
   search, setSearch,                    // search from menuH
   lowStockThreshold = DEFAULT_LOW_STOCK_THRESHOLD,
 advancedFeatures,
+advancedData = null,
 toast_ = null,                        // optional feedback hook
 }) {
   const [stockInItem, setStockInItem] = useState(null);

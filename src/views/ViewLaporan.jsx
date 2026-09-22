@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { csvByDay, TRX_HEADER, trxRow, csvLaporan, csvSalesRate, csvPerMenu, csvMetodeBayar, csvStok } from "../utilities/csvbuild.js";
 import { fmt, fmtNum } from "../utilities/receipt.js";
 import { METODE_LABELS } from "../constants/payments.js";
@@ -7,6 +7,7 @@ import { isVoided, api } from "../utilities/utils.js";
 import { buildInsights } from "../utilities/insights.js";
 import { buildCashFlow } from "../utilities/cashflow.js";
 import { buildReportHTML } from "../utilities/reportHtml.js";
+import CashFlowChart from "../components/CashFlowChart.jsx";
 
 // ViewLaporan — laporan keuangan & penjualan per shift, dengan CSV export.
 function ViewLaporan({
@@ -60,6 +61,29 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
       : activeShift
         ? [activeShift]
         : [];
+  // Rentang jam untuk sumbu X grafik arus kas: hanya jam saat shift berjalan
+  // (dari startJam shift paling awal sampai endJam/ jam sekarang untuk shift
+  // yang masih aktif). Kalau tak ada info waktu, biarkan null -> chart pakai
+  // rentang data yang tersedia.
+  const shiftHourRange = useMemo(() => {
+    const jamParts = (s) => {
+      const m = String(s || "").match(/(\d{1,2})/);
+      if (!m) return null;
+      const h = Number(m[1]);
+      return Number.isFinite(h) && h >= 0 && h <= 23 ? h : null;
+    };
+    let start = null;
+    let end = null;
+    for (const s of selectedShiftList) {
+      const sh = jamParts(s?.startJam);
+      if (sh != null) start = start == null ? sh : Math.min(start, sh);
+      const eh = jamParts(s?.endJam);
+      if (eh != null) end = end == null ? eh : Math.max(end, eh);
+      else if (s?.status === "open") end = end == null ? new Date().getHours() : Math.max(end, new Date().getHours());
+    }
+    if (start == null || end == null || end < start) return null;
+    return { start, end };
+  }, [selectedShiftList]);
   const reportOpeningCash = selectedShiftList.reduce((sum, shift) => sum + Number(shift?.openingCash || 0), 0) || Number(openingCash || 0);
   const reportTotalExpenses = selectedShiftList.reduce((sum, shift) => sum + Number((shift?.expenses || []).reduce((inner, item) => inner + Number(item.jumlah || 0), 0)), 0) || Number(totalExpenses || 0);
   const netProfit = laba - reportTotalExpenses;
@@ -134,6 +158,37 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
     return found?.label || normalizedKey;
   };
   const cashFlow = showCashFlow ? buildCashFlow(shiftTrx, selectedShiftList, getExpenseCategoryLabel, labelOf) : null;
+  // Rincian grafik arus kas per shift. Kalau sebuah shift berjalan lebih dari
+  // sehari (mis. lupa ditutup berhari-hari), grafiknya memakai mode harian
+  // (sumbu X = tanggal) karena sumbu jam tak lagi bermakna.
+  const shiftChartSplits = useMemo(() => {
+    const jamParts = (s) => {
+      const m = String(s || "").match(/(\d{1,2})/);
+      if (!m) return null;
+      const h = Number(m[1]);
+      return Number.isFinite(h) && h >= 0 && h <= 23 ? h : null;
+    };
+    const daysOf = (list) => new Set(
+      list.map((b) => b?.date).filter(Boolean)
+    ).size;
+    return [...selectedShiftList]
+      .reverse() // paling baru di atas, paling lama di bawah
+      .map((s) => {
+        const trx = shiftTrx.filter((t) => t.shiftId === s.id);
+        const cf = buildCashFlow(trx, [s], getExpenseCategoryLabel, labelOf);
+        const multiDay = (cf.spanDays || 0) > 1;
+        const start = jamParts(s?.startJam);
+        let end = jamParts(s?.endJam);
+        if (end == null && s?.status === "open") end = new Date().getHours();
+        const hourRange = start != null && end != null && end >= start ? { start, end } : null;
+        return { shift: s, cashFlow: cf, hourRange, mode: multiDay ? "day" : "hour", days: daysOf(cf.daily || []) };
+      });
+  }, [selectedShiftList, shiftTrx, getExpenseCategoryLabel, labelOf]);
+  // Tampilkan rincian per-shift hanya kalau memang perlu: "Semua Shift" yang
+  // mencakup >1 hari, atau satu shift tunggal yang berjalan >1 hari.
+  const showShiftSplits = shiftChartSplits.length > 1
+    ? new Set(selectedShiftList.map((s) => s?.dateKey).filter(Boolean)).size > 1
+    : shiftChartSplits.length === 1 && shiftChartSplits[0].mode === "day";
 //Pelunasan manual (buku hutang): tandai piutang pelanggan jadi lunas.
   const handleSettleDebt = async (debt) => {
     const name = String(debt?.name || "").trim();
@@ -285,6 +340,7 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
           {l:"Total Pengeluaran",v:fmt(reportTotalExpenses),c:"#e84040",s:`${(selShift?.expenses || []).length || 0} catatan`,key:"expense"},
           {l:"Total Modal",v:hasModal?fmt(mod):"Belum diinput",c:"#b87a00",s:hasModal?`dari sub ${fmt(sub)}`:"-",key:"modal"},
           {l:"Laba Bersih",v:fmt(netProfit),c:netProfit>=0?G:"#e84040",s:hasModal?`margin ${sub>0?((netProfit/(sub||1))*100).toFixed(1):0}%`:"-",key:"profit"},
+          {l:"Margin",v:sub>0?`${((netProfit/(sub||1))*100).toFixed(1)}%`:"-",c:"#1a5fb4",s:hasModal?"laba bersih / sub total":"belum ada modal",key:"margin"},
             ...(showResepHpp?[{l:"HPP dari Resep",v:hasHppResep?fmt(hppResep):"Belum ada resep",c:"#1a5fb4",s:hasHppResep?`${resepMissingCount.n>0?`${resepMissingCount.n} item tanpa resep`:"estimasi otomatis"}`:"-",key:"hppresep"}]:[]),
         ].map((s,i)=>{
           const cardStyle = {background:W,border:`1px solid ${BD}`,borderRadius:9,padding:"12px 14px",boxShadow:"0 1px 4px rgba(0,0,0,0.04)",textAlign:"left",fontFamily:"inherit",cursor:"default",width:"100%",height:"100%"};
@@ -413,24 +469,33 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
             <div style={{background:W,border:`1px solid ${BD}`,borderRadius:9,padding:"12px 14px",color:MT,fontSize:12}}>Belum ada data arus kas pada periode ini.</div>
           ) : (
             <div style={{display:"grid",gap:12}}>
-              <div style={{display:"grid",gap:12,gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))"}}>
-                <div style={{background:W,border:`1px solid ${BD}`,borderRadius:9,padding:"12px 14px"}}>
-                  <div style={{fontSize:11,color:MT,marginBottom:4}}>Pemasukan</div>
-                  <div style={{fontSize:15,fontWeight:700,color:G}}>{fmt(cashFlow.grossIncome)}</div>
-                </div>
-                <div style={{background:W,border:`1px solid ${BD}`,borderRadius:9,padding:"12px 14px"}}>
-                  <div style={{fontSize:11,color:MT,marginBottom:4}}>Pengeluaran</div>
-                  <div style={{fontSize:15,fontWeight:700,color:"#dc2626"}}>{fmt(cashFlow.totalExpense)}</div>
-                </div>
-                <div style={{background:W,border:`1px solid ${BD}`,borderRadius:9,padding:"12px 14px"}}>
-                  <div style={{fontSize:11,color:MT,marginBottom:4}}>Laba Bersih</div>
-                  <div style={{fontSize:15,fontWeight:700,color:cashFlow.netProfit >= 0 ? G : "#dc2626"}}>{fmt(cashFlow.netProfit)}</div>
-                </div>
-                <div style={{background:W,border:`1px solid ${BD}`,borderRadius:9,padding:"12px 14px"}}>
-                  <div style={{fontSize:11,color:MT,marginBottom:4}}>Margin</div>
-                  <div style={{fontSize:15,fontWeight:700,color:TX}}>{Number(cashFlow.margin || 0).toFixed(2)}%</div>
-                </div>
-              </div>
+              {showShiftSplits ? (
+                shiftChartSplits.map(({ shift, cashFlow: cf, hourRange, mode, days }) => (
+                  <div key={shift.id} style={{display:"grid",gap:8}}>
+                    <div style={{display:"flex",alignItems:"baseline",gap:8,flexWrap:"wrap"}}>
+                      <span style={{fontSize:11,fontWeight:700,color:TX}}>
+                        Shift {shift.shiftNum} · {shift.hari} {shift.tgl} {shift.bln} {shift.thn}
+                      </span>
+                      <span style={{fontSize:10,color:MT}}>
+                        {shift.startJam}{shift.endJam?`–${shift.endJam}`:""} · {shift.operator}{shift.status==="open"?" 🟢 Aktif":""}
+                      </span>
+                    </div>
+                    {mode === "day" && (
+                      <div style={{fontSize:10,color:"#b87a00",background:"#fff7e6",border:"1px solid #f0d9a8",borderRadius:7,padding:"6px 10px"}}>
+                        Shift ini berjalan lebih dari sehari{days ? ` (${days} hari)` : ""} — mungkin lupa ditutup. Grafik ditampilkan per hari.
+                      </div>
+                    )}
+                    <CashFlowChart
+                      mode={mode}
+                      data={mode === "day" ? cf.daily : null}
+                      hourly={cf.hourly}
+                      hourRange={hourRange}
+                    />
+                  </div>
+                ))
+              ) : (
+                <CashFlowChart hourly={cashFlow.hourly} hourRange={shiftHourRange} />
+              )}
               {cashFlow.incomeBySource && cashFlow.incomeBySource.length > 0 && (
                 <div style={{background:W,border:`1px solid ${BD}`,borderRadius:9,padding:"12px 14px"}}>
                   <div style={{fontSize:11,fontWeight:700,color:TX,marginBottom:8}}>Pemasukan per Sumber</div>
