@@ -65,14 +65,14 @@ export default function StockInModal({ item, onClose, onDone, toast_ }) {
 
           <label style={{ display:"flex", flexDirection:"column", gap:4 }}>
             <span style={{ fontSize:TYPOGRAPHY.label.fontSize, color:MT }}>Jumlah masuk</span>
-            <input autoFocus value={qty} onChange={(e) => setQty(e.target.value.replace(/\D/g, ""))}
+            <input id="stockin-qty" name="stockInQty" autoFocus value={qty} onChange={(e) => setQty(e.target.value.replace(/\D/g, ""))}
               placeholder="0" inputMode="numeric"
               style={{ border:`1px solid ${BD}`, borderRadius:RADIUS.sm, padding:"7px 9px", fontFamily:"inherit", fontSize:TYPOGRAPHY.small.fontSize, outline:"none" }} />
           </label>
 
           <label style={{ display:"flex", flexDirection:"column", gap:4 }}>
             <span style={{ fontSize:TYPOGRAPHY.label.fontSize, color:MT }}>Harga modal terbaru / satuan (opsional)</span>
-            <input value={modal} onChange={(e) => setModal(e.target.value.replace(/\D/g, ""))}
+            <input id="stockin-modal" name="stockInModal" value={modal} onChange={(e) => setModal(e.target.value.replace(/\D/g, ""))}
               placeholder="mis. 5000" inputMode="numeric"
               style={{ border:`1px solid ${BD}`, borderRadius:RADIUS.sm, padding:"7px 9px", fontFamily:"inherit", fontSize:TYPOGRAPHY.small.fontSize, outline:"none" }} />
             <span style={{ fontSize:9, color:MT }}>Dikosongkan = modal lama dipertahankan.</span>
@@ -80,7 +80,7 @@ export default function StockInModal({ item, onClose, onDone, toast_ }) {
 
           <label style={{ display:"flex", flexDirection:"column", gap:4 }}>
             <span style={{ fontSize:TYPOGRAPHY.label.fontSize, color:MT }}>Catatan (opsional)</span>
-            <input value={note} onChange={(e) => setNote(e.target.value)}
+            <input id="stockin-note" name="stockInNote" value={note} onChange={(e) => setNote(e.target.value)}
               placeholder="mis. beli dari supplier A"
               style={{ border:`1px solid ${BD}`, borderRadius:RADIUS.sm, padding:"7px 9px", fontFamily:"inherit", fontSize:TYPOGRAPHY.small.fontSize, outline:"none" }} />
           </label>

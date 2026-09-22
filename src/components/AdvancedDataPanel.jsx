@@ -127,27 +127,27 @@ function BahanBakuPanel({ advancedData, toast_, suppliers }) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
         <div>
           <div style={label}>Nama bahan</div>
-          <input style={input} value={form.nama} onChange={(e) => setForm({ ...form, nama: e.target.value })} placeholder="cth: Biji Kopi Arabika" />
+          <input id="bahan-nama" name="bahanNama" style={input} value={form.nama} onChange={(e) => setForm({ ...form, nama: e.target.value })} placeholder="cth: Biji Kopi Arabika" />
         </div>
         <div>
           <div style={label}>Satuan</div>
-          <input style={input} value={form.satuan} onChange={(e) => setForm({ ...form, satuan: e.target.value })} placeholder="gram / ml / pcs" />
+          <input id="bahan-satuan" name="bahanSatuan" style={input} value={form.satuan} onChange={(e) => setForm({ ...form, satuan: e.target.value })} placeholder="gram / ml / pcs" />
         </div>
         <div>
           <div style={label}>Stok</div>
-          <input style={input} type="number" value={form.stok} onChange={(e) => setForm({ ...form, stok: e.target.value })} placeholder="0" />
+          <input id="bahan-stok" name="bahanStok" style={input} type="number" value={form.stok} onChange={(e) => setForm({ ...form, stok: e.target.value })} placeholder="0" />
         </div>
         <div>
           <div style={label}>Min. stok (peringatan)</div>
-          <input style={input} type="number" value={form.minStok} onChange={(e) => setForm({ ...form, minStok: e.target.value })} placeholder="0" />
+          <input id="bahan-minstok" name="bahanMinStok" style={input} type="number" value={form.minStok} onChange={(e) => setForm({ ...form, minStok: e.target.value })} placeholder="0" />
         </div>
         <div>
           <div style={label}>Harga / satuan</div>
-          <input style={input} type="number" value={form.hargaSatuan} onChange={(e) => setForm({ ...form, hargaSatuan: e.target.value })} placeholder="0" />
+          <input id="bahan-hargasatuan" name="bahanHargaSatuan" style={input} type="number" value={form.hargaSatuan} onChange={(e) => setForm({ ...form, hargaSatuan: e.target.value })} placeholder="0" />
         </div>
         <div>
           <div style={label}>Supplier (opsional)</div>
-          <select style={input} value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })}>
+          <select id="bahan-supplier" name="bahanSupplier" style={input} value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })}>
             <option value="">-- tanpa supplier --</option>
             {(suppliers || []).map((s) => (
               <option key={s.id} value={s.id}>{s.nama}</option>
@@ -218,19 +218,19 @@ function SupplierPanel({ advancedData, toast_ }) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
         <div>
           <div style={label}>Nama supplier</div>
-          <input style={input} value={form.nama} onChange={(e) => setForm({ ...form, nama: e.target.value })} placeholder="cth: CV Kopi Nusantara" />
+          <input id="supplier-nama" name="supplierNama" style={input} value={form.nama} onChange={(e) => setForm({ ...form, nama: e.target.value })} placeholder="cth: CV Kopi Nusantara" />
         </div>
         <div>
           <div style={label}>Kontak (PIC)</div>
-          <input style={input} value={form.kontak} onChange={(e) => setForm({ ...form, kontak: e.target.value })} placeholder="Nama PIC" />
+          <input id="supplier-kontak" name="supplierKontak" style={input} value={form.kontak} onChange={(e) => setForm({ ...form, kontak: e.target.value })} placeholder="Nama PIC" />
         </div>
         <div>
           <div style={label}>Telepon</div>
-          <input style={input} value={form.telepon} onChange={(e) => setForm({ ...form, telepon: e.target.value })} placeholder="08xx" />
+          <input id="supplier-telepon" name="supplierTelepon" style={input} value={form.telepon} onChange={(e) => setForm({ ...form, telepon: e.target.value })} placeholder="08xx" />
         </div>
         <div>
           <div style={label}>Alamat</div>
-          <input style={input} value={form.alamat} onChange={(e) => setForm({ ...form, alamat: e.target.value })} placeholder="Kota / alamat" />
+          <input id="supplier-alamat" name="supplierAlamat" style={input} value={form.alamat} onChange={(e) => setForm({ ...form, alamat: e.target.value })} placeholder="Kota / alamat" />
         </div>
       </div>
 
@@ -292,15 +292,15 @@ function LoyaltyPanel({ advancedData, toast_ }) {
         <div key={i} style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr", gap: 8, marginBottom: 6 }}>
           <div>
             <div style={label}>Label</div>
-            <input style={input} value={t.label} onChange={(e) => change(i, "label", e.target.value)} placeholder="Bronze" />
+            <input id={`loyalty-label-${i}`} name={`loyaltyLabel_${i}`} style={input} value={t.label} onChange={(e) => change(i, "label", e.target.value)} placeholder="Bronze" />
           </div>
           <div>
             <div style={label}>Min. total (Rp)</div>
-            <input style={input} type="number" value={t.min} onChange={(e) => change(i, "min", e.target.value)} />
+            <input id={`loyalty-min-${i}`} name={`loyaltyMin_${i}`} style={input} type="number" value={t.min} onChange={(e) => change(i, "min", e.target.value)} />
           </div>
           <div>
             <div style={label}>Diskon (%)</div>
-            <input style={input} type="number" value={t.discountPct} onChange={(e) => change(i, "discountPct", e.target.value)} />
+            <input id={`loyalty-discount-${i}`} name={`loyaltyDiscount_${i}`} style={input} type="number" value={t.discountPct} onChange={(e) => change(i, "discountPct", e.target.value)} />
           </div>
         </div>
       ))}
@@ -360,7 +360,7 @@ function ResepPanel({ advancedData, menu, toast_ }) {
       </div>
 
       <div style={{ ...label }}>Pilih menu</div>
-      <select style={{ ...input, marginBottom: 8 }} value={activeMenu} onChange={(e) => setActiveMenu(e.target.value)}>
+      <select id="resep-active-menu" name="resepActiveMenu" style={{ ...input, marginBottom: 8 }} value={activeMenu} onChange={(e) => setActiveMenu(e.target.value)}>
         <option value="">-- pilih menu --</option>
         {(menu || []).map((m) => (
           <option key={m.id} value={m.id}>{m.nama}</option>
@@ -377,12 +377,14 @@ function ResepPanel({ advancedData, menu, toast_ }) {
         <>
           {lines.map((l, i) => (
             <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 1fr auto", gap: 8, marginBottom: 6 }}>
-              <select style={input} value={l.bahanId} onChange={(e) => updateLine(i, "bahanId", e.target.value)}>
+              <select id={`resep-bahan-${i}`} name={`resepBahan_${i}`} style={input} value={l.bahanId} onChange={(e) => updateLine(i, "bahanId", e.target.value)}>
                 {bahanList.map((b) => (
                   <option key={b.id} value={b.id}>{b.nama} ({b.satuan || "-"})</option>
                 ))}
               </select>
               <input
+                id={`resep-qty-${i}`}
+                name={`resepQty_${i}`}
                 style={input}
                 type="number"
                 step="any"
@@ -514,6 +516,8 @@ function ImportExcelPanel({ menu, cats, advancedData, toast_ }) {
       </div>
 
       <input
+        id="excel-import-file"
+        name="excelImportFile"
         ref={fileRef}
         type="file"
         accept=".xlsx,.xls"

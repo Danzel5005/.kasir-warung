@@ -177,10 +177,10 @@ function ViewRiwayat({
         </div>
 
         <div style={{ display:"flex", gap:6, alignItems:"center", marginLeft:"auto", flexWrap:"wrap" }}>
-          <input type="date" value={fFrom} onChange={e => setFFrom(e.target.value)}
+          <input type="date" id="history-from" name="historyFrom" value={fFrom} onChange={e => setFFrom(e.target.value)}
             style={{ ...inp, width:"auto", padding:"4px 7px", fontSize:11 }}/>
           <span style={{ fontSize:11, color:MT }}>s/d</span>
-          <input type="date" value={fTo} onChange={e => setFTo(e.target.value)}
+          <input type="date" id="history-to" name="historyTo" value={fTo} onChange={e => setFTo(e.target.value)}
             style={{ ...inp, width:"auto", padding:"4px 7px", fontSize:11 }}/>
           {(fFrom || fTo) &&
             <button onClick={() => { setFFrom(""); setFTo(""); }}

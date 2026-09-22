@@ -119,6 +119,7 @@ describe("regresi: konstanta desain harus di-import", () => {
     "../components/modals/settings-tabs/shared.jsx",
     "../components/modals/SettingsModal.jsx",
     "../views/ViewKelola.jsx",
+    "../views/ViewFiturLanjutan.jsx",
   ];
 
   it.each(files)("%s mengimpor setiap konstanta desain yang dipakai", (rel) => {

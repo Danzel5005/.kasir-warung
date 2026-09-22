@@ -20,12 +20,15 @@ export function SaveButton({ children = "Simpan", onClick }) {
 
 // PasswordInput — same `{ value, onChange, placeholder, style, compact }`
 // contract as before, shared by the Users tab (self password + new user form).
-export function PasswordInput({ value, onChange, placeholder, style, compact = false }) {
+export function PasswordInput({ value, onChange, placeholder, style, compact = false, id, name, autoComplete }) {
   const [show, setShow] = useState(false);
   const hide = () => setShow(false);
   const iconSize = compact ? 13 : 16;
   return <div style={{ position: "relative", width: "100%" }}>
     <input
+      id={id || "password-input"}
+      name={name || "password"}
+      autoComplete={autoComplete || "current-password"}
       type={show ? "text" : "password"}
       value={value}
       onChange={onChange}

@@ -101,6 +101,8 @@ export default function ModalStack({
             <div style={{ fontSize: 12, color: MT, marginBottom: 18 }}>Masukkan jumlah uang kas awal saat mulai shift agar laporan bisa menghitung saldo kas.</div>
             <label style={{ display: "block", fontSize: 11, color: MT, fontWeight: 700, marginBottom: 6 }}>Jumlah Kas (Rp)</label>
             <input
+              id="opening-cash-amount"
+              name="openingCashAmount"
               autoFocus
               type="text"
               value={openingCashInput}
@@ -125,7 +127,7 @@ export default function ModalStack({
             <div style={{ display: "grid", gap: 14 }}>
               <div>
                 <label style={{ display: "block", fontSize: 11, color: MT, fontWeight: 700, marginBottom: 6 }}>Deskripsi</label>
-                <input value={expenseForm.deskripsi} onChange={(e) => setExpenseForm(f => ({ ...f, deskripsi: e.target.value }))} placeholder="Contoh: Beli gula, bayar listrik, dll" style={{ width: "100%", boxSizing: "border-box", padding: "11px 12px", borderRadius: 10, border: `1.5px solid ${BD}`, fontSize: 13, fontFamily: "inherit" }} />
+                <input id="expense-deskripsi" name="expenseDeskripsi" value={expenseForm.deskripsi} onChange={(e) => setExpenseForm(f => ({ ...f, deskripsi: e.target.value }))} placeholder="Contoh: Beli gula, bayar listrik, dll" style={{ width: "100%", boxSizing: "border-box", padding: "11px 12px", borderRadius: 10, border: `1.5px solid ${BD}`, fontSize: 13, fontFamily: "inherit" }} />
               </div>
               <div>
                 <label style={{ display: "block", fontSize: 11, color: MT, fontWeight: 700, marginBottom: 6 }}>Kategori Pengeluaran</label>
@@ -135,7 +137,7 @@ export default function ModalStack({
                   ))}
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <input value={expenseCategoryDraft} onChange={(e) => setExpenseCategoryDraft(e.target.value)} placeholder="Tambah kategori baru" style={{ flex: 1, boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: `1.5px solid ${BD}`, fontSize: 12, fontFamily: "inherit" }} />
+                  <input id="expense-category-draft" name="expenseCategoryDraft" value={expenseCategoryDraft} onChange={(e) => setExpenseCategoryDraft(e.target.value)} placeholder="Tambah kategori baru" style={{ flex: 1, boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: `1.5px solid ${BD}`, fontSize: 12, fontFamily: "inherit" }} />
                   <button type="button" onClick={async () => {
                     const draft = expenseCategoryDraft.trim();
                     if (!draft) return;
@@ -149,7 +151,7 @@ export default function ModalStack({
               </div>
               <div>
                 <label style={{ display: "block", fontSize: 11, color: MT, fontWeight: 700, marginBottom: 6 }}>Jumlah Pengeluaran (Rp)</label>
-                <input value={expenseForm.jumlah} onChange={(e) => setExpenseForm(f => ({ ...f, jumlah: e.target.value.replace(/\D/g, "") }))} placeholder="0" style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: 10, border: `1.5px solid ${BD}`, fontSize: 18, fontWeight: 700, fontFamily: "inherit" }} />
+                <input id="expense-jumlah" name="expenseJumlah" value={expenseForm.jumlah} onChange={(e) => setExpenseForm(f => ({ ...f, jumlah: e.target.value.replace(/\D/g, "") }))} placeholder="0" style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: 10, border: `1.5px solid ${BD}`, fontSize: 18, fontWeight: 700, fontFamily: "inherit" }} />
               </div>
             </div>
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>

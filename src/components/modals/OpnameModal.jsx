@@ -64,7 +64,7 @@ export default function OpnameModal({ menu, onClose, onDone, toast_ }) {
         </div>
 
         <div style={{ padding:"9px 16px", borderBottom:`1px solid ${BD}` }}>
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari item..."
+          <input id="opname-search" name="opnameSearch" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari item..."
             style={{ width:"100%", border:`1px solid ${BD}`, borderRadius:RADIUS.sm, padding:"7px 9px", fontFamily:"inherit", fontSize:TYPOGRAPHY.small.fontSize, outline:"none", boxSizing:"border-box" }} />
         </div>
 
@@ -79,7 +79,7 @@ export default function OpnameModal({ menu, onClose, onDone, toast_ }) {
                   <div style={{ fontSize:TYPOGRAPHY.small.fontSize, fontWeight:600, color:TX, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{m.nama}</div>
                   <div style={{ fontSize:9, color:MT }}>Sistem: {Number(m.stok)}{hasDiff ? ` · selisih ${d > 0 ? "+" : ""}${d}` : ""}</div>
                 </div>
-                <input value={counted[m.id] ?? ""} onChange={(e) => setCounted((p) => ({ ...p, [m.id]: e.target.value.replace(/\D/g, "") }))}
+                <input id={`opname-count-${m.id}`} name={`opnameCount_${m.id}`} value={counted[m.id] ?? ""} onChange={(e) => setCounted((p) => ({ ...p, [m.id]: e.target.value.replace(/\D/g, "") }))}
                   placeholder={String(Number(m.stok))} inputMode="numeric"
                   style={{ width:76, border:`1px solid ${hasDiff ? "#e8a040" : BD}`, borderRadius:RADIUS.sm, padding:"5px 8px", fontFamily:"inherit", fontSize:TYPOGRAPHY.small.fontSize, outline:"none", textAlign:"right",
                     background: hasDiff ? "#fffaf0" : W }} />

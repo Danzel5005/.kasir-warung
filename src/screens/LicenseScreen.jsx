@@ -30,7 +30,7 @@ export default function LicenseScreen({
 
         <div style={{marginBottom:12}}>
           <label style={{fontSize:10,color:MT,fontWeight:600,display:"block",marginBottom:5}}>LICENSE KEY</label>
-          <input autoFocus value={licenseH.licKey} onChange={e=>{licenseH.setLicKey(e.target.value.toUpperCase());licenseH.setLicErr("");}}
+          <input id="license-key" name="licenseKey" autoFocus value={licenseH.licKey} onChange={e=>{licenseH.setLicKey(e.target.value.toUpperCase());licenseH.setLicErr("");}}
             onKeyDown={e=>e.key==="Enter"&&licenseH.doActivate()}
             placeholder="YKK-XXXXX-XXXXX-XXXXX-XXXXX"
             style={{width:"100%",padding:"11px 13px",boxSizing:"border-box",border:`1.5px solid ${licenseH.licErr?"#e84040":BD}`,borderRadius:8,fontSize:13,fontFamily:"monospace",letterSpacing:1,outline:"none",background:licenseH.licErr?"#fff5f5":W}}

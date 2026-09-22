@@ -21,13 +21,13 @@ const VoidModal = ({ voidTargetId, voidReason, setVoidReason, voidNote, setVoidN
 				</div>
 				<div style={{ marginBottom: 10 }}>
 					<label style={{ fontSize: 11, fontWeight: 700, color: G, marginBottom: 5, display:"block" }}>Alasan Void *</label>
-					<select value={voidReason} onChange={(event) => setVoidReason(event.target.value)} disabled={isVoiding} style={{ ...inp, width: "100%" }}>
+					<select id="void-reason" name="voidReason" value={voidReason} onChange={(event) => setVoidReason(event.target.value)} disabled={isVoiding} style={{ ...inp, width: "100%" }}>
 						{VOID_REASONS.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
 					</select>
 				</div>
 				<div style={{ marginBottom: 10 }}>
 					<label style={{ fontSize: 11, fontWeight: 700, color: G, marginBottom: 5, display:"block" }}>Catatan Tambahan</label>
-					<input type="text" value={voidNote} onChange={(event) => setVoidNote(event.target.value)} disabled={isVoiding} placeholder="Opsional" style={{ ...inp, width: "100%" }} />
+					<input id="void-note" name="voidNote" type="text" value={voidNote} onChange={(event) => setVoidNote(event.target.value)} disabled={isVoiding} placeholder="Opsional" style={{ ...inp, width: "100%" }} />
 				</div>
 				<div style={{ display: "flex", gap: 8, marginTop: 14 }}>
 					<button onClick={onClose} disabled={isVoiding}

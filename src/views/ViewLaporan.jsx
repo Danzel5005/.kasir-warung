@@ -278,7 +278,7 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
         </div>
       </div>
 
-      <div style={{fontSize:11,fontWeight:700,color:G,marginBottom:10}}>📊 {shiftLabel} — {isReportLoading ? "memuat..." : `${shiftTrx.length} transaksi`}</div>
+      <div style={{fontSize:11,fontWeight:700,color:G,marginBottom:10}}>{shiftLabel} — {isReportLoading ? "memuat..." : `${shiftTrx.length} transaksi`}</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))",gap:10,marginBottom:20}}>
         {[
           {l:"Total Pendapatan",v:fmt(rev),c:G,s:`dari ${shiftTrx.length} trx`,key:"income"},

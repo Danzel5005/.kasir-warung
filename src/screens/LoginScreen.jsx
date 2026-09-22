@@ -28,6 +28,9 @@ export default function LoginScreen({
         <div style={{marginBottom:11}}>
           <label style={{fontSize:10,color:MT,fontWeight:600,display:"block",marginBottom:4}}>USERNAME</label>
           <input
+            id="login-username"
+            name="username"
+            autoComplete="username"
             autoFocus
             type="text" value={authH.loginForm.username}
             onChange={e=>authH.setLoginForm(f=>({...f,username:e.target.value,error:""}))}
@@ -39,6 +42,8 @@ export default function LoginScreen({
           <div style={{position:"relative",width:"100%"}}>
             <input
               id="pw-input"
+              name="password"
+              autoComplete="current-password"
               type={showPw ? "text" : "password"}
               value={authH.loginForm.password}
               onChange={e=>authH.setLoginForm(f=>({...f,password:e.target.value,error:""}))}

@@ -30,6 +30,7 @@ import ViewKasir from "./views/ViewKasir.jsx";
 import ViewRiwayat from "./views/ViewRiwayat.jsx";
 import ViewLaporan from "./views/ViewLaporan.jsx";
 import ViewKelola from "./views/ViewKelola.jsx";
+import ViewFiturLanjutan from "./views/ViewFiturLanjutan.jsx";
 import CustomerPicker from "./components/CustomerPicker.jsx";
 
   import { useHistoryVoid } from "./hooks/useHistoryVoid.js";
@@ -114,6 +115,9 @@ function KasirWorkspace() {
 
   useEffect(() => {
     if (authH.currentUser && !canAccessView(authH.currentUser, view)) setView("menu");
+    // Halaman Fitur Lanjutan ikut hilang saat saklar induk dimatikan — pindah
+    // kembali ke kasir supaya user tidak terjebak di halaman kosong.
+    if (view === "fitur-lanjutan" && !settingsH.settings.advancedFeatures?.enabled) setView("menu");
   }, [authH.currentUser, view]);
 
   // ── confirmDel: SENGAJA tetap di App.jsx, bukan di salah satu hook.
@@ -222,6 +226,7 @@ function KasirWorkspace() {
         case "R": navigate("history"); break;
         case "L": navigate("laporan"); break;
         case "M": navigate("kelola"); break;
+        case "F": navigate("fitur-lanjutan"); break;
         case "P": cartH.setDrawerOpen(d => !d); break;
         case "/": e.preventDefault(); navigate("menu"); setTimeout(() => searchRef.current?.focus(), 80); break;
       }
@@ -514,9 +519,18 @@ const executeConfirmDel = useCallback((restoreStock = false) => {
             search={menuH.search} setSearch={menuH.setSearch}
             lowStockThreshold={Number(settingsH.settings.lowStockThreshold) > 0 ? Number(settingsH.settings.lowStockThreshold) : undefined}
               advancedFeatures={settingsH.settings.advancedFeatures} isAdvancedActive={settingsH.isAdvancedActive}
-              advancedData={advDataH}
               toast_={toastH.toast_}
             />
+        )}
+
+        {/* ══════ FITUR LANJUTAN VIEW ═════════════════════════════════════ */}
+        {view==="fitur-lanjutan" && isAdmin(authH.currentUser) && settingsH.settings.advancedFeatures?.enabled && (
+          <ViewFiturLanjutan
+            menu={menuH.menu} cats={menuH.cats}
+            advancedData={advDataH}
+            settings={settingsH.settings}
+            toast_={toastH.toast_}
+          />
         )}
       </div>
 

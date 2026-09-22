@@ -132,6 +132,8 @@ export default function PayModal({ cartH, processPayment, setPayModal, paymentMe
           {cartH.metode === "cash" && (<>
             <div style={{ fontSize:TYPOGRAPHY.label.fontSize, color:MT, fontWeight:600, marginBottom:4 }}>JUMLAH BAYAR (Rp)</div>
             <input
+              id="pay-amount"
+              name="payAmount"
               type="text"
               value={cartH.paid}
               onChange={e => cartH.setPaid(e.target.value.replace(/\D/g, ""))}

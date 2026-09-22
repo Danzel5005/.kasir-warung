@@ -3,7 +3,6 @@ import { fmt } from "../utilities/receipt.js";
 import { G, W, BD, MT, row, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../constants/design.js";
 import StockBadge from "../components/StockBadge.jsx";
 import StockAlertPanel from "../components/StockAlertPanel.jsx";
-import AdvancedDataPanel from "../components/AdvancedDataPanel.jsx";
 import { isAdvancedFeatureOn } from "../constants/advancedFeatures.js";
 import StockInModal from "../components/modals/StockInModal.jsx";
 import OpnameModal from "../components/modals/OpnameModal.jsx";
@@ -20,7 +19,6 @@ function ViewKelola({
   search, setSearch,                    // search from menuH
   lowStockThreshold = DEFAULT_LOW_STOCK_THRESHOLD,
 advancedFeatures,
-advancedData,
 toast_ = null,                        // optional feedback hook
 }) {
   const [stockInItem, setStockInItem] = useState(null);
@@ -98,6 +96,7 @@ toast_ = null,                        // optional feedback hook
           <div style={{display:"flex",alignItems:"center",gap:8,background:COLOR_PALETTE.grayLight,border:`1px solid ${BD}`,borderRadius:RADIUS.md,padding:"6px 10px",minWidth:200}}>
             <span style={{color:MT,fontSize:13}}>&#128269;</span>
             <input 
+              id="kelola-search" name="kelolaSearch"
               value={search} 
               onChange={e=>setSearch(e.target.value)} 
               placeholder="Cari menu..." 
@@ -128,7 +127,6 @@ toast_ = null,                        // optional feedback hook
           />
         </div>
       )}
-      <AdvancedDataPanel settings={{ advancedFeatures }} advancedData={advancedData} menu={menu} cats={cats} toast_={toast_} />
         {catKeys.map(catKey => {
           const items_ = groupedItems[catKey];
           return(

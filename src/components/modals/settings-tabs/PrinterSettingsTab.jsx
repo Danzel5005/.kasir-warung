@@ -26,7 +26,7 @@ export function PrinterSettingsTab({ settingsH }) {
     <div style={{ paddingTop: 12, borderTop: `1px solid ${BD}`, marginTop: 10 }}>
       <div style={{ fontSize: TYPOGRAPHY.label.fontSize, fontWeight: 600, color: G, marginBottom: 8 }}>Lebar Kertas Resi (mm):</div>
       <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
-        <input type="number" min="30" max="210" value={paperWidth} onChange={(event) => setPaperWidth(event.target.value)} onKeyDown={(event) => event.key === "Enter" && settingsH.setReceiptPaperWidth(paperWidth)} placeholder="80" style={{ ...fieldStyle, width: 90 }} />
+        <input id="receipt-paper-width" name="receiptPaperWidth" type="number" min="30" max="210" value={paperWidth} onChange={(event) => setPaperWidth(event.target.value)} onKeyDown={(event) => event.key === "Enter" && settingsH.setReceiptPaperWidth(paperWidth)} placeholder="80" style={{ ...fieldStyle, width: 90 }} />
         <SaveButton onClick={() => settingsH.setReceiptPaperWidth(paperWidth)} />
         {[58, 80].map((width) => <button key={width} onClick={() => selectWidth(width)} style={{ padding: "6px 10px", background: Number(settingsH.settings.receiptPaperWidthMm) === width ? COLOR_PALETTE.primaryLight : W, border: `1px solid ${Number(settingsH.settings.receiptPaperWidthMm) === width ? G : BD}`, borderRadius: RADIUS.sm, cursor: "pointer", fontFamily: "inherit", fontSize: TYPOGRAPHY.label.fontSize, fontWeight: 600 }}>{width}mm</button>)}
       </div>

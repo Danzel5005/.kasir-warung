@@ -7,7 +7,7 @@ describe("permissions", () => {
 
   it("allows admins to access every view", () => {
     expect(isAdmin(admin)).toBe(true);
-    for (const view of ["menu", "bills", "history", "laporan", "kelola"]) {
+    for (const view of ["menu", "bills", "history", "laporan", "kelola", "fitur-lanjutan"]) {
       expect(canAccessView(admin, view)).toBe(true);
     }
   });
@@ -18,5 +18,6 @@ describe("permissions", () => {
       expect(canAccessView(cashier, view)).toBe(true);
     }
     expect(canAccessView(cashier, "kelola")).toBe(false);
+    expect(canAccessView(cashier, "fitur-lanjutan")).toBe(false);
   });
 });

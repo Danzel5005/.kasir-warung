@@ -82,7 +82,7 @@ function ViewKasir({
         <div style={{padding:"8px 12px",background:W,borderBottom:`1px solid ${BD}`,flexShrink:0}}>
           <div style={{display:"flex",alignItems:"center",gap:8,background:LT,border:`1px solid ${BD}`,borderRadius:7,padding:"6px 10px"}}>
             <span style={{color:MT,fontSize:13}}>&#128269;</span>
-            <input ref={searchRef} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cari menu / Menu ID... (tekan / untuk fokus)" style={{border:"none",background:"transparent",outline:"none",fontSize:12,fontFamily:"inherit",width:"100%"}}/>
+            <input id="kasir-search" name="kasirSearch" ref={searchRef} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cari menu / Menu ID... (tekan / untuk fokus)" style={{border:"none",background:"transparent",outline:"none",fontSize:12,fontFamily:"inherit",width:"100%"}}/>
             {search&&<button onClick={()=>setSearch("")} style={{border:"none",background:"none",cursor:"pointer",color:MT,fontSize:12}}>&#10005;</button>}
           </div>
         </div>
@@ -154,14 +154,14 @@ function ViewKasir({
                   {field.label} {field.required && <span style={{color:"#e84040"}}>*</span>}
                 </div>
                 {field.type === "number" ? (
-                  <input type="number" min="1" 
+                  <input type="number" id={`receipt-add-${field.key}`} name={`receiptAdditional_${field.key}`} min="1" 
                     value={receiptAdditionalValues[field.key] || ""} 
                     onChange={e => updateReceiptAdditionalValue(field.key, e.target.value)}
                     placeholder={field.placeholder || `Masukkan ${field.label.toLowerCase()}...`}
                     style={{...inp,fontSize:12}}
                   />
                 ) : (
-                  <input type="text" 
+                  <input type="text" id={`receipt-add-${field.key}`} name={`receiptAdditional_${field.key}`}
                     value={receiptAdditionalValues[field.key] || ""} 
                     onChange={e => updateReceiptAdditionalValue(field.key, e.target.value)}
                     placeholder={field.placeholder || `Masukkan ${field.label.toLowerCase()}...`}

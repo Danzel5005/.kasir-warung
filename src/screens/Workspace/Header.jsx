@@ -3,6 +3,17 @@ import { canAccessView, isAdmin } from "../../utilities/permissions.js";
 import { ClockBadge } from "../../components/ClockBadge.jsx";
 
 export default function Header({ settingsH, authH, billsH, historyH, view, navigate, logoRef }) {
+  // Tombol "Fitur Lanjutan" hanya muncul saat saklar induk dinyalakan, supaya
+  // halaman pengelolaan fitur lanjutan ikut hilang/muncul bersama tombolnya.
+  const advOn = !!settingsH.settings?.advancedFeatures?.enabled;
+  const navItems = [
+    { key:"menu", label:"Kasir", hotkey:"K" },
+    { key:"bills", label:`Open Bill (${billsH.bills.filter(b=>b.status==="open").length})`, hotkey:"O" },
+    { key:"history", label:`Riwayat (${historyH.history.length})`, hotkey:"R" },
+    { key:"laporan", label:"Laporan", hotkey:"L" },
+    { key:"kelola", label:"Menu", hotkey:"M" },
+    ...(advOn ? [{ key:"fitur-lanjutan", label:"Fitur Lanjutan", hotkey:"F" }] : []),
+  ];
   return (
     <header style={{background:W,borderBottom:`1px solid ${BD}`,padding:"0 16px",height:56,display:"flex",alignItems:"center",gap:10,flexShrink:0,boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
       {/* Logo */}
@@ -12,7 +23,7 @@ export default function Header({ settingsH, authH, billsH, historyH, view, navig
         </div>
         {settingsH.logo&&<button onClick={(e)=>{e.stopPropagation();settingsH.handleLogoRemove();}} title="Hapus logo" style={{position:"absolute",top:-7,right:-7,width:16,height:16,borderRadius:"50%",border:"none",background:"#e84040",color:"#fff",fontSize:9,lineHeight:"16px",textAlign:"center",cursor:"pointer",padding:0,fontWeight:700}}>✕</button>}
       </div>
-      <input ref={logoRef} type="file" accept=".jpg,.jpeg,.png" style={{display:"none"}} onChange={settingsH.handleLogoUpload}/>
+      <input id="logo-upload" name="logoUpload" ref={logoRef} type="file" accept=".jpg,.jpeg,.png" style={{display:"none"}} onChange={settingsH.handleLogoUpload}/>
       <div style={{flexShrink:0}}>
         <div style={{fontSize:13,fontWeight:700,color:G}}>Sistem Kasir</div>
         <div style={{fontSize:9,color:OR,fontWeight:600}}>{settingsH.settings.warungName || "Warung"}</div>
@@ -20,7 +31,7 @@ export default function Header({ settingsH, authH, billsH, historyH, view, navig
 
       {/* Nav */}
       <div style={{display:"flex",gap:2,marginLeft:8}}>
-        {[{key:"menu",label:"Kasir",hotkey:"K"},{key:"bills",label:`Open Bill (${billsH.bills.filter(b=>b.status==="open").length})`,hotkey:"O"},{key:"history",label:`Riwayat (${historyH.history.length})`,hotkey:"R"},{key:"laporan",label:"Laporan",hotkey:"L"},{key:"kelola",label:"Menu",hotkey:"M"}].filter(b => canAccessView(authH.currentUser, b.key)).map(b=>(
+        {navItems.filter(b => canAccessView(authH.currentUser, b.key)).map(b=>(
           <button key={b.key} onClick={()=>navigate(b.key)} title={`Hotkey: ${b.hotkey}`} style={{padding:"4px 11px",borderRadius:5,border:"none",cursor:"pointer",fontFamily:"inherit",fontSize:11,fontWeight:600,background:view===b.key?G:"transparent",color:view===b.key?W:MT,transition:"all 0.15s"}}>
             {b.label}
           </button>

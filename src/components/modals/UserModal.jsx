@@ -64,6 +64,8 @@ export default function UserModal({ authH, setUserModal }) {
           <div style={{ marginBottom:8 }}>
             <label style={{ fontSize:TYPOGRAPHY.label.fontSize, color:MT, fontWeight:600, display:"block", marginBottom:3 }}>Nama Lengkap</label>
             <input
+              id="new-user-nama"
+              name="newUserName"
               type="text"
               placeholder="Contoh: Kasir Budi"
               value={newUser.nama}
@@ -74,6 +76,9 @@ export default function UserModal({ authH, setUserModal }) {
           <div style={{ marginBottom:8 }}>
             <label style={{ fontSize:TYPOGRAPHY.label.fontSize, color:MT, fontWeight:600, display:"block", marginBottom:3 }}>Username</label>
             <input
+              id="new-user-username"
+              name="newUserUsername"
+              autoComplete="off"
               type="text"
               placeholder="Contoh: kasir1"
               value={newUser.username}
@@ -84,6 +89,9 @@ export default function UserModal({ authH, setUserModal }) {
           <div style={{ marginBottom:8 }}>
             <label style={{ fontSize:TYPOGRAPHY.label.fontSize, color:MT, fontWeight:600, display:"block", marginBottom:3 }}>Password</label>
             <input
+              id="new-user-password"
+              name="newUserPassword"
+              autoComplete="new-password"
               type="password"
               placeholder="Min. 4 karakter"
               value={newUser.password}

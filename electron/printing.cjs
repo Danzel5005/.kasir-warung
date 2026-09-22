@@ -174,7 +174,7 @@ ipcMain.handle("print-receipt-escpos", async (_e, { trx, printerName, paperWidth
       const printer = new ThermalPrinter({ type: PrinterTypes.EPSON, interface: selectedName === "auto" ? "printer:auto" : `printer:${selectedName}`, ...(nodePrinterDriver ? { driver: nodePrinterDriver } : {}), width: charsPerLineForWidth(paperW), removeSpecialCharacters: false, options: { timeout: 5000 } });
       if (!await printer.isPrinterConnected()) return { ok: false, error: `Printer tidak ditemukan 404: "${selectedName}" tidak terhubung. Pastikan printer terhubung dan driver terinstall.` };
       buildEscPosReceipt(printer, trx, warungName, warungAddress, warungPhone, operatorName, [...cats, ...(rJSON(files.cats) || [])], customerEnabled);
-      await executeEscPosInChunks(printer, printer.Interface.getPrinterName());
+      await printer.execute();
       console.log("[ESC/POS] Print successful to:", selectedName);
       return { ok: true };
     } catch (err) { const message = err?.message || String(err); console.error("[ESC/POS] Print failed for:", selectedName, message); const looksHardware = /not found|not connected|timeout|offline|printer|device/i.test(message); return { ok: false, error: looksHardware ? `Printer tidak ditemukan 404: "${selectedName}" tidak terhubung. Pastikan printer terhubung dan driver terinstall.` : message }; }

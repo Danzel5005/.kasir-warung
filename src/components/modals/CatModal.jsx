@@ -43,6 +43,8 @@ export default function CatModal({ menuH }) {
               {editingCatKey === c.key ? (
                 <>
                   <input
+                    id={`cat-edit-${c.key}`}
+                    name="catEditLabel"
                     autoFocus
                     value={editingCatLabel}
                     onChange={e => setEditingCatLabel(e.target.value)}
@@ -154,6 +156,8 @@ export default function CatModal({ menuH }) {
         {/* Tambah kategori baru */}
         <div style={{ display:"flex", gap:7 }}>
           <input
+            id="new-cat-label"
+            name="newCategory"
             value={menuH.newCatLabel}
             onChange={e => menuH.setNewCatLabel(e.target.value)}
             onKeyDown={e => e.key === "Enter" && menuH.addCat()}

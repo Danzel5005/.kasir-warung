@@ -393,7 +393,7 @@ function createDatabaseService({ ipcMain, files, ensureDir, rJSON, atomicWrite, 
         if (value !== null && (Number.isNaN(value) || value < 0)) return { ok: false, error: "stok tidak valid" };
         const info = db.prepare("UPDATE products SET stok = ? WHERE menu_id = ?").run(value, String(id));
         if (!info.changes) return { ok: false, error: "item tak ada" };
-        return { ok: true, menu: loadMenuList() };
+        return { ok: true, stock: { [String(id)]: value }, menu: loadMenuList() };
       } catch (err) { console.error("[stock-set] Error:", err.message); return { ok: false, error: err.message }; }
     });
 
