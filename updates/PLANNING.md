@@ -7,7 +7,7 @@
 
 ---
 
-## 🎯 Strategic Foundation
+## Strategic Foundation
 
 ### Unique Value Proposition
 1. **Full data ownership** - No cloud lock-in, all data lives locally (client's choice)
@@ -26,7 +26,7 @@
 
 ---
 
-## 📊 Growth Baseline (3-month momentum)
+## Growth Baseline (3-month momentum)
 
 From code comments & user memory:
 - Current: ~50-100 trx/day per client
@@ -38,7 +38,7 @@ From code comments & user memory:
 
 ---
 
-## 🗂️ Roadmap Structure
+## Roadmap Structure
 
 - **YEAR 1 (Months 1-12):** Stabilize core POS, build sync foundation
 - **YEAR 2-3 (Months 13-36):** Regulatory compliance sprint, team scaling
@@ -49,7 +49,7 @@ From code comments & user memory:
 # YEAR 1: Foundation & Sync Readiness
 ## (Months 1-12)
 
-### 🔴 CRITICAL PATH (blocking everything else)
+### CRITICAL PATH (blocking everything else)
 
 #### 1.1 Phase 1 Security Integration (Months 1-3)
 **Status:** Phase 1 modules created, not yet integrated.  
@@ -148,7 +148,7 @@ Current chaos:
 
 ---
 
-### 🟡 HIGH PRIORITY (Year 1 Q2-Q3)
+### HIGH PRIORITY (Year 1 Q2-Q3)
 
 #### 1.4 Undo/Recovery System (Months 4-5)
 **Pain point:** "Tutup Shift" is the most destructive operation with zero undo.  
@@ -248,7 +248,7 @@ closeShift() {
 
 ---
 
-### 🟢 SHOULD DO (Year 1 Q3-Q4)
+### SHOULD DO (Year 1 Q3-Q4)
 
 #### 1.8 Admin Dashboard (Lite version)
 **Scope:** Backend admin tools to manage:
@@ -300,7 +300,7 @@ closeShift() {
 # YEAR 2-3: Regulatory Compliance & Scaling
 ## (Months 13-36)
 
-### 🔴 CRITICAL PATH: Tax & Accounting Compliance
+### CRITICAL PATH: Tax & Accounting Compliance
 
 #### 2.1 E-Invoice (Faktur Pajak) Integration (Months 13-18)
 **Context:** Indonesia requires e-Invoice for businesses over certain revenue thresholds.  
@@ -392,7 +392,7 @@ closeShift() {
 
 ---
 
-### 🟡 SYNC IMPLEMENTATION (parallel with compliance)
+### SYNC IMPLEMENTATION (parallel with compliance)
 
 #### 2.4 Sync Engine Build (Months 14-20)
 **Prerequisites:** Architecture designed in Year 1 Phase 1.2.  
@@ -457,7 +457,7 @@ closeShift() {
 
 ---
 
-### 🟢 TEAM SCALING & DOCS
+### TEAM SCALING & DOCS
 
 #### 2.6 Code Documentation & Onboarding (Months 15-24)
 **Scope:** Prepare codebase for team (currently solo).
@@ -516,7 +516,7 @@ closeShift() {
 # YEAR 4-5: Market Expansion & Maturity
 ## (Months 37-60)
 
-### 🟡 MARKET DIFFERENTIATION
+### MARKET DIFFERENTIATION
 
 #### 4.1 Mobile App (PWA + Optional Native)
 **Strategic decision:**
@@ -588,7 +588,7 @@ closeShift() {
 
 ---
 
-### 🟢 ECOSYSTEM & NICE-TO-HAVES
+### ECOSYSTEM & NICE-TO-HAVES
 
 #### 4.5 Loyalty/Rewards System
 **Scope:** Customer retention features.
@@ -630,7 +630,7 @@ closeShift() {
 
 ---
 
-### 🟢 SCALING & RELIABILITY
+### SCALING & RELIABILITY
 
 #### 4.8 Disaster Recovery & High Availability
 **Scope:** Make YKK Kasir mission-critical for business operations.
@@ -679,7 +679,7 @@ closeShift() {
 
 ---
 
-# 🚨 CRITICAL RISKS & ASSUMPTIONS
+# CRITICAL RISKS & ASSUMPTIONS
 
 ## Technical Risks
 
@@ -813,7 +813,7 @@ closeShift() {
 
 ---
 
-# 🗺️ NOT TO BUILD (Explicit Scope Boundaries)
+# NOT TO BUILD (Explicit Scope Boundaries)
 
 To protect focus, do NOT build these (tempting but wrong):
 
@@ -830,7 +830,7 @@ To protect focus, do NOT build these (tempting but wrong):
 
 ---
 
-# 📈 Metrics to Track (Now)
+# Metrics to Track (Now)
 
 By Year 5, you'll need these baselines:
 
@@ -858,7 +858,7 @@ By Year 5, you'll need these baselines:
 
 ---
 
-# 💰 Rough Budget & Team Size
+# Rough Budget & Team Size
 
 ## Year 1 (Solo)
 - Hardware: Laptop, server (VPS Rp 500k/month)
