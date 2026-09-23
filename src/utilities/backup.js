@@ -10,10 +10,10 @@
 // Kept dependency-free on purpose: no React, no window, no fs.
 
 // Canonical store keys. Order mirrors the order data is written in main.
-const BACKUP_KEYS = ["menu", "categories", "settings", "users", "customers", "qris", "bills", "shifts", "transactions", "logo"];
+const BACKUP_KEYS = ["menu", "categories", "settings", "users", "customers", "qris", "bills", "shifts", "transactions", "logo", "resep", "bahanBaku", "supplier", "loyaltyTiers"];
 
 // Keys that are stored as arrays — anything else is treated as an object/blob.
-const ARRAY_KEYS = ["menu", "categories", "users", "customers", "bills", "shifts", "transactions"];
+const ARRAY_KEYS = ["menu", "categories", "users", "customers", "bills", "shifts", "transactions", "bahanBaku", "supplier", "loyaltyTiers"];
 
 const BACKUP_FORMAT = "kasir-warung-backup";
 const BACKUP_VERSION = 1;
@@ -103,6 +103,10 @@ function backupSummary(result) {
     shifts: "shift",
     transactions: "transaksi",
     logo: "logo",
+    resep: "resep menu",
+    bahanBaku: "bahan baku",
+    supplier: "supplier",
+    loyaltyTiers: "tier loyalty",
   };
   const parts = BACKUP_KEYS
     .filter((k) => Number(result.counts[k]) > 0)

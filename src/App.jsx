@@ -365,15 +365,15 @@ const printReceipt = useCallback(async (trx) => {
   }
 
   if (selection.isPdf) {
-    const html = buildReceiptHTML(trx, settingsH.logo, settingsH.settings.receiptAdditionals, settingsH.settings.qrisImages, settingsH.settings.warungName, menuH.cats, settingsH.settings.warungAddress, settingsH.settings.warungPhone, settingsH.settings.paymentMethods, settingsH.settings.receiptPaperWidthMm, settingsH.settings.customerEnabled !== false);
+    const html = buildReceiptHTML(trx, settingsH.logo, settingsH.settings.receiptAdditionals, settingsH.settings.qrisImages, settingsH.settings.warungName, menuH.cats, settingsH.settings.warungAddress, settingsH.settings.warungPhone, settingsH.settings.paymentMethods, settingsH.settings.receiptPaperWidthMm, settingsH.settings.customerEnabled !== false, settingsH.settings.receiptHeaderText, settingsH.settings.receiptFooterText);
     const res = await settingsH.printHTML(html, "Selesai Mencetak Resi");
     return res;
   }
 
-  const html = buildReceiptHTML(trx, settingsH.logo, settingsH.settings.receiptAdditionals, settingsH.settings.qrisImages, settingsH.settings.warungName, menuH.cats, settingsH.settings.warungAddress, settingsH.settings.warungPhone, settingsH.settings.paymentMethods, settingsH.settings.receiptPaperWidthMm, settingsH.settings.customerEnabled !== false);
+  const html = buildReceiptHTML(trx, settingsH.logo, settingsH.settings.receiptAdditionals, settingsH.settings.qrisImages, settingsH.settings.warungName, menuH.cats, settingsH.settings.warungAddress, settingsH.settings.warungPhone, settingsH.settings.paymentMethods, settingsH.settings.receiptPaperWidthMm, settingsH.settings.customerEnabled !== false, settingsH.settings.receiptHeaderText, settingsH.settings.receiptFooterText);
   const res = await settingsH.printHTML(html, "Selesai Mencetak Resi");
   return res;
-}, [settingsH.logo, settingsH.printHTML, settingsH.settings.printerName, settingsH.settings.receiptAdditionals, settingsH.settings.qrisImages, settingsH.settings.warungName, settingsH.settings.warungAddress, settingsH.settings.warungPhone, menuH.cats, settingsH.settings.paymentMethods, settingsH.settings.receiptPaperWidthMm, settingsH.settings.customerEnabled, toastH.toast_]);
+}, [settingsH.logo, settingsH.printHTML, settingsH.settings.printerName, settingsH.settings.receiptAdditionals, settingsH.settings.qrisImages, settingsH.settings.warungName, settingsH.settings.warungAddress, settingsH.settings.warungPhone, menuH.cats, settingsH.settings.paymentMethods, settingsH.settings.receiptPaperWidthMm, settingsH.settings.customerEnabled, settingsH.settings.receiptHeaderText, settingsH.settings.receiptFooterText, toastH.toast_]);
 
   // printPreview — depend ke cart (items/receiptAdditionalValues), pakai printHTML generic dari settings
   // PENTING: membaca cartH.items/receiptAdditionalValues dan settingsH.logo langsung. Semua wajib di deps.
@@ -381,12 +381,12 @@ const printReceipt = useCallback(async (trx) => {
     if (!cartH.items.length) { toastH.toast_("Isi pesanan dulu", "err"); return; }
     setPrintingPreview(true);
     try {
-      const html = buildPreviewHTML(cartH.receiptAdditionalValues, cartH.items, settingsH.logo, settingsH.settings.receiptAdditionals, settingsH.settings.warungName, menuH.cats, settingsH.settings.warungAddress, settingsH.settings.warungPhone, settingsH.settings.receiptPaperWidthMm, cartH.pricingConfig, cartH.paidNum, cartH.metode);
+      const html = buildPreviewHTML(cartH.receiptAdditionalValues, cartH.items, settingsH.logo, settingsH.settings.receiptAdditionals, settingsH.settings.warungName, menuH.cats, settingsH.settings.warungAddress, settingsH.settings.warungPhone, settingsH.settings.receiptPaperWidthMm, cartH.pricingConfig, cartH.paidNum, cartH.metode, settingsH.settings.receiptHeaderText, settingsH.settings.receiptFooterText);
       await settingsH.printHTML(html, "Mencetak preview tagihan...");
     } finally {
       setPrintingPreview(false);
     }
-  }, [cartH.items, cartH.receiptAdditionalValues, cartH.pricingConfig, cartH.paidNum, cartH.metode, toastH.toast_, settingsH.logo, settingsH.printHTML, settingsH.settings.receiptAdditionals, settingsH.settings.warungName, settingsH.settings.warungAddress, settingsH.settings.warungPhone, menuH.cats, settingsH.settings.receiptPaperWidthMm]);
+  }, [cartH.items, cartH.receiptAdditionalValues, cartH.pricingConfig, cartH.paidNum, cartH.metode, toastH.toast_, settingsH.logo, settingsH.printHTML, settingsH.settings.receiptAdditionals, settingsH.settings.warungName, settingsH.settings.warungAddress, settingsH.settings.warungPhone, menuH.cats, settingsH.settings.receiptPaperWidthMm, settingsH.settings.receiptHeaderText, settingsH.settings.receiptFooterText]);
 
   // loadBillToCart (wrapped) — selain mengisi cart, juga memulihkan pelanggan
   // yang tersimpan di bill. useCart.loadBillToCart sengaja tetap "murni"

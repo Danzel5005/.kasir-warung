@@ -29,6 +29,7 @@ Selain fungsi kasir inti, aplikasi menyediakan sekumpulan fitur lanjutan yang di
 ### Pelanggan dan member
 
 - Pemilih pelanggan pada layar kasir untuk mengaitkan transaksi ke pelanggan atau member.
+- Saat fitur pelanggan aktif dan keyboard masuk ke kolom nama pelanggan, daftar pelanggan yang tersimpan langsung muncul sebagai dropdown yang bisa diklik, berurutan secara alfabet, dan menyempit mengikuti ketikan. Navigasi keyboard `↑`/`↓`/`Enter`/`Esc` juga didukung.
 - Data pelanggan disimpan pada transaksi dalam bentuk salinan (`customerId`, `customerNama`, `customerTelepon`) sehingga riwayat dan struk lama tetap terbaca meskipun pelanggan kemudian diubah namanya atau dihapus.
 - Nama pelanggan, atau nama beserta telepon jika tersedia, ditampilkan pada baris `PELANGGAN` di struk dan pada jalur thermal ESC/POS.
 - Pelanggan yang dipilih otomatis dilepas setelah transaksi selesai agar tidak terbawa ke transaksi berikutnya.
@@ -296,7 +297,7 @@ Persyaratan RAM dan ruang di atas adalah batas operasional yang disarankan untuk
 | `components/modals/settings-tabs/` | Implementasi panel tiap tab Settings: printer, warung, pembayaran, QRIS, receipt, pricing, backup, pengguna, dan fitur lanjutan, dengan `index.js` sebagai barrel. |
 | `constants/` | Konfigurasi kategori, menu, pembayaran, additionals, receipt fields, fitur lanjutan (`advancedFeatures.js`), dan design tokens. `design.js` adalah sumber token visual utama saat ini. |
 | `hooks/` | Domain state dan operasi untuk auth/shift, barcode, bills, cart, customers, history, license, menu, settings, users, data lanjutan, impor Excel, dan toast/undo. |
-| `utilities/` | Logika murni dan adapter untuk barcode, kalkulasi harga, kategori, CSV, i18n, printer, receipt, shift, stock, user, backup, ipc guard, IPC API, loyalty, bahan baku, supplier, resep dan HPP, cash flow, insight, report HTML, dan impor Excel. Banyak utilitas memiliki file test berdekatan. |
+| `utilities/` | Logika murni dan adapter untuk barcode, kalkulasi harga, kategori, CSV, i18n, printer, receipt, shift, stock, user, backup, ipc guard, IPC API, loyalty, pencarian pelanggan, bahan baku, supplier, resep dan HPP, cash flow, insight, report HTML, dan impor Excel. Banyak utilitas memiliki file test berdekatan. |
 | `views/` | Layar Kasir, Open Bill, Riwayat, Laporan, Kelola Menu/Kategori, dan Fitur Lanjutan. |
 
 ### `updates/`

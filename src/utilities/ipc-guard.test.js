@@ -100,6 +100,25 @@ describe("wiring: dev runner untuk main process", () => {
   });
 });
 
+// Regresi: modal detail bahan HARUS selalu di atas modal daftar nama bahan.
+// Keduanya pakai `position: fixed` + zIndex literal; kalau nilai detail <=
+// nilai list, detail akan tertutup oleh modal daftar (bug nyata).
+describe("regresi: urutan z-index modal bahan", () => {
+  const zIndexOf = (rel) => {
+    const src = read(rel);
+    const m = src.match(/zIndex:\s*(\d+)/);
+    return m ? Number(m[1]) : null;
+  };
+
+  it("BahanDetailModal punya zIndex lebih tinggi dari BahanListModal", () => {
+    const detail = zIndexOf("../components/modals/BahanDetailModal.jsx");
+    const list = zIndexOf("../components/modals/BahanListModal.jsx");
+    expect(detail).not.toBeNull();
+    expect(list).not.toBeNull();
+    expect(detail).toBeGreaterThan(list);
+  });
+});
+
 // Regresi dari bug nyata: `toast_ is not defined` dan `TX is not defined`.
 // Konstanta desain yang dipakai tapi tidak di-import = crash saat render.
 describe("regresi: konstanta desain harus di-import", () => {
@@ -118,6 +137,10 @@ describe("regresi: konstanta desain harus di-import", () => {
     "../components/modals/settings-tabs/UsersSettingsTab.jsx",
     "../components/modals/settings-tabs/shared.jsx",
     "../components/modals/SettingsModal.jsx",
+    "../components/modals/BahanDetailModal.jsx",
+    "../components/modals/BahanListModal.jsx",
+    "../components/modals/MenuListModal.jsx",
+    "../components/modals/SupplierListModal.jsx",
     "../views/ViewKelola.jsx",
     "../views/ViewFiturLanjutan.jsx",
   ];

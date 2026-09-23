@@ -11,8 +11,8 @@ const envelope = (stores = {}, extra = {}) => ({
 });
 
 describe("BACKUP_KEYS", () => {
-  it("covers every persisted store", () => {
-    expect(BACKUP_KEYS).toEqual(["menu", "categories", "settings", "users", "customers", "qris", "bills", "shifts", "transactions", "logo"]);
+  it("covers every persisted store, termasuk data fitur lanjutan", () => {
+    expect(BACKUP_KEYS).toEqual(["menu", "categories", "settings", "users", "customers", "qris", "bills", "shifts", "transactions", "logo", "resep", "bahanBaku", "supplier", "loyaltyTiers"]);
   });
 });
 

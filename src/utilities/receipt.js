@@ -62,6 +62,25 @@ const formatAdditionals = (additionals) => {
   return parts.join(" • ");
 };
 
+// Escape user-supplied text (header/footer notes) before injecting into HTML.
+// Keeps the receipt safe even if the owner types characters like < or &.
+const escapeHtml = (value) => String(value ?? "")
+  .replace(/&/g, "&amp;")
+  .replace(/</g, "&lt;")
+  .replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;")
+  .replace(/'/g, "&#39;");
+
+// Render a custom header/footer text block. Returns "" when the text is empty
+// so an unconfigured receipt stays byte-identical to the previous output.
+// `extraClass` lets the footer reuse the same styling with a modifier.
+const renderTextBlock = (text, extraClass = "") => {
+  const trimmed = String(text ?? "").trim();
+  if (!trimmed) return "";
+  const cls = extraClass ? `receipt-note ${extraClass}` : "receipt-note";
+  return `<div class="${cls}">${escapeHtml(trimmed)}</div>`;
+};
+
 // Build receipt additional fields (from Resi settings) into KV rows
 const buildAdditionalFields = (data, receiptAdditionals) => {
   if (!receiptAdditionals || !receiptAdditionals.length) return "";
@@ -127,7 +146,7 @@ const buildCategoryTotals = (items, cats = []) => {
   return { taggedCategories, untaggedCategories };
 };
 
-function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName, cats = [], warungAddress = "", warungPhone = "", paymentMethods = [], paperWidthMm = DEFAULT_PAPER_WIDTH_MM, customerEnabled = true) {
+function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName, cats = [], warungAddress = "", warungPhone = "", paymentMethods = [], paperWidthMm = DEFAULT_PAPER_WIDTH_MM, customerEnabled = true, headerText = "", footerText = "") {
   // Use stored tax/service from transaction (no recalculation)
   const pajak = trx.pajak || 0;
   const service = trx.service || 0;
@@ -142,6 +161,10 @@ function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName,
   const cashPaymentNote = trx.metodeBayar === "cash" ? getCashPaymentNote(trx.bayar, total) : "";
   const addFields = buildAdditionalFields(trx, receiptAdditionals);
   const storeName = warungName || trx.warungName || DEFAULT_WARUNG; // [11] dynamic custom name
+  // Custom header (below logo/name) & footer (bottom of receipt) notes,
+  // configured from the Resi settings tab.
+  const headerLine = renderTextBlock(headerText);
+  const footerLine = renderTextBlock(footerText, "footer");
   const operatorName = trx.operator || "Kasir"; // [2] dynamic operator name from transaction
   // GAP 5 — customer/member. Denormalized on the trx, so an old receipt keeps
   // showing the name that was correct at the time of sale.
@@ -207,6 +230,8 @@ ${buildPrintCSS(paperWidthMm)}
     .payment-note{margin-top:8px;text-align:center;font-size:11.5px;border:1px dashed #999;padding:6px;font-weight:700;}
     .qris-img{display:block;margin:8px auto;max-width:60mm;max-height:60mm;}
     .footer-note{text-align:center;font-size:11px;margin-top:8px;font-weight:700;}
+    .receipt-note{text-align:center;font-size:11.5px;margin-top:6px;white-space:pre-line;font-weight:700;}
+    .receipt-note.footer{white-space:pre-line;}
     .cat-line{display:flex;justify-content:space-between;font-size:12px;margin:3px 0;font-weight:700;}
     .footer-list{font-size:11px;margin-top:6px;font-weight:700;}
     .footer-list div{margin:2px 0;font-weight:700;}
@@ -218,6 +243,7 @@ ${buildPrintCSS(paperWidthMm)}
       <div class="section header">
         ${logo?`<img src="${logo}" class="qris-img" style="max-height:30mm;max-width:30mm;border-radius:4px;" /><br/>`:""}
         <div class="store-name center bold">${storeName}</div>
+        ${headerLine}
         ${addressLine?`<div class="store-line center">${addressLine}</div>`:""}
         ${phoneLine?`<div class="store-line center">Telp: ${phoneLine}</div>`:""}
         <div class="store-line center">${trx.hari}, ${trx.tgl} ${trx.bln} ${trx.thn} &bull; ${trx.jam}:${trx.mnt}:${trx.dtk}</div>
@@ -248,19 +274,22 @@ ${buildPrintCSS(paperWidthMm)}
         <div class="cat-line"><span>SUBTOTAL ITEMS :</span><span>${totalQty}</span></div>
         ${Object.keys(untaggedCategories).length ? `<div class="footer-list">${renderCatTotals(untaggedCategories)}</div>` : ""}
         ${Object.keys(taggedCategories).length ? `<div class="footer-list"><div class="bold">TAGGED</div>${renderCatTotals(taggedCategories)}</div>` : ""}
-        <div class="footer-note">Barang yang sudah dibeli tidak bisa<br/>dikembalikan<br/>Terimakasih</div>
+        ${footerLine || `<div class="footer-note">Barang yang sudah dibeli tidak bisa<br/>dikembalikan<br/>Terimakasih</div>`}
       </div>
     </div>
   </body></html>`;
 }
 
-function buildPreviewHTML(receiptAdditionalValues, items, logo, receiptAdditionals, warungName, cats = [], warungAddress = "", warungPhone = "", paperWidthMm = DEFAULT_PAPER_WIDTH_MM, pricingConfig = {}, paid = 0, metode = "cash") {
+function buildPreviewHTML(receiptAdditionalValues, items, logo, receiptAdditionals, warungName, cats = [], warungAddress = "", warungPhone = "", paperWidthMm = DEFAULT_PAPER_WIDTH_MM, pricingConfig = {}, paid = 0, metode = "cash", headerText = "", footerText = "") {
   const subtotal = items.reduce((s, i) => s + i.harga * i.qty, 0);
   const { pajak, service, discount, total } = calcPrice(subtotal, { ...pricingConfig, items });
   const cashPaymentNote = metode === "cash" && Number(paid || 0) > 0 ? getCashPaymentNote(paid, total) : "";
   const t = getNow();
   const addFields = buildAdditionalFields(receiptAdditionalValues, receiptAdditionals);
   const storeName = warungName || DEFAULT_WARUNG;
+  // Custom header/footer notes — same rendering as the printed receipt.
+  const headerLine = renderTextBlock(headerText);
+  const footerLine = renderTextBlock(footerText, "footer");
   const addressLine = warungAddress || "";
   const phoneLine = warungPhone || "";
   const { taggedCategories, untaggedCategories } = buildCategoryTotals(items, cats);
@@ -312,6 +341,8 @@ ${buildPrintCSS(paperWidthMm)}
     .totals .kv.grand{font-size:14px;padding-top:4px;margin-top:4px;border-top:1px solid var(--line);font-weight:700;}
     .preview-tag{text-align:center;font-size:9px;margin-top:4px;font-weight:700;}
     .footer-note{text-align:center;font-size:11px;margin-top:8px;font-weight:700;}
+    .receipt-note{text-align:center;font-size:11.5px;margin-top:6px;white-space:pre-line;font-weight:700;}
+    .receipt-note.footer{white-space:pre-line;}
     .cat-line{display:flex;justify-content:space-between;font-size:12px;margin:3px 0;font-weight:700;}
     .footer-list{font-size:11px;margin-top:6px;font-weight:700;}
     .footer-list div{margin:2px 0;font-weight:700;}
@@ -320,6 +351,7 @@ ${buildPrintCSS(paperWidthMm)}
       <div class="section header">
         ${logo?`<img src="${logo}" style="display:block;margin:0 auto 4px;max-height:30mm;max-width:30mm;border-radius:4px;" /><br/>`:""}
         <div class="store-name center bold">${storeName}</div>
+        ${headerLine}
         ${addressLine?`<div class="store-line center">${addressLine}</div>`:""}
         ${phoneLine?`<div class="store-line center">Telp: ${phoneLine}</div>`:""}
         <div class="store-line center">${t.hari}, ${t.tgl} ${t.bln} ${t.thn} &bull; ${t.jam}:${t.mnt}</div>
@@ -340,7 +372,7 @@ ${buildPrintCSS(paperWidthMm)}
         <div class="cat-line"><span>SUBTOTAL ITEMS :</span><span>${totalQty}</span></div>
         ${Object.keys(untaggedCategories).length ? `<div class="footer-list">${renderCatTotals(untaggedCategories)}</div>` : ""}
         ${Object.keys(taggedCategories).length ? `<div class="footer-list"><div class="bold">TAGGED</div>${renderCatTotals(taggedCategories)}</div>` : ""}
-        <div class="footer-note">Belum Lunas</div>
+        ${footerLine || `<div class="footer-note">Belum Lunas</div>`}
       </div>
     </div>
   </body></html>`;

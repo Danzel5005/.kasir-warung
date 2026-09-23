@@ -35,9 +35,16 @@ function createBackupRestoreService({ app, ipcMain, dialog, files, ensureDir, rJ
     ["shifts", files.shifts],
     ["transactions", files.trx],
     ["logo", files.logo],
+    // Data "Fitur Lanjutan" (resep/HPP, bahan baku, supplier, loyalty tiers)
+    // tersimpan di file JSON terpisah lewat useAdvancedData(). Tanpa entri di
+    // sini, data fitur lanjutan TIDAK ikut terbawa saat backup/restore.
+    ["resep", files.resep],
+    ["bahanBaku", files.bahanBaku],
+    ["supplier", files.supplier],
+    ["loyaltyTiers", files.loyaltyTiers],
   ];
 
-  const ARRAY_STORES = new Set(["menu", "categories", "users", "customers", "bills", "shifts", "transactions"]);
+  const ARRAY_STORES = new Set(["menu", "categories", "users", "customers", "bills", "shifts", "transactions", "bahanBaku", "supplier", "loyaltyTiers"]);
 
   const stamp = () => new Date().toISOString().replace(/[:.]/g, "-");
   const today = () => new Date().toISOString().slice(0, 10);

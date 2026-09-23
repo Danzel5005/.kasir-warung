@@ -29,6 +29,10 @@ const LABELS = {
   shifts: "Shift",
   transactions: "Transaksi",
   logo: "Logo",
+  resep: "Resep Menu",
+  bahanBaku: "Bahan Baku",
+  supplier: "Supplier",
+  loyaltyTiers: "Tier Loyalty",
 };
 
 const describeCounts = (counts = {}) =>

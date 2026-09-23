@@ -73,3 +73,33 @@ export function bahanDeltasFromItems(items = [], resep = {}, sign = -1) {
   }
   return deltas;
 }
+
+// bahanBakuUsage — daftar resep (menu) yang memakai sebuah bahan baku.
+// Dipakai modal detail bahan baku: "di resep mana saja bahan ini dipakai".
+//
+// bahanId : id bahan baku yang dicari.
+// resep   : map menuId -> [{ bahanId, qty }].
+// menu    : daftar menu [{ id, nama }] untuk label nama menu.
+// Return  : [{ menuId, nama, qty }] terurut nama menu (A-Z); qty = per 1 porsi.
+export function bahanBakuUsage(bahanId = "", resep = {}, menu = []) {
+  const key = String(bahanId || "").trim();
+  if (!key) return [];
+  const resepMap = resep && typeof resep === "object" && !Array.isArray(resep) ? resep : {};
+  const nameMap = new Map(
+    (Array.isArray(menu) ? menu : []).map((m) => [String(m?.id ?? "").trim(), String(m?.nama || "").trim()])
+  );
+  const out = [];
+  for (const menuId of Object.keys(resepMap)) {
+    const lines = Array.isArray(resepMap[menuId]) ? resepMap[menuId] : [];
+    const hits = lines.filter((l) => String(l?.bahanId || "").trim() === key);
+    if (hits.length === 0) continue;
+    const qty = hits.reduce((sum, l) => sum + Number(l?.qty || 0), 0);
+    out.push({
+      menuId,
+      nama: nameMap.get(String(menuId).trim()) || `Menu ${menuId}`,
+      qty,
+    });
+  }
+  out.sort((a, b) => a.nama.localeCompare(b.nama));
+  return out;
+}

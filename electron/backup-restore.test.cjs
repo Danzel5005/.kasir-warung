@@ -30,6 +30,10 @@ function makeFiles(dir) {
     shifts: path.join(dir, "shifts.json"),
     trx: path.join(dir, "transactions.json"),
     logo: path.join(dir, "logo.json"),
+    resep: path.join(dir, "resep.json"),
+    bahanBaku: path.join(dir, "bahan-baku.json"),
+    supplier: path.join(dir, "supplier.json"),
+    loyaltyTiers: path.join(dir, "loyalty-tiers.json"),
     db: path.join(dir, "kasir.db"),
     wal: path.join(dir, "trx.wal"),
     backups: path.join(dir, "backups"),
@@ -89,11 +93,12 @@ afterEach(() => {
 });
 
 describe("backup-restore.cjs: STORES", () => {
-  it("mencakup semua store yang dipersistensikan (10 pasangan key/file)", () => {
-    expect(harness.svc.STORES).toHaveLength(10);
+  it("mencakup semua store yang dipersistensikan termasuk data fitur lanjutan (14 pasangan key/file)", () => {
+    expect(harness.svc.STORES).toHaveLength(14);
     expect(harness.svc.STORES.map(([key]) => key)).toEqual([
       "menu", "categories", "settings", "users", "customers",
       "qris", "bills", "shifts", "transactions", "logo",
+      "resep", "bahanBaku", "supplier", "loyaltyTiers",
     ]);
   });
 });
@@ -292,6 +297,35 @@ describe("backup-restore.cjs: restoreBackup", () => {
     expect(JSON.parse(fs.readFileSync(files.trx, "utf-8")).map((t) => t.id)).toEqual(["t1"]);
     expect(JSON.parse(fs.readFileSync(files.settings, "utf-8")).warungName).toBe("Warung Bu Tini");
     expect(res.restored.menu).toBe(2);
+  });
+
+  it("KUNCI: data fitur lanjutan (resep, bahan baku, supplier, loyalty) ikut backup & restore", async () => {
+    // Seed data fitur lanjutan ke file-file terpisahnya.
+    fs.writeFileSync(files.menu, JSON.stringify([{ id: "m1", nama: "Kopi" }]), "utf-8");
+    fs.writeFileSync(files.resep, JSON.stringify({ m1: [{ bahanId: "b1", qty: 2 }] }), "utf-8");
+    fs.writeFileSync(files.bahanBaku, JSON.stringify([{ id: "b1", nama: "Gula", stok: 10 }]), "utf-8");
+    fs.writeFileSync(files.supplier, JSON.stringify([{ id: "s1", nama: "Toko A" }]), "utf-8");
+    fs.writeFileSync(files.loyaltyTiers, JSON.stringify([{ nama: "Gold", min: 100000 }]), "utf-8");
+
+    const target = path.join(dir, "backup.json");
+    await harness.svc.createBackup(target, { keepInternal: false });
+
+    // Rusak/ kosongkan setelah backup.
+    fs.writeFileSync(files.resep, "{}", "utf-8");
+    fs.writeFileSync(files.bahanBaku, "[]", "utf-8");
+    fs.writeFileSync(files.supplier, "[]", "utf-8");
+    fs.writeFileSync(files.loyaltyTiers, "[]", "utf-8");
+
+    const res = await harness.svc.restoreBackup(target);
+    expect(res.ok).toBe(true);
+    expect(JSON.parse(fs.readFileSync(files.resep, "utf-8"))).toEqual({ m1: [{ bahanId: "b1", qty: 2 }] });
+    expect(JSON.parse(fs.readFileSync(files.bahanBaku, "utf-8"))).toEqual([{ id: "b1", nama: "Gula", stok: 10 }]);
+    expect(JSON.parse(fs.readFileSync(files.supplier, "utf-8"))).toEqual([{ id: "s1", nama: "Toko A" }]);
+    expect(JSON.parse(fs.readFileSync(files.loyaltyTiers, "utf-8"))).toEqual([{ nama: "Gold", min: 100000 }]);
+    expect(res.restored.resep).toBe(1);
+    expect(res.restored.bahanBaku).toBe(1);
+    expect(res.restored.supplier).toBe(1);
+    expect(res.restored.loyaltyTiers).toBe(1);
   });
 
   it("menutup DB, menghapus file sqlite, lalu init+migrate ulang", async () => {

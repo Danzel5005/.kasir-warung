@@ -164,6 +164,47 @@ describe("receipt.js - Receipt utilities and HTML builders", () => {
       expect(html).toContain("KASIR");
       expect(html).toContain("METODE");
     });
+
+    it("should render custom header and footer text when configured", () => {
+      const html = buildReceiptHTML(
+        mockTrxCash, null, [], {}, "Warung Test", [], "", "", [], 80, true,
+        "Cabang Sukamaju", "Terima kasih atas kunjungan Anda"
+      );
+      expect(html).toContain('class="receipt-note"');
+      expect(html).toContain("Cabang Sukamaju");
+      expect(html).toContain("Terima kasih atas kunjungan Anda");
+    });
+
+    it("should not render receipt-note blocks when header/footer are empty", () => {
+      const html = buildReceiptHTML(mockTrxCash, null, [], {}, "Warung Test");
+      expect(html).not.toContain('class="receipt-note"');
+    });
+
+    it("should escape HTML in header/footer text to prevent injection", () => {
+      const html = buildReceiptHTML(
+        mockTrxCash, null, [], {}, "Warung Test", [], "", "", [], 80, true,
+        "<script>alert(1)</script>", "A & B"
+      );
+      expect(html).not.toContain("<script>alert(1)</script>");
+      expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+      expect(html).toContain("A &amp; B");
+    });
+
+    it("should overwrite the hardcoded footer when a custom footer is set", () => {
+      const html = buildReceiptHTML(
+        mockTrxCash, null, [], {}, "Warung Test", [], "", "", [], 80, true,
+        "", "Terima kasih sudah berbelanja"
+      );
+      expect(html).toContain("Terima kasih sudah berbelanja");
+      // The hardcoded default footer must be gone entirely.
+      expect(html).not.toContain("Barang yang sudah dibeli");
+      expect(html).not.toContain("Terimakasih");
+    });
+
+    it("should keep the hardcoded footer when no custom footer is set", () => {
+      const html = buildReceiptHTML(mockTrxCash, null, [], {}, "Warung Test");
+      expect(html).toContain("Barang yang sudah dibeli");
+    });
   });
 
   describe("buildPreviewHTML", () => {
@@ -201,6 +242,14 @@ describe("receipt.js - Receipt utilities and HTML builders", () => {
       const items = [{ nama: "Teh", harga: 58300, qty: 1, kategori: "Minuman" }];
       const html = buildPreviewHTML({}, items, null, [], "Warung Test", [], "", "", 80, {}, 50000, "cash");
       expect(html).toContain("Kurang Bayar Rp. 8.300");
+    });
+
+    it("should render custom header/footer text in preview", () => {
+      const items = [{ nama: "Teh", harga: 5000, qty: 1, kategori: "Minuman" }];
+      const html = buildPreviewHTML({}, items, null, [], "Warung Test", [], "", "", 80, {}, 0, "cash", "Header Preview", "Footer Preview");
+      expect(html).toContain("Header Preview");
+      expect(html).toContain("Footer Preview");
+      expect(html).toContain('class="receipt-note"');
     });
   });
 });

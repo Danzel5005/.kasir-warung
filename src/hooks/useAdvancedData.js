@@ -18,6 +18,23 @@ function normalizeResep(input) {
   return out;
 }
 
+// Normalisasi RINGAN untuk baris resep yang sedang diedit di UI: hanya
+// menyeragamkan tipe (bahanId string, qty angka boleh 0/kosong) TANPA membuang
+// baris. Baris dengan qty kosong tetap dipertahankan supaya user bisa
+// mengosongkan input jumlah bahan dulu sebelum mengisinya sendiri.
+function coerceResepLines(lines) {
+  return (Array.isArray(lines) ? lines : []).map((l) => ({
+    bahanId: String(l?.bahanId || "").trim(),
+    qty: l?.qty === "" || l?.qty === null || l?.qty === undefined ? "" : Number(l.qty),
+  }));
+}
+
+// Versi bersih untuk PERSISTENSI/penyimpanan: baris tak lengkap (tanpa bahan
+// atau qty <= 0) dibuang agar data tersimpan selalu valid.
+function cleanResepLines(lines) {
+  return coerceResepLines(lines).filter((l) => l.bahanId && Number(l.qty) > 0);
+}
+
 // Hook data fitur advanced (resep/HPP, bahan baku, supplier, loyalty tiers).
 // Storage keys terpisah; lihat electron/main.cjs FILES + utilities/utils.js api.
 export function useAdvancedData({ toast_ }) {
@@ -85,8 +102,11 @@ export function useAdvancedData({ toast_ }) {
   const setMenuResep = useCallback((menuId, lines) => {
     const key = String(menuId);
     setResep((prev) => {
-      const next = { ...prev, [key]: normalizeResep({ [key]: lines })[key] || [] };
-      api.saveResep(next);
+      // State UI: pertahankan baris apa adanya (qty boleh kosong).
+      const next = { ...prev, [key]: coerceResepLines(lines) };
+      // Persistensi: simpan hanya baris yang valid (punya bahan & qty > 0),
+      // tanpa mengubah state edit user.
+      api.saveResep({ ...prev, [key]: cleanResepLines(lines) });
       return next;
     });
   }, []);

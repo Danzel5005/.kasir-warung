@@ -44,6 +44,8 @@ function useSettings({ toast_, onChange }) {
     warungName: "",
     warungAddress: "",
     warungPhone: "",
+    receiptHeaderText: "",
+    receiptFooterText: "",
     receiptPaperWidthMm: 80,
     discounts: [],
     pajak: { enabled: false, value: 0 },
@@ -62,6 +64,8 @@ function useSettings({ toast_, onChange }) {
   const [warungNameInput, setWarungNameInput] = useState("");
   const [warungAddressInput, setWarungAddressInput] = useState("");
   const [warungPhoneInput, setWarungPhoneInput] = useState("");
+  const [receiptHeaderInput, setReceiptHeaderInput] = useState("");
+  const [receiptFooterInput, setReceiptFooterInput] = useState("");
   const logoRef = useRef();
 
   // deps kosong aman: hanya setter, tidak baca state apapun.
@@ -88,6 +92,11 @@ function useSettings({ toast_, onChange }) {
     // Ensure new fields exist
     if (!s.warungAddress) s.warungAddress = "";
     if (!s.warungPhone) s.warungPhone = "";
+    // Custom header/footer notes on the receipt (below the logo / at the
+    // bottom). Always strings — empty means "not configured" and the receipt
+    // renders exactly as before.
+    if (typeof s.receiptHeaderText !== "string") s.receiptHeaderText = "";
+    if (typeof s.receiptFooterText !== "string") s.receiptFooterText = "";
     // Customer/member feature — enabled by default, must be a boolean
     if (typeof s.customerEnabled !== "boolean") s.customerEnabled = true;
     // Fitur Tingkat Lanjut — selalu objek yang sudah dinormalisasi (semua
@@ -100,6 +109,9 @@ function useSettings({ toast_, onChange }) {
     const pw = Math.round(Number(s.receiptPaperWidthMm));
     if (!Number.isFinite(pw) || pw < 30 || pw > 210) s.receiptPaperWidthMm = 80;
     else s.receiptPaperWidthMm = pw;
+    // Seed the editable header/footer inputs from the saved values.
+    setReceiptHeaderInput(s.receiptHeaderText || "");
+    setReceiptFooterInput(s.receiptFooterText || "");
     setSettings(s);
     onChange?.(s);
   }, [onChange]);
@@ -129,6 +141,8 @@ function useSettings({ toast_, onChange }) {
     warungNameInput, setWarungNameInput,
     warungAddressInput, setWarungAddressInput,
     warungPhoneInput, setWarungPhoneInput,
+    receiptHeaderInput, setReceiptHeaderInput,
+    receiptFooterInput, setReceiptFooterInput,
     loadInitial,
     ...createLogoHandlers(deps),
     ...createPrinterHandlers(deps),

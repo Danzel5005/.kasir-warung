@@ -4,6 +4,10 @@ import { isAdvancedFeatureOn } from "../constants/advancedFeatures.js";
 import { DEFAULT_LOYALTY_TIERS } from "../utilities/loyalty.js";
 import { useExcelImport } from "../hooks/useExcelImport.js";
 import { ROW_NEW, ROW_CONFLICT, ROW_ERROR } from "../utilities/excelImport.js";
+import BahanDetailModal from "./modals/BahanDetailModal.jsx";
+import BahanListModal from "./modals/BahanListModal.jsx";
+import MenuListModal from "./modals/MenuListModal.jsx";
+import SupplierListModal from "./modals/SupplierListModal.jsx";
 
 // AdvancedDataPanel -- panel pengelolaan fitur lanjutan (Bahan Baku, Supplier,
 // Loyalty Tier, Resep/HPP). Setiap sub-panel muncul HANYA bila flag terkait
@@ -82,11 +86,28 @@ function money(n) {
   return "Rp " + v.toLocaleString("id-ID");
 }
 
+// Batas jumlah bahan yang tampil di daftar ringkas Bahan Baku. Bila daftar
+// (hasil filter) lebih banyak dari ini, sisanya disembunyikan dan muncul
+// tombol "Lihat semua bahan" yang membuka modal daftar lengkap.
+const BAHAN_COLLAPSE_LIMIT = 5;
+
+// Batas jumlah supplier yang tampil di daftar ringkas Supplier. Sisa supplier
+// dibuka di SupplierListModal (pola sama dengan Bahan Baku).
+const SUPPLIER_COLLAPSE_LIMIT = 5;
+
+// Batas jumlah menu yang tampil pada dropdown search bar Resep & HPP. Bila
+// daftar menu lebih banyak, sisa menu dibuka lewat tombol "Lihat semua menu"
+// (MenuListModal) — bukan lagi daftar "menu terbaru".
+const RESEP_MENU_LIMIT = 10;
+
 // ---------------------------------------------------------------------------
 // Bahan Baku
 // ---------------------------------------------------------------------------
-function BahanBakuPanel({ advancedData, toast_, suppliers }) {
+function BahanBakuPanel({ advancedData, toast_, suppliers, menu }) {
   const [form, setForm] = useState({ id: "", nama: "", satuan: "", stok: "", minStok: "", hargaSatuan: "", supplierId: "" });
+  const [detail, setDetail] = useState(null);
+  const [search, setSearch] = useState("");
+  const [showAll, setShowAll] = useState(false);
   const editing = !!form.id;
 
   const reset = () =>
@@ -118,11 +139,31 @@ function BahanBakuPanel({ advancedData, toast_, suppliers }) {
     toast_?.(`Bahan "${b.nama}" dihapus`, "ok");
   };
 
-  const list = advancedData.bahanBaku;
+  const list = advancedData.bahanBaku || [];
+
+  // Filter nama bahan (case-insensitive). Daftar ringkas dibatasi
+  // BAHAN_COLLAPSE_LIMIT; label "Lihat semua" menyesuaikan hasil filter.
+  const q = search.trim().toLowerCase();
+  const filtered = useMemo(
+    () => (q ? list.filter((b) => String(b.nama || "").toLowerCase().includes(q)) : list),
+    [list, q]
+  );
+  // Panel selalu menampilkan maksimal BAHAN_COLLAPSE_LIMIT (5) bahan. Sisa
+  // bahan tidak dilipat di panel, melainkan dibuka di BahanListModal.
+  const visible = filtered.slice(0, BAHAN_COLLAPSE_LIMIT);
+  const hiddenCount = filtered.length - visible.length;
+  const collapseLabel = q ? "Lihat semua hasil" : "Lihat semua bahan";
 
   return (
     <div style={card}>
-      <div style={sectionTitle}>Bahan Baku ({list.length})</div>
+      <div style={{ ...sectionTitle, display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+        <span>Bahan Baku ({list.length})</span>
+        {q && (
+          <span style={{ fontSize: TYPOGRAPHY.label.fontSize, fontWeight: 600, color: MT, textTransform: "none", letterSpacing: 0 }}>
+            {filtered.length} hasil
+          </span>
+        )}
+      </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
         <div>
@@ -161,10 +202,35 @@ function BahanBakuPanel({ advancedData, toast_, suppliers }) {
         {editing && <button style={btnGhost} onClick={reset}>Batal</button>}
       </div>
 
-      {list.map((b) => {
+      {list.length > 0 && (
+        <div style={{ marginBottom: 6 }}>
+          <input
+            id="bahan-search"
+            name="bahanSearch"
+            style={input}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cari nama bahan baku..."
+            aria-label="Cari bahan baku"
+          />
+        </div>
+      )}
+
+      {q && filtered.length === 0 && (
+        <div style={{ fontSize: TYPOGRAPHY.label.fontSize, color: MT, padding: "4px 0" }}>
+          Tidak ada bahan cocok dengan "{search.trim()}".
+        </div>
+      )}
+
+      {visible.map((b) => {
         const low = Number(b.stok) <= Number(b.minStok);
         return (
-          <div key={b.id} style={{ ...row, borderTop: `1px solid ${BD}`, padding: "6px 0", alignItems: "center" }}>
+          <div
+            key={b.id}
+            style={{ ...row, borderTop: `1px solid ${BD}`, padding: "6px 0", alignItems: "center", cursor: "pointer" }}
+            onClick={() => setDetail(b)}
+            title="Klik untuk lihat detail bahan"
+          >
             <div>
               <div style={{ fontSize: TYPOGRAPHY.small.fontSize, fontWeight: 700 }}>
                 {b.nama} <span style={{ color: MT, fontWeight: 400 }}>({b.satuan || "-"})</span>
@@ -174,13 +240,41 @@ function BahanBakuPanel({ advancedData, toast_, suppliers }) {
                 {low ? "  \u26A0 restock" : ""}
               </div>
             </div>
-            <div style={{ display: "flex", gap: 5 }}>
+            <div style={{ display: "flex", gap: 5 }} onClick={(e) => e.stopPropagation()}>
               <button style={btnGhost} onClick={() => editRow(b)}>Edit</button>
               <button style={btnDanger} onClick={() => remove(b)}>Hapus</button>
             </div>
           </div>
         );
       })}
+
+      {hiddenCount > 0 && (
+        <div style={{ marginTop: 8 }}>
+          <button style={btnGhost} onClick={() => setShowAll(true)}>
+            {collapseLabel} ({hiddenCount} lainnya)
+          </button>
+        </div>
+      )}
+
+      {showAll && (
+        <BahanListModal
+          list={filtered}
+          search={search}
+          onSearch={setSearch}
+          onPick={(b) => setDetail(b)}
+          onClose={() => setShowAll(false)}
+        />
+      )}
+
+      {detail && (
+        <BahanDetailModal
+          bahan={detail}
+          resep={advancedData.resep}
+          menu={menu}
+          suppliers={suppliers}
+          onClose={() => setDetail(null)}
+        />
+      )}
     </div>
   );
 }
@@ -191,6 +285,8 @@ function BahanBakuPanel({ advancedData, toast_, suppliers }) {
 function SupplierPanel({ advancedData, toast_ }) {
   const empty = { id: "", nama: "", kontak: "", telepon: "", alamat: "", catatan: "" };
   const [form, setForm] = useState(empty);
+  const [search, setSearch] = useState("");
+  const [showAll, setShowAll] = useState(false);
   const editing = !!form.id;
   const reset = () => setForm(empty);
 
@@ -209,11 +305,29 @@ function SupplierPanel({ advancedData, toast_ }) {
     toast_?.(`Supplier "${s.nama}" dihapus`, "ok");
   };
 
-  const list = advancedData.supplier;
+  const list = advancedData.supplier || [];
+
+  // Filter nama supplier (case-insensitive). Panel selalu menampilkan maks
+  // SUPPLIER_COLLAPSE_LIMIT; sisa supplier dibuka di SupplierListModal.
+  const q = search.trim().toLowerCase();
+  const filtered = useMemo(
+    () => (q ? list.filter((s) => String(s.nama || "").toLowerCase().includes(q)) : list),
+    [list, q]
+  );
+  const visible = filtered.slice(0, SUPPLIER_COLLAPSE_LIMIT);
+  const hiddenCount = filtered.length - visible.length;
+  const collapseLabel = q ? "Lihat semua hasil" : "Lihat semua supplier";
 
   return (
     <div style={card}>
-      <div style={sectionTitle}>Supplier ({list.length})</div>
+      <div style={{ ...sectionTitle, display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+        <span>Supplier ({list.length})</span>
+        {q && (
+          <span style={{ fontSize: TYPOGRAPHY.label.fontSize, fontWeight: 600, color: MT, textTransform: "none", letterSpacing: 0 }}>
+            {filtered.length} hasil
+          </span>
+        )}
+      </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
         <div>
@@ -239,7 +353,27 @@ function SupplierPanel({ advancedData, toast_ }) {
         {editing && <button style={btnGhost} onClick={reset}>Batal</button>}
       </div>
 
-      {list.map((s) => (
+      {list.length > 0 && (
+        <div style={{ marginBottom: 6 }}>
+          <input
+            id="supplier-search"
+            name="supplierSearch"
+            style={input}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cari nama supplier..."
+            aria-label="Cari supplier"
+          />
+        </div>
+      )}
+
+      {q && filtered.length === 0 && (
+        <div style={{ fontSize: TYPOGRAPHY.label.fontSize, color: MT, padding: "4px 0" }}>
+          Tidak ada supplier cocok dengan "{search.trim()}".
+        </div>
+      )}
+
+      {visible.map((s) => (
         <div key={s.id} style={{ ...row, borderTop: `1px solid ${BD}`, padding: "6px 0", alignItems: "center" }}>
           <div>
             <div style={{ fontSize: TYPOGRAPHY.small.fontSize, fontWeight: 700 }}>{s.nama}</div>
@@ -253,6 +387,23 @@ function SupplierPanel({ advancedData, toast_ }) {
           </div>
         </div>
       ))}
+
+      {hiddenCount > 0 && (
+        <div style={{ marginTop: 8 }}>
+          <button style={btnGhost} onClick={() => setShowAll(true)}>
+            {collapseLabel} ({hiddenCount} lainnya)
+          </button>
+        </div>
+      )}
+
+      {showAll && (
+        <SupplierListModal
+          list={filtered}
+          search={search}
+          onSearch={setSearch}
+          onClose={() => setShowAll(false)}
+        />
+      )}
     </div>
   );
 }
@@ -321,14 +472,130 @@ function LoyaltyPanel({ advancedData, toast_ }) {
 // ---------------------------------------------------------------------------
 // Resep / HPP per menu
 // ---------------------------------------------------------------------------
+
+// Dropdown bahan baku dengan search bar. Dipakai pada tiap baris resep supaya
+// user bisa mencari nama bahan (bukan scroll <select> panjang). Menampilkan
+// label terpilih saat fokus, dan daftar saran yang disaring saat mengetik.
+function BahanSearchSelect({ value, bahanList, onChange, id, name }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+
+  const selected = (bahanList || []).find((b) => b.id === value) || null;
+  const display = open ? text : selected ? `${selected.nama} (${selected.satuan || "-"})` : "";
+
+  const filtered = useMemo(() => {
+    const q = text.trim().toLowerCase();
+    if (!q) return bahanList || [];
+    return (bahanList || []).filter((b) => String(b.nama || "").toLowerCase().includes(q));
+  }, [bahanList, text]);
+
+  const choose = (b) => {
+    onChange(b.id);
+    setText("");
+    setOpen(false);
+  };
+
+  return (
+    <div style={{ position: "relative" }}>
+      <input
+        id={id}
+        name={name}
+        style={input}
+        value={display}
+        autoComplete="off"
+        placeholder="Cari nama bahan..."
+        onFocus={() => {
+          setOpen(true);
+          setText("");
+        }}
+        onBlur={() => setTimeout(() => setOpen(false), 120)}
+        onChange={(e) => {
+          setText(e.target.value);
+          setOpen(true);
+        }}
+      />
+      {open && (
+        <div
+          style={{
+            position: "absolute",
+            top: "100%",
+            left: 0,
+            right: 0,
+            zIndex: 30,
+            background: W,
+            border: `1px solid ${BD}`,
+            borderRadius: RADIUS.sm,
+            marginTop: 2,
+            maxHeight: 200,
+            overflowY: "auto",
+            boxShadow: "0 6px 16px rgba(0,0,0,0.12)",
+          }}
+        >
+          {filtered.map((b) => (
+            <div
+              key={b.id}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                choose(b);
+              }}
+              style={{
+                padding: "6px 10px",
+                cursor: "pointer",
+                fontSize: TYPOGRAPHY.small.fontSize,
+                borderBottom: `1px solid ${LT}`,
+                background: b.id === value ? LT : W,
+              }}
+            >
+              {b.nama} <span style={{ color: MT }}>({b.satuan || "-"})</span>
+              {b.id === value ? " \u2713" : ""}
+            </div>
+          ))}
+          {filtered.length === 0 && (
+            <div style={{ padding: "6px 10px", fontSize: TYPOGRAPHY.label.fontSize, color: MT }}>
+              Tidak ada bahan cocok.
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ResepPanel({ advancedData, menu, toast_ }) {
   const [activeMenu, setActiveMenu] = useState("");
+  const [query, setQuery] = useState("");
+  const [showSuggest, setShowSuggest] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const bahanList = advancedData.bahanBaku;
 
   const lines = activeMenu ? advancedData.resep[activeMenu] || [] : [];
   const hpp = activeMenu ? advancedData.hppByMenu[activeMenu] || null : null;
   const menuObj = useMemo(() => (menu || []).find((m) => m.id === activeMenu), [menu, activeMenu]);
   const margin = menuObj ? advancedData.marginFor(activeMenu, menuObj.harga) : null;
+
+  // Filter menu berdasarkan kata kunci (nama menu). Dipakai untuk search bar
+  // di atas daftar menu supaya pencarian resep lebih cepat saat menu banyak.
+  const filteredMenu = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return menu || [];
+    return (menu || []).filter((m) => String(m.nama || "").toLowerCase().includes(q));
+  }, [menu, query]);
+
+  const hasQuery = query.trim().length > 0;
+
+  // Dropdown menampilkan maks RESEP_MENU_LIMIT (10) menu pertama, baik saat
+  // ada ketikan (hasil filter) maupun kosong (10 menu pertama dari daftar).
+  const visibleSuggest = showSuggest ? filteredMenu.slice(0, RESEP_MENU_LIMIT) : [];
+  const hiddenMenuCount = showAll ? 0 : Math.max(0, filteredMenu.length - RESEP_MENU_LIMIT);
+
+  const pickMenu = (id) => {
+    setActiveMenu(id);
+    setShowSuggest(false);
+    const m = (menu || []).find((x) => x.id === id);
+    if (m) {
+      setQuery(m.nama);
+    }
+  };
 
   const setLines = async (next) => {
     advancedData.setMenuResep(activeMenu, next);
@@ -352,6 +619,36 @@ function ResepPanel({ advancedData, menu, toast_ }) {
     await setLines(lines.filter((_, i) => i !== idx));
   };
 
+  // Simpan resep menu aktif lalu kosongkan form supaya user bisa langsung
+  // menyusun resep untuk item menu berikutnya. Simpan DILARANG bila ada baris
+  // yang belum lengkap: bahan belum dipilih atau qty kosong/0.
+  const saveMenu = async () => {
+    if (!activeMenu) return;
+    if (lines.length === 0) {
+      toast_?.("Resep masih kosong", "err");
+      return;
+    }
+    // Cari baris bermasalah (qty 0/kosong, atau bahan belum dipilih).
+    const badIdx = lines.findIndex((l) => !l.bahanId || !(Number(l.qty) > 0));
+    if (badIdx !== -1) {
+      const bad = lines[badIdx];
+      const namaBahan = (bahanList.find((b) => b.id === bad.bahanId) || {}).nama;
+      toast_?.(
+        namaBahan
+          ? `Jumlah bahan "${namaBahan}" harus lebih dari 0`
+          : `Baris ${badIdx + 1}: pilih bahan dan isi jumlah lebih dari 0`,
+        "err"
+      );
+      return;
+    }
+    advancedData.setMenuResep(activeMenu, lines);
+    toast_?.(`Resep "${menuObj?.nama || ""}" disimpan`, "ok");
+    // Kosongkan form untuk resep menu berikutnya.
+    setActiveMenu("");
+    setQuery("");
+    setShowSuggest(false);
+  };
+
   return (
     <div style={card}>
       <div style={sectionTitle}>Resep &amp; HPP</div>
@@ -360,12 +657,122 @@ function ResepPanel({ advancedData, menu, toast_ }) {
       </div>
 
       <div style={{ ...label }}>Pilih menu</div>
-      <select id="resep-active-menu" name="resepActiveMenu" style={{ ...input, marginBottom: 8 }} value={activeMenu} onChange={(e) => setActiveMenu(e.target.value)}>
-        <option value="">-- pilih menu --</option>
-        {(menu || []).map((m) => (
-          <option key={m.id} value={m.id}>{m.nama}</option>
-        ))}
-      </select>
+      <div style={{ position: "relative", marginBottom: 8 }}>
+        <input
+          id="resep-menu-search"
+          name="resepMenuSearch"
+          style={input}
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setShowSuggest(true);
+          }}
+          onFocus={() => setShowSuggest(true)}
+          onBlur={() => setTimeout(() => setShowSuggest(false), 120)}
+          placeholder="Cari nama menu..."
+          aria-label="Cari nama menu"
+          aria-autocomplete="list"
+        />
+        {visibleSuggest.length > 0 && (
+          <div
+            style={{
+              position: "absolute",
+              top: "100%",
+              left: 0,
+              right: 0,
+              zIndex: 20,
+              background: W,
+              border: `1px solid ${BD}`,
+              borderRadius: RADIUS.sm,
+              marginTop: 2,
+              maxHeight: 200,
+              overflowY: "auto",
+              boxShadow: "0 6px 16px rgba(0,0,0,0.12)",
+            }}
+          >
+            {visibleSuggest.map((m) => (
+              <div
+                key={m.id}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  pickMenu(m.id);
+                }}
+                style={{
+                  padding: "6px 10px",
+                  cursor: "pointer",
+                  fontSize: TYPOGRAPHY.small.fontSize,
+                  borderBottom: `1px solid ${LT}`,
+                }}
+                title="Klik untuk menyusun resep menu ini"
+              >
+                {m.nama}
+                {menuObj && m.id === activeMenu ? " \u2713" : ""}
+              </div>
+            ))}
+            {hiddenMenuCount > 0 && (
+              <div
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setShowAll(true);
+                  setShowSuggest(false);
+                }}
+                style={{
+                  padding: "6px 10px",
+                  cursor: "pointer",
+                  fontSize: TYPOGRAPHY.label.fontSize,
+                  fontWeight: 700,
+                  color: COLOR_PALETTE.info,
+                  background: COLOR_PALETTE.infoLight,
+                }}
+                title="Lihat semua menu"
+              >
+                Lihat semua menu ({hiddenMenuCount} lainnya)
+              </div>
+            )}
+          </div>
+        )}
+        {showSuggest && visibleSuggest.length === 0 && (
+          <div
+            style={{
+              position: "absolute",
+              top: "100%",
+              left: 0,
+              right: 0,
+              zIndex: 20,
+              background: W,
+              border: `1px solid ${BD}`,
+              borderRadius: RADIUS.sm,
+              marginTop: 2,
+              padding: "6px 10px",
+              fontSize: TYPOGRAPHY.label.fontSize,
+              color: MT,
+            }}
+          >
+            {hasQuery ? "Tidak ada menu cocok." : "Ketik untuk mencari menu."}
+          </div>
+        )}
+      </div>
+
+      {!showAll && hiddenMenuCount > 0 && (
+        <div style={{ marginBottom: 8 }}>
+          <button style={btnGhost} onClick={() => setShowAll(true)}>
+            Lihat semua menu ({hiddenMenuCount} lainnya)
+          </button>
+        </div>
+      )}
+
+      {showAll && (
+        <MenuListModal
+          list={filteredMenu}
+          search={query}
+          onSearch={(v) => setQuery(v)}
+          onPick={(m) => {
+            pickMenu(m.id);
+            setShowAll(false);
+          }}
+          onClose={() => setShowAll(false)}
+        />
+      )}
 
       {!activeMenu && (
         <div style={{ fontSize: TYPOGRAPHY.label.fontSize, color: MT }}>
@@ -376,12 +783,29 @@ function ResepPanel({ advancedData, menu, toast_ }) {
       {activeMenu && (
         <>
           {lines.map((l, i) => (
-            <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 1fr auto", gap: 8, marginBottom: 6 }}>
-              <select id={`resep-bahan-${i}`} name={`resepBahan_${i}`} style={input} value={l.bahanId} onChange={(e) => updateLine(i, "bahanId", e.target.value)}>
-                {bahanList.map((b) => (
-                  <option key={b.id} value={b.id}>{b.nama} ({b.satuan || "-"})</option>
-                ))}
-              </select>
+            <div
+              key={i}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "2fr 1fr auto",
+                gap: 8,
+                marginBottom: 6,
+                padding: 4,
+                borderRadius: RADIUS.sm,
+                border: !(Number(l.qty) > 0)
+                  ? `1px solid ${COLOR_PALETTE.danger}`
+                  : "1px solid transparent",
+                background: !(Number(l.qty) > 0) ? COLOR_PALETTE.dangerLight : "transparent",
+              }}
+              title={!(Number(l.qty) > 0) ? "Isi jumlah bahan lebih dari 0" : ""}
+            >
+              <BahanSearchSelect
+                id={`resep-bahan-${i}`}
+                name={`resepBahan_${i}`}
+                value={l.bahanId}
+                bahanList={bahanList}
+                onChange={(id) => updateLine(i, "bahanId", id)}
+              />
               <input
                 id={`resep-qty-${i}`}
                 name={`resepQty_${i}`}
@@ -398,12 +822,16 @@ function ResepPanel({ advancedData, menu, toast_ }) {
 
           <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
             <button style={btnGhost} onClick={addLine}>+ Baris Bahan</button>
+            <button style={btnPrimary} onClick={saveMenu}>Simpan</button>
             {lines.length > 0 && (
               <button
                 style={btnDanger}
                 onClick={async () => {
                   advancedData.clearMenuResep(activeMenu);
                   toast_?.("Resep dikosongkan", "ok");
+                  setActiveMenu("");
+                  setQuery("");
+                  setShowSuggest(false);
                 }}
               >
                 Kosongkan Resep
@@ -639,7 +1067,7 @@ function AdvancedDataPanel({ settings, advancedData, menu, cats, toast_, onImpor
       <ImportExcelPanel menu={menu} cats={cats} advancedData={advancedData} toast_={toast_} onImported={onImported} />
       {showResep && <ResepPanel advancedData={advancedData} menu={menu} toast_={toast_} />}
       {showBahan && (
-        <BahanBakuPanel advancedData={advancedData} toast_={toast_} suppliers={advancedData.supplier} />
+        <BahanBakuPanel advancedData={advancedData} toast_={toast_} suppliers={advancedData.supplier} menu={menu} />
       )}
       {showSupplier && <SupplierPanel advancedData={advancedData} toast_={toast_} />}
       {showLoyalty && <LoyaltyPanel advancedData={advancedData} toast_={toast_} />}

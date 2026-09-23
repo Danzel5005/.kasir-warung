@@ -57,5 +57,29 @@ export function createWarungHandlers({ settings, setSettings, toast_, onChange }
     );
   }, [settings, toast_, onChange]);
 
-  return { setWarungName, setWarungAddress, setWarungPhone, setCustomerEnabled, setLoyaltyTierBasis };
+  // Custom header note on the receipt — rendered centered beneath the logo
+  // and store name. Multi-line text is supported (newlines preserved).
+  const setReceiptHeaderText = useCallback(async (text) => {
+    const next = typeof text === "string" ? text : "";
+    const s = { ...settings, receiptHeaderText: next };
+    await api.saveSettings(s);
+    setSettings(s);
+    onChange?.(s);
+    toast_(next.trim() ? "Header resi disimpan" : "Header resi dikosongkan", "ok");
+  }, [settings, toast_, onChange]);
+
+  // Custom footer note on the receipt — rendered at the very bottom.
+  const setReceiptFooterText = useCallback(async (text) => {
+    const next = typeof text === "string" ? text : "";
+    const s = { ...settings, receiptFooterText: next };
+    await api.saveSettings(s);
+    setSettings(s);
+    onChange?.(s);
+    toast_(next.trim() ? "Footer resi disimpan" : "Footer resi dikosongkan", "ok");
+  }, [settings, toast_, onChange]);
+
+  return {
+    setWarungName, setWarungAddress, setWarungPhone, setCustomerEnabled, setLoyaltyTierBasis,
+    setReceiptHeaderText, setReceiptFooterText,
+  };
 }

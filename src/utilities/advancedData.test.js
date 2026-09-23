@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { hppFromResep, hppForMenus, marginFromResep, bahanDeltasFromItems } from "./resepHpp.js";
+import { hppFromResep, hppForMenus, marginFromResep, bahanDeltasFromItems, bahanBakuUsage } from "./resepHpp.js";
 import { calcPrice } from "./calculations.js";
 import {
   DEFAULT_BAHAN_BAKU,
@@ -140,6 +140,38 @@ describe("resepHpp.js", () => {
     it("guards null/invalid inputs", () => {
       expect(bahanDeltasFromItems(null, resepMap)).toEqual({});
       expect(bahanDeltasFromItems([{ id: "m1", qty: 1 }], null)).toEqual({});
+    });
+  });
+
+  describe("bahanBakuUsage", () => {
+    const resepMap = {
+      m1: [{ bahanId: "b1", qty: 20 }, { bahanId: "b2", qty: 10 }],
+      m2: [{ bahanId: "b2", qty: 5 }],
+      m3: [{ bahanId: "b2", qty: 2 }, { bahanId: "b2", qty: 3 }],
+    };
+    const menu = [{ id: "m1", nama: "Kopi Susu" }, { id: "m2", nama: "Americano" }, { id: "m3", nama: "Latte" }];
+
+    it("lists menus that use the bahan with per-portion qty", () => {
+      const u = bahanBakuUsage("b2", resepMap, menu);
+      expect(u).toEqual([
+        { menuId: "m2", nama: "Americano", qty: 5 },
+        { menuId: "m1", nama: "Kopi Susu", qty: 10 },
+        { menuId: "m3", nama: "Latte", qty: 5 },
+      ]);
+    });
+
+    it("returns empty when bahan is unused", () => {
+      expect(bahanBakuUsage("nope", resepMap, menu)).toEqual([]);
+    });
+
+    it("falls back to placeholder name for unknown menu", () => {
+      const u = bahanBakuUsage("b1", { mx: [{ bahanId: "b1", qty: 3 }] }, menu);
+      expect(u).toEqual([{ menuId: "mx", nama: "Menu mx", qty: 3 }]);
+    });
+
+    it("guards empty bahanId / invalid inputs", () => {
+      expect(bahanBakuUsage("", resepMap, menu)).toEqual([]);
+      expect(bahanBakuUsage("b1", null, null)).toEqual([]);
     });
   });
 });
