@@ -2,11 +2,9 @@
 
 All notable changes to this project are documented in this file.
 
-## v1.2.1.1
+## v1.2.1-D
 
-Rilis perbaikan dan penyempurnaan setelah v1.2.0. Berfokus pada stabilitas
-fitur lanjutan, pengalaman pengguna (search bar, dropdown, modal), diskon
-loyalty tier, kustomisasi resi, serta perbaikan import Excel dan backup.
+Rilis perbaikan kedua dan penyempurnaan setelah v1.2.0. Berfokus pada stabilitas fitur lanjutan, pengalaman pengguna (search bar, dropdown, modal), diskon loyalty tier, kustomisasi resi, serta perbaikan import Excel dan backup.
 
 ### Ringkasan
 
@@ -238,11 +236,12 @@ Test yang disesuaikan: `electron/db.test.cjs`, `electron/backup-restore.test.cjs
 
 ### Catatan Versi
 
-Versi `1.2.1.1` diselaraskan di seluruh berkas berikut:
+Versi aplikasi disetel ke `1.2.1` di seluruh berkas berikut:
 
 - `package.json` (`version`)
 - `package-lock.json` (`version` dan `packages[""].version`)
 - `updates/latest.json` (`version` dan `notes`)
 - `README.md` (versi aplikasi saat ini)
 
-Dokumen ini mencakup seluruh perubahan sejak `v1.2.0`.
+Rilis ini ditandai sebagai **v1.2.1-Beta**. Dokumen ini mencakup seluruh
+perubahan sejak `v1.2.0`.
