@@ -549,7 +549,7 @@ Hotkey hanya diproses ketika fokus tidak berada di input, textarea, atau select:
 - Renderer mengakses kemampuan native melalui preload bridge, bukan melalui akses Node.js langsung.
 - Panggilan IPC yang dilewatkan utilitas backup dibungkus `safeIpc` sehingga kegagalan handler dilaporkan sebagai hasil terstruktur, bukan promise yang tidak tertangani.
 - `ErrorBoundary` menangkap error render pada level React dan menampilkan layar pemulihan, bukan window kosong.
-- Jangan mengirim `electron/license-secret.cjs`, license key, file `.ykk_lic`, database produksi, atau data pelanggan ke repository publik.
+- Harusnya jangan mengirim `electron/license-secret.cjs`, license key, file `.ykk_lic`, database produksi, atau data pelanggan ke repository publik, tapi yaudahlah, pake lah.
 - Backup harus dilakukan sebelum upgrade, migrasi, pemindahan komputer, atau tindakan pemulihan.
 - `package.json` dan source code adalah sumber kebenaran untuk script, versi, dependensi, dan konfigurasi packaging.
 
