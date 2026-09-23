@@ -2,7 +2,7 @@
 
 Aplikasi Point of Sale (POS) desktop untuk warung dan usaha makanan/minuman. Aplikasi berjalan sebagai aplikasi Windows berbasis Electron dengan antarmuka React, menyimpan data transaksi secara lokal, dan mendukung pencetakan struk thermal maupun PDF.
 
-Dokumen ini mengikuti struktur dan perilaku kode yang ada di repository. Versi aplikasi saat ini adalah `1.2.1` untuk Windows 10 ke atas.
+Dokumen ini mengikuti struktur dan perilaku kode yang ada di repository. Versi aplikasi saat ini adalah `1.2.1.1` untuk Windows 10 ke atas.
 
 Selain fungsi kasir inti, aplikasi menyediakan sekumpulan fitur lanjutan yang dikelompokkan menjadi tiga grup — laporan tambahan, fitur pelanggan tambahan, serta bahan baku, supplier, dan harga — dan dapat dinyalakan secara terpisah dari Settings pada tab Fitur Lanjutan.
 
