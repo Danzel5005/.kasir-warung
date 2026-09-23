@@ -2,7 +2,9 @@
 
 Aplikasi Point of Sale (POS) desktop untuk warung dan usaha makanan/minuman. Aplikasi berjalan sebagai aplikasi Windows berbasis Electron dengan antarmuka React, menyimpan data transaksi secara lokal, dan mendukung pencetakan struk thermal maupun PDF.
 
-Dokumen ini mengikuti struktur dan perilaku kode yang ada di repository. Versi aplikasi saat ini adalah `1.1.0` untuk Windows 10 keatas.
+Dokumen ini mengikuti struktur dan perilaku kode yang ada di repository. Versi aplikasi saat ini adalah `1.2.1` untuk Windows 10 ke atas.
+
+Selain fungsi kasir inti, aplikasi menyediakan sekumpulan fitur lanjutan yang dikelompokkan menjadi tiga grup — laporan tambahan, fitur pelanggan tambahan, serta bahan baku, supplier, dan harga — dan dapat dinyalakan secara terpisah dari Settings pada tab Fitur Lanjutan.
 
 ## Ruang Lingkup Fitur
 
@@ -14,6 +16,7 @@ Dokumen ini mengikuti struktur dan perilaku kode yang ada di repository. Versi a
 - Dukungan barcode melalui keyboard wedge. Pada Windows, aplikasi juga mencoba membaca scanner USB HID secara langsung melalui `node-hid`.
 - Harga menu, harga modal, stok terbatas atau stok tanpa batas.
 - Diskon bertingkat berdasarkan kuantitas item.
+- Diskon loyalty tier yang dapat ditumpuk dengan diskon bertingkat ketika fitur pelanggan tambahan aktif.
 - Pajak dan service yang dapat diaktifkan serta dikonfigurasi dari Settings.
 - Field tambahan checkout dan struk yang dapat dibuat, diubah, diwajibkan, disembunyikan, atau dihapus.
 - Data pelanggan atau member yang dipilih dari pemilih pelanggan, lalu disimpan pada transaksi dan ditampilkan di struk.
@@ -62,6 +65,60 @@ Pilihan tambahan tidak mengubah harga dan item dengan pilihan berbeda menjadi ba
 - Ringkasan pendapatan berdasarkan metode pembayaran mengikuti metode bayar yang dikonfigurasi di Settings.
 - Ekspor laporan ke CSV melalui dialog penyimpanan Windows.
 
+### Laporan lanjutan
+
+Fitur laporan lanjutan aktif ketika grup "Laporan Tambahan" dinyalakan dari tab Fitur Lanjutan di Settings.
+
+- Insight penjualan: jam tersibuk, hari tersibuk, tren penjualan per periode, serta perbandingan performa antar periode.
+- Cash flow: analitik arus kas yang menggabungkan pendapatan transaksi dan pengeluaran shift, dikelompokkan per hari beserta grafik arus kas.
+- Ekspor laporan ke PDF melalui dialog penyimpanan Windows, dihasilkan dari HTML laporan yang dirender oleh aplikasi.
+- Seluruh perhitungan laporan lanjutan menggunakan kode murni di `src/utilities/insights.js` dan `src/utilities/cashflow.js`, dengan transaksi void dikeluarkan dari total.
+
+### Loyalty tier dan diskon pelanggan
+
+Fitur loyalty aktif ketika grup "Fitur Pelanggan Tambahan" dinyalakan dari tab Fitur Lanjutan di Settings.
+
+- Tingkat loyalty (tier) didefinisikan sebagai daftar tingkatan dengan ambang total belanja dan persentase diskon.
+- Tier pelanggan ditentukan otomatis dari total belanja pelanggan tersebut dan diskon tier otomatis diterapkan pada keranjang.
+- Dasar perhitungan tier dapat dipilih dari Settings pada tab Harga:
+	- `Transaksi` (default): tier dihitung dari subtotal transaksi yang sedang berjalan.
+	- `Lifetime`: tier dihitung dari akumulasi seluruh belanja pelanggan, diambil dari agregasi `customer-totals` pada database.
+- Badge tier pelanggan ditampilkan pada keranjang dan pada layar kasir.
+- Tingkatan tier dapat diatur dan diubah dari panel loyalty, dengan normalisasi nilai agar data tier yang tersimpan tetap valid.
+
+### Bahan baku, supplier, dan resep (HPP)
+
+Fitur ini aktif ketika grup "Pengaturan Bahan Baku, Supplier, dan Harga tambahan" dinyalakan dari tab Fitur Lanjutan di Settings.
+
+- Bahan baku: daftar bahan dengan satuan, harga beli, dan stok, beserta operasi tambah, ubah, dan hapus.
+- Supplier: daftar pemasok dengan kontak dan catatan, beserta operasi tambah, ubah, dan hapus.
+- Resep dan HPP: setiap menu dapat memiliki resep berisi bahan baku beserta jumlah pemakaian. Harga modal (HPP) menu dihitung dari resep, sehingga biaya modal tidak lagi diisi manual.
+- Pemakaian bahan baku dari resep ikut dipotong ketika transaksi berhasil dibayar.
+- Opsi `canViewCost` mengatur apakah harga modal dan laba ditampilkan pada antarmuka.
+
+### Halaman Fitur Lanjutan
+
+Halaman Fitur Lanjutan tampil ketika master switch fitur lanjutan dinyalakan, dan hanya dapat diakses oleh admin.
+
+- Menampilkan status ringkasan tiap fitur lanjutan yang aktif.
+- Menyediakan akses ke impor menu dari Excel, pengelolaan bahan baku, supplier, resep dan HPP, serta pengaturan loyalty tier.
+- Laporan tambahan (insight penjualan, cash flow, ekspor PDF) tetap berada pada halaman Laporan.
+
+### Impor menu dan HPP dari Excel
+
+- Impor membaca satu file `.xlsx` dengan tiga sheet yang dikenali: `Menu`, `BahanBaku`, dan `Resep`.
+- Setiap baris divalidasi dan diklasifikasikan sebagai baris baru, baris yang bertentangan dengan data yang ada, atau baris error, lalu ditampilkan sebagai rencana impor sebelum diterapkan.
+- Kategori baru dibuat otomatis ketika belum tersedia.
+- Stok yang sudah ada tidak pernah ditimpa oleh nilai dari file impor.
+- Ketika sheet `Resep` terisi, nilai tersebut yang dipakai dan mengalahkan nilai `modal` manual pada sheet menu.
+- Pemrosesan Excel memakai modul `xlsx` yang diimpor secara dinamis di `src/utilities/excelImport.js`.
+
+### Piutang dan penyelesaian transaksi
+
+- Open bill yang belum dibayar dapat dibayar sebagian atau diselesaikan di lain waktu.
+- Penyelesaian transaksi (`trx-settle`) memproses pelunasan dan memperbarui status open bill menjadi transaksi selesai.
+- Riwayat open bill dan transaksi selesai dapat dibedakan dari statusnya.
+
 ### Peringatan stok menipis
 
 - Panel peringatan stok pada halaman Kelola Menu yang memisahkan item habis (`stok` sama dengan 0) dan item menipis.
@@ -105,6 +162,7 @@ Settings ditampilkan sebagai modal dengan tab berikut:
 | `Harga` | Diskon bertingkat, pajak dan service, serta ambang batas stok menipis. |
 | `Backup` | Backup, restore, dan pemeriksaan data. |
 | `Kelola Pengguna` | Menambah dan menghapus pengguna, serta mengubah password. |
+| `Fitur Lanjutan` | Master switch fitur lanjutan dan pengaturan per grup: laporan tambahan, fitur pelanggan tambahan, serta bahan baku, supplier, dan harga. |
 
 Catatan:
 
@@ -112,11 +170,13 @@ Catatan:
 - Metode pembayaran dapat ditambah dan dihapus, dengan minimal satu metode aktif.
 - Field struk dapat ditambah, diubah, diwajibkan, atau dihapus, termasuk field bawaan seperti nomor meja dan jumlah pax.
 - Diskon bertingkat dan kategori pengeluaran shift tetap dikelola dari Settings.
+- Basis tier loyalty (`Transaksi` atau `Lifetime`) diatur dari tab Harga.
+- Tab Fitur Lanjutan mengatur master switch dan tiap grup fitur lanjutan; halaman Fitur Lanjutan dan tab ini hanya dapat diakses oleh admin.
 
 ### Backup dan restore
 
 - Backup dibuat dari panel pada tab Backup dan disimpan sebagai file JSON dengan format `kasir-warung-backup`.
-- Backup mencakup penyimpanan data utama, termasuk transaksi, shift, menu, kategori, open bill, settings, pengguna, logo, dan QRIS.
+- Backup mencakup penyimpanan data utama: menu, kategori, settings, pengguna, pelanggan, QRIS, open bill, shift, transaksi, dan logo.
 - File backup dapat divalidasi dan diringkas sebelum dipulihkan.
 - Pemulihan menulis snapshot pengaman sebelum perubahan, menutup database, menulis ulang penyimpanan JSON, menghapus `kasir.db` beserta `-wal` dan `-shm`, lalu menjalankan ulang inisialisasi dan migrasi.
 - Snapshot internal dibuat otomatis dan dibatasi hingga 20 file terbaru.
@@ -146,6 +206,7 @@ Versi di bawah ini adalah versi yang tercatat di `package.json` saat dokumentasi
 | `node-hid` | `^2.0.0` | Pembacaan scanner USB HID sebagai fallback |
 | `node-machine-id` | `^1.1.12` | Pembentukan hardware ID untuk lisensi |
 | `node-thermal-printer` | `^4.6.1` | Pembuatan dan pengiriman data ESC/POS |
+| `xlsx` | `^0.18.5` | Pembacaan file Excel untuk impor menu, bahan baku, dan resep |
 
 ### Dependensi pengembangan dan build
 
@@ -196,9 +257,6 @@ Persyaratan RAM dan ruang di atas adalah batas operasional yang disarankan untuk
 | `generator.cjs` | Generator license key berbasis runtime CommonJS. Gunakan hanya di lingkungan yang dipercaya. |
 | `generator.py` | Generator atau utilitas license key berbasis Python untuk kebutuhan operasional pengembang. |
 | `fix_photo.py` | Utilitas Python untuk perbaikan atau pemrosesan foto menu. |
-| `stress-test.js` | Skrip stress test sisi JavaScript. |
-| `stress-test-console.js` | Varian stress test yang ditujukan untuk console. |
-| `stress-test-node.cjs` | Varian stress test untuk Node.js CommonJS. |
 | `test-app-printer.js` | Skrip pengujian integrasi aplikasi/printer. |
 | `test-db.js` | Skrip pengujian akses database. |
 | `test-printer.js` | Skrip pengujian printer. |
@@ -218,8 +276,13 @@ Persyaratan RAM dan ruang di atas adalah batas operasional yang disarankan untuk
 | `print-manager.cjs` | Modul pendukung alur manajemen printing. |
 | `license.cjs` | Pembacaan hardware ID, validasi license key, aktivasi, dan penyimpanan lisensi. |
 | `license-secret.cjs` | Implementasi secret/generator kunci lisensi. Lindungi dari publikasi. |
+| `auth.cjs` | Hashing password scrypt, verifikasi panjang-tetap, migrasi lazy dari plaintext, dan penyimpanan sesi pengguna. |
+| `auth-ipc.cjs` | Registrasi handler IPC untuk autentikasi dan pengelolaan sesi login. |
 | `category-label.cjs` | Resolusi label kategori untuk output printer. |
+| `update-check.cjs` | Pemeriksaan versi terbaru dari feed update dan perbandingan versi semantik. |
 | `dev-runner.cjs` | Runner development yang memantau perubahan pada `electron/` dan me-restart main process secara otomatis. Tidak digunakan pada build produksi. |
+| `free-port.cjs` | Utilitas development untuk membebaskan port yang tertahan sebelum menjalankan Vite/Electron. |
+| `kill-electron.cjs` | Utilitas development untuk menghentikan proses Electron yang masih berjalan. |
 
 ### `src/`
 
@@ -228,13 +291,13 @@ Persyaratan RAM dan ruang di atas adalah batas operasional yang disarankan untuk
 | `App.jsx` | Koordinator aplikasi: lifecycle lisensi/login/shift, pemuatan data, navigasi, hotkey, pembayaran, printing, dan wiring antar-hook. |
 | `main.jsx` | Entry point React renderer. |
 | `assets/` | Ikon dan aset statis, termasuk ikon aplikasi. |
-| `components/` | Komponen UI bersama seperti detail bill, jam, loader, badge stok, panel peringatan stok, pemilih pelanggan, panel backup/restore, error boundary, dan tag. |
+| `components/` | Komponen UI bersama seperti detail bill, jam, loader, badge stok, panel peringatan stok, pemilih pelanggan, panel backup/restore, panel data lanjutan, grafik cash flow, error boundary, dan tag. |
 | `components/modals/` | Modal item, kategori, additionals minuman, pembayaran, struk, printer, settings, pengguna, konfirmasi, dan tutup shift. |
-| `components/modals/SettingsPanels.jsx` | Implementasi panel tiap tab Settings: printer, warung, pembayaran, QRIS, receipt, pricing, backup, dan pengguna. |
-| `constants/` | Konfigurasi kategori, menu, pembayaran, additionals, receipt fields, dan design tokens. `design.js` adalah sumber token visual utama saat ini. |
-| `hooks/` | Domain state dan operasi untuk auth/shift, barcode, bills, cart, customers, history, license, menu, settings, users, dan toast/undo. |
-| `utilities/` | Logika murni dan adapter untuk barcode, kalkulasi harga, kategori, CSV, i18n, printer, receipt, shift, stock, user, backup, ipc guard, dan IPC API. Banyak utilitas memiliki file test berdekatan. |
-| `views/` | Layar Kasir, Open Bill, Riwayat, Laporan, dan Kelola Menu/Kategori. |
+| `components/modals/settings-tabs/` | Implementasi panel tiap tab Settings: printer, warung, pembayaran, QRIS, receipt, pricing, backup, pengguna, dan fitur lanjutan, dengan `index.js` sebagai barrel. |
+| `constants/` | Konfigurasi kategori, menu, pembayaran, additionals, receipt fields, fitur lanjutan (`advancedFeatures.js`), dan design tokens. `design.js` adalah sumber token visual utama saat ini. |
+| `hooks/` | Domain state dan operasi untuk auth/shift, barcode, bills, cart, customers, history, license, menu, settings, users, data lanjutan, impor Excel, dan toast/undo. |
+| `utilities/` | Logika murni dan adapter untuk barcode, kalkulasi harga, kategori, CSV, i18n, printer, receipt, shift, stock, user, backup, ipc guard, IPC API, loyalty, bahan baku, supplier, resep dan HPP, cash flow, insight, report HTML, dan impor Excel. Banyak utilitas memiliki file test berdekatan. |
+| `views/` | Layar Kasir, Open Bill, Riwayat, Laporan, Kelola Menu/Kategori, dan Fitur Lanjutan. |
 
 ### `updates/`
 
@@ -271,6 +334,10 @@ Lokasi aktual dapat dilihat dari aplikasi melalui API `getDataPath`.
 | `customers.json` | Daftar pelanggan atau member untuk pemilih pelanggan. |
 | `settings.json` | Identitas warung, printer, payment methods, QRIS, receipt fields, pricing, dan expense categories. |
 | `users.json` | Akun pengguna dan role. |
+| `resep.json` | Resep per menu beserta daftar bahan baku dan jumlah pemakaiannya untuk perhitungan HPP. |
+| `bahan-baku.json` | Daftar bahan baku dengan satuan, harga beli, dan stok. |
+| `supplier.json` | Daftar supplier dengan kontak dan catatan. |
+| `loyalty-tiers.json` | Daftar tingkatan loyalty tier beserta ambang total belanja dan persentase diskon. |
 | `logo.json` | Logo dalam bentuk data yang disimpan aplikasi. |
 | `qris.json` | Gambar QRIS per metode pembayaran. |
 | `trx.wal` | Catatan transaksi sementara untuk recovery setelah crash saat pembayaran. |
@@ -332,7 +399,7 @@ npm run test:watch
 npm run build
 ```
 
-Test unit renderer berada di `src/utilities/` dan `src/hooks/`, mencakup barcode, kalkulasi, category management, CSP, CSV, printer, receipt, stock, backup, ipc guard, pemulihan sesi login, dan utilitas IPC.
+Test unit renderer berada di `src/utilities/` dan `src/hooks/`, mencakup barcode, kalkulasi, category management, CSP, CSV, printer, receipt, stock, backup, ipc guard, pemulihan sesi login, utilitas IPC, data fitur lanjutan, cash flow, insight penjualan, report HTML, dan impor Excel.
 
 Test unit main process berada di `electron/` dan ikut dijalankan oleh `npm test`:
 
@@ -363,14 +430,14 @@ npm run electron:build
 
 Script tersebut menjalankan `vite build`, lalu `electron-builder --win`. Konfigurasi packaging berada di `package.json`:
 
-- Product name: `Kasir Warung`.
+- Product name: `DEN POS`.
 - App ID: `com.warung.kasir`.
 - Target: installer NSIS Windows x64.
 - Output: `release/`.
 - Ikon: `src/assets/icon.ico`.
 - Installer bukan one-click; pengguna dapat memilih folder instalasi.
 - Desktop shortcut dan Start Menu shortcut dibuat otomatis.
-- Nama shortcut: `Kasir WRG`.
+- Nama shortcut: `DEN POS`.
 - File yang dipaketkan: `dist/**/*`, `electron/**/*`, secret lisensi yang ditentukan konfigurasi, `node_modules/**/*`, dan `package.json`.
 
 File installer yang dihasilkan mengikuti versi `package.json`, sehingga nama file tidak boleh diasumsikan selalu sama. Periksa isi `release/` setelah build.
@@ -391,6 +458,11 @@ File installer yang dihasilkan mengikuti versi `package.json`, sehingga nama fil
 	- **Peringatan stok**: atur "Batas Stok Menipis" di Settings → Pricing, pastikan panel peringatan stok muncul di Kelola Menu dan ekspor daftar restock (CSV) berisi item yang perlu ditambah.
 	- **Ekspor CSV bebas void**: ekspor dari Riwayat dan Laporan, lalu pastikan transaksi yang sudah di-void tidak ikut menyumbang angka pada file CSV.
 	- **Backup & Restore**: buat backup dari Settings → Backup, pulihkan dari file, dan pastikan aplikasi meminta restart, data kembali utuh, serta snapshot pengaman `pre-restore_<stamp>.json` terbentuk.
+	- **Fitur lanjutan**: nyalakan master switch di Settings → Fitur Lanjutan, pastikan halaman Fitur Lanjutan dapat dibuka oleh admin melalui hotkey `F`, dan tampil ringkasan status tiap grup.
+	- **Loyalty tier**: atur tier, pilih pelanggan, lalu pastikan badge tier muncul dan diskon tier otomatis diterapkan pada keranjang. Uji kedua basis tier (`Transaksi` dan `Lifetime`).
+	- **Bahan baku, supplier, dan resep**: tambah bahan baku dan supplier, isi resep sebuah menu, lalu pastikan HPP menu mengikuti resep dan pemakaian bahan baku terpotong setelah transaksi dibayar.
+	- **Impor Excel**: siapkan file `.xlsx` dengan sheet `Menu`, `BahanBaku`, dan `Resep`, lalu pastikan rencana impor menandai baris baru, konflik, dan error dengan benar tanpa menimpa stok yang sudah ada.
+	- **Laporan lanjutan**: buka halaman Laporan dan pastikan insight penjualan, cash flow, dan ekspor PDF berjalan serta konsisten dengan transaksi yang ada.
 10. Uji printer thermal pada lebar yang dipakai dan uji printer PDF secara terpisah.
 11. Simpan installer dan checksum internal sesuai prosedur distribusi. Jangan memasukkan license secret atau license key pelanggan ke repository.
 12. Saat upgrade pada komputer pengguna, tutup aplikasi lebih dahulu, pasang installer baru, lalu verifikasi data dan lisensi. Migrasi JSON ke SQLite dilakukan saat startup dan membuat salinan migrasi di `json-backups`.
@@ -442,6 +514,20 @@ Lisensi memang terikat hardware ID. Catat hardware ID yang tampil pada layar akt
 - Transaksi void tetap terlihat pada Riwayat dengan label `VOID`, tetapi sengaja dikeluarkan dari total laporan keuangan serta seluruh ekspor CSV.
 - Nilai laporan yang lebih kecil setelah void adalah perilaku yang benar, bukan kehilangan data.
 
+### Fitur lanjutan tidak muncul
+
+- Pastikan master switch fitur lanjutan menyala di Settings → Fitur Lanjutan. Halaman Fitur Lanjutan, tombol navigasi, dan hotkey `F` hanya tampil ketika master switch aktif.
+- Pastikan pengguna yang login memiliki peran admin. Halaman Fitur Lanjutan bersifat khusus admin.
+- Grup per fitur (laporan tambahan, fitur pelanggan tambahan, bahan baku/supplier/harga) menyala secara terpisah. Aktifkan grup yang sesuai agar bagian terkait muncul di Kasir dan Laporan.
+- Ketika basis tier loyalty diatur ke `Lifetime`, tier dihitung dari agregasi total belanja pelanggan melalui query `customer-totals`. Pastikan transaksi pelanggan tersebut sudah tersimpan pada database.
+
+### Impor Excel gagal atau sebagian baris ditolak
+
+- Pastikan file berekstensi `.xlsx` dan memiliki sheet bernama `Menu`, `BahanBaku`, atau `Resep`.
+- Baris yang bertentangan dengan data yang ada ditandai sebagai konflik dan baris tidak valid ditandai sebagai error pada rencana impor, bukan langsung diterapkan.
+- Stok yang sudah ada tidak ditimpa oleh file impor; perbarui stok melalui pengelolaan menu atau bahan baku.
+- Ketika sheet `Resep` terisi, nilai HPP mengikuti resep dan mengabaikan kolom `modal` manual pada sheet menu.
+
 ## Hotkey Aplikasi
 
 Hotkey hanya diproses ketika fokus tidak berada di input, textarea, atau select:
@@ -453,6 +539,7 @@ Hotkey hanya diproses ketika fokus tidak berada di input, textarea, atau select:
 | `R` | Buka Riwayat |
 | `L` | Buka Laporan |
 | `M` | Buka Kelola Menu |
+| `F` | Buka Fitur Lanjutan. Ketika fitur lanjutan tidak menyala, navigasi dialihkan ke Kasir; halaman hanya dirender untuk admin |
 | `P` | Buka atau tutup drawer keranjang |
 | `/` | Buka Kasir dan fokus ke pencarian |
 
