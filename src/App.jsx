@@ -605,6 +605,7 @@ const executeConfirmDel = useCallback((restoreStock = false) => {
             advancedData={advDataH}
             settings={settingsH.settings}
             toast_={toastH.toast_}
+            onImported={menuH.refreshFromStore}
           />
         )}
       </div>

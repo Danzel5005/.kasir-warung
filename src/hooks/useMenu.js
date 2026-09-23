@@ -30,6 +30,17 @@ function useMenu({ toast_, addUndo }) {
     setCats(savedCats && savedCats.length ? savedCats : DEFAULT_CATS);
   }, []);
 
+  // Muat ulang menu + kategori DARI PENYIMPANAN (SQLite/localStorage).
+  // Dipakai setelah operasi yang mengubah data di luar useMenu (mis. import
+  // Excel memakai api.bulkUpsertMenu langsung) supaya state React ikut
+  // ter-update tanpa perlu restart aplikasi.
+  const refreshFromStore = useCallback(async () => {
+    const [savedMenu, savedCats] = await Promise.all([api.loadMenu(), api.loadCats()]);
+    if (Array.isArray(savedMenu)) setMenu(savedMenu);
+    if (Array.isArray(savedCats) && savedCats.length) setCats(savedCats);
+    return savedMenu;
+  }, []);
+
   // ── Categories (semua = always prepended) — expression, pakai useMemo bukan useCallback
   const allCats = useMemo(() => [{ key: "semua", label: "Semua Menu" }, ...cats], [cats]);
 
@@ -239,6 +250,7 @@ const clearAllMenu = useCallback(async () => {
     setKategori, setSearch, setItemModal, setForm, setCatModal, setNewCatLabel,
     setMenu, // diperlukan App.jsx untuk commit stok SETELAH IPC processPayment sukses
     applyStockView,
+    refreshFromStore,
     loadInitial, openAdd, openEdit, saveItem, deleteItem,
     addCat, editCat, deleteCat, addTagToCategory, removeTagFromCategory, clearAllMenu
   };

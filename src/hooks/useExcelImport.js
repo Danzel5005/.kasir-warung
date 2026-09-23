@@ -19,7 +19,7 @@ import {
 // dan menjalankan komit ke penyimpanan saat diminta.
 //
 // alur step: "idle" -> "preview" -> "committing" -> "done"
-export function useExcelImport({ menu = [], cats = {}, advancedData, toast_ }) {
+export function useExcelImport({ menu = [], cats = {}, advancedData, toast_, onImported }) {
   const [step, setStep] = useState("idle");
   const [fileName, setFileName] = useState("");
   const [parsed, setParsed] = useState(null); // hasil parseImportWorkbook
@@ -173,6 +173,15 @@ export function useExcelImport({ menu = [], cats = {}, advancedData, toast_ }) {
       };
       setResult(summary);
       setStep("done");
+      // Sinkronkan state menu/kategori di UI dengan data yang baru disimpan
+      // (upsert massal dilakukan lewat api langsung, bukan lewat useMenu),
+      // supaya menu baru langsung terlihat TANPA restart aplikasi.
+      try {
+        if (typeof onImported === "function") await onImported();
+      } catch (refreshErr) {
+        // Commit sudah sukses di penyimpanan; kegagalan refresh UI tidak fatal.
+        if (toast_) toast_("Import tersimpan, tetapi gagal memuat ulang tampilan", "err");
+      }
       if (toast_) toast_("Import selesai", "ok");
       return { ok: true, summary };
     } catch (err) {
@@ -180,7 +189,7 @@ export function useExcelImport({ menu = [], cats = {}, advancedData, toast_ }) {
       if (toast_) toast_("Import gagal saat menyimpan", "err");
       return { ok: false, error: String(err?.message || err) };
     }
-  }, [validated, advancedData, existingBahan, existingResep, toast_]);
+  }, [validated, advancedData, existingBahan, existingResep, toast_, onImported]);
 
   return {
     step,

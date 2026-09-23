@@ -452,8 +452,8 @@ const statusColor = {
   [ROW_ERROR]: { bg: COLOR_PALETTE.dangerLight, fg: COLOR_PALETTE.danger },
 };
 
-function ImportExcelPanel({ menu, cats, advancedData, toast_ }) {
-  const imp = useExcelImport({ menu, cats, advancedData, toast_ });
+function ImportExcelPanel({ menu, cats, advancedData, toast_, onImported }) {
+  const imp = useExcelImport({ menu, cats, advancedData, toast_, onImported });
   const fileRef = useRef(null);
 
   const plan = imp.validated?.plan;
@@ -626,7 +626,7 @@ function ImportExcelPanel({ menu, cats, advancedData, toast_ }) {
   );
 }
 
-function AdvancedDataPanel({ settings, advancedData, menu, cats, toast_ }) {
+function AdvancedDataPanel({ settings, advancedData, menu, cats, toast_, onImported }) {
   const showBahan = isAdvancedFeatureOn(settings, "bahanBaku");
   const showSupplier = isAdvancedFeatureOn(settings, "supplier");
   const showLoyalty = isAdvancedFeatureOn(settings, "loyalty");
@@ -636,7 +636,7 @@ function AdvancedDataPanel({ settings, advancedData, menu, cats, toast_ }) {
 
   return (
     <div style={{ padding: "10px 16px 0", flexShrink: 0 }}>
-      <ImportExcelPanel menu={menu} cats={cats} advancedData={advancedData} toast_={toast_} />
+      <ImportExcelPanel menu={menu} cats={cats} advancedData={advancedData} toast_={toast_} onImported={onImported} />
       {showResep && <ResepPanel advancedData={advancedData} menu={menu} toast_={toast_} />}
       {showBahan && (
         <BahanBakuPanel advancedData={advancedData} toast_={toast_} suppliers={advancedData.supplier} />

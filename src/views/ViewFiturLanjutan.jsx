@@ -17,7 +17,7 @@ import { ADVANCED_FEATURE_GROUPS, DEFAULT_ADVANCED_FEATURES } from "../constants
 //   advancedData - nilai balik useAdvancedData()
 //   settings     - objek settings (untuk isAdvancedFeatureOn)
 //   toast_       - feedback opsional
-function ViewFiturLanjutan({ menu, cats, advancedData, settings, toast_ }) {
+function ViewFiturLanjutan({ menu, cats, advancedData, settings, toast_, onImported }) {
   const adv = settings?.advancedFeatures || DEFAULT_ADVANCED_FEATURES;
 
   return (
@@ -71,7 +71,14 @@ function ViewFiturLanjutan({ menu, cats, advancedData, settings, toast_ }) {
           </div>
         </div>
 
-        <AdvancedDataPanel settings={settings} advancedData={advancedData} menu={menu} cats={cats} toast_={toast_} />
+        <AdvancedDataPanel
+          settings={settings}
+          advancedData={advancedData}
+          menu={menu}
+          cats={cats}
+          toast_={toast_}
+          onImported={onImported}
+        />
       </div>
     </div>
   );
