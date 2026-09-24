@@ -87,7 +87,7 @@ export default function LicenseScreen({
         open={showJoin}
         onClose={()=>setShowJoin(false)}
         hostH={hostH}
-        onApproved={()=>{ /* Fase 3: reload memakai snapshot Host */ }}
+        onApproved={()=>window.location.reload()}
       />
     </div>
   );

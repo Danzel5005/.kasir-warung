@@ -91,6 +91,7 @@ describe("host-client: join flow", () => {
     // Host approve → client terima approved → grant tersimpan.
     const approveRes = server.approveFollower("CLIENT-HWID-0001", "kasir-2");
     expect(approveRes.ok).toBe(true);
+    server.sendTo("CLIENT-HWID-0001", { type: "snapshot", snapshot: { menu: [] } });
     await waitForEvent(clientEvents, (e) => e.kind === "approved");
 
     const grant = store.read();
@@ -111,6 +112,24 @@ describe("host-client: join flow", () => {
       }, grant.grantSignature)
     ).toBe(true);
 
+    client.disconnect();
+  });
+
+  it("baru menyatakan approved setelah snapshot diterapkan", async () => {
+    const hostEvents = [];
+    const { server, port } = await startServer((evt) => hostEvents.push(evt));
+    const sequence = [];
+    const client = createHostClient({
+      getHwid: () => "CLIENT-HWID-ORDER",
+      snapshotApplier: () => sequence.push("applied"),
+      onEvent: (evt) => { if (evt.kind === "snapshot" || evt.kind === "approved") sequence.push(evt.kind); },
+    });
+    client.join({ host: "127.0.0.1", port, hostId: HOST_ID });
+    await waitForEvent(hostEvents, (e) => e.kind === "join-request" && e.hwid === "CLIENT-HWID-ORDER");
+    server.approveFollower("CLIENT-HWID-ORDER", "kasir-2");
+    server.sendTo("CLIENT-HWID-ORDER", { type: "snapshot", snapshot: { menu: [{ id: 1 }] } });
+    await waitForEvent(sequence, (value) => value === "approved");
+    expect(sequence).toEqual(["applied", "snapshot", "approved"]);
     client.disconnect();
   });
 

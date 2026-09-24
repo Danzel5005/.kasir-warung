@@ -12,12 +12,13 @@ function useLicense() {
   // deps kosong aman: hanya setter, tidak baca state apapun.
   const checkLicenseOnLoad = useCallback(async () => {
     if (window.kasirAPI?.checkLicense) {
-      const [status, hwid] = await Promise.all([
+      const [status, hostStatus, hwid] = await Promise.all([
         window.kasirAPI.checkLicense(),
+        window.kasirAPI.hostLicenseStatus?.() || { activated: false },
         window.kasirAPI.getHardwareId(),
       ]);
       setHardwareId(hwid || "");
-      setLicenseStatus(status);
+      setLicenseStatus(hostStatus?.activated ? { valid: true, viaHost: true, ...hostStatus } : status);
     } else {
       // Dev mode (browser biasa) — skip license
       setLicenseStatus({ valid: true });

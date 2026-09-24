@@ -27,6 +27,7 @@ function createHostClient({ getHwid, deviceName = "DEN POS", hostLicenseStore, o
   let ws = null;
   let target = null; // { host, port, hostId, name }
   let connectTimer = null;
+  let pendingGrant = null;
   let reqSeq = 0;
   const pendingReserves = new Map(); // reqId -> { resolve, timer }
 
@@ -40,6 +41,7 @@ function createHostClient({ getHwid, deviceName = "DEN POS", hostLicenseStore, o
 
   function cleanup() {
     if (connectTimer) { clearTimeout(connectTimer); connectTimer = null; }
+    pendingGrant = null;
     // Gagalkan semua reserve yang masih menunggu (koneksi putus).
     for (const [reqId, pending] of pendingReserves) {
       if (pending.timer) clearTimeout(pending.timer);
@@ -72,7 +74,7 @@ function createHostClient({ getHwid, deviceName = "DEN POS", hostLicenseStore, o
         });
         const grant = { ...payload, grantSignature: msg.grantSignature || null };
         if (hostLicenseStore && grant.grantSignature) hostLicenseStore.write(grant);
-        onEvent({ kind: "approved", grant });
+        pendingGrant = grant;
         break;
       }
       case "rejected":
@@ -88,6 +90,10 @@ function createHostClient({ getHwid, deviceName = "DEN POS", hostLicenseStore, o
           catch (err) { console.warn("[Client] snapshotApplier error:", err?.message || err); }
         }
         onEvent({ kind: "snapshot", snapshot: msg.snapshot || {}, applied, sentAt: msg.sentAt });
+        if (pendingGrant) {
+          onEvent({ kind: "approved", grant: pendingGrant });
+          pendingGrant = null;
+        }
         break;
       }
       case "reserve-stock-result":
