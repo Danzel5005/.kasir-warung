@@ -226,7 +226,7 @@ function createWindow() {
   mainWin.webContents.on("did-finish-load", () => startRawScannerFallback(mainWin));
   mainWin.webContents.on("did-fail-load", (_event, errorCode, errorDescription) => console.error("[Main] Failed to load:", errorCode, errorDescription));
 }
-
+app.disableHardwareAcceleration();
 app.whenReady().then(() => {
   console.log("[Main] App ready, initializing...");
   process.on("uncaughtException", (err) => console.error("[Main] Uncaught exception:", err));
