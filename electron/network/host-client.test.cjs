@@ -52,6 +52,16 @@ afterEach(async () => {
 });
 
 describe("host-client: join flow", () => {
+  it("mencoba alamat discovery berikutnya jika alamat pertama gagal", async () => {
+    const hostEvents = [];
+    const { port } = await startServer((evt) => hostEvents.push(evt));
+    const client = createHostClient({ getHwid: () => "CLIENT-HWID-FALLBACK" });
+
+    expect(client.join({ host: "127.0.0.2", addresses: ["127.0.0.1"], port, hostId: HOST_ID }).ok).toBe(true);
+    await waitForEvent(hostEvents, (e) => e.kind === "join-request" && e.hwid === "CLIENT-HWID-FALLBACK");
+    client.disconnect();
+  });
+
   it("connect → hello → hello-ack → approved, grant tersimpan", async () => {
     const hostEvents = [];
     const { server, port } = await startServer((evt) => hostEvents.push(evt));

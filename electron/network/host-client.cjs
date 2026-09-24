@@ -127,35 +127,39 @@ function createHostClient({ getHwid, deviceName = "DEN POS", hostLicenseStore, o
     };
     onEvent({ kind: "connecting", target });
 
-    try {
-      ws = new WebSocket(`ws://${target.host}:${target.port}`);
-    } catch (err) {
-      onEvent({ kind: "error", error: err.message });
-      return { ok: false, error: err.message };
-    }
+    const candidates = [...new Set([target.host, ...(hostInfo.addresses || [])])]
+      .filter(Boolean);
+    let candidateIndex = 0;
 
-    connectTimer = setTimeout(() => {
-      if (ws && ws.readyState !== WebSocket.OPEN) {
-        onEvent({ kind: "error", error: "Koneksi ke Device A timeout" });
-        cleanup();
-      }
-    }, CONNECT_TIMEOUT_MS);
-    if (connectTimer.unref) connectTimer.unref();
-
-    ws.on("open", () => {
+    const tryNext = () => {
       if (connectTimer) { clearTimeout(connectTimer); connectTimer = null; }
-      const hwid = getHwid();
-      try {
-        ws.send(JSON.stringify({ type: "hello", hwid, deviceName }));
-      } catch (err) {
-        onEvent({ kind: "error", error: err.message });
+      if (ws) { try { ws.removeAllListeners(); ws.terminate(); } catch (_) { /* ignore */ } ws = null; }
+      const address = candidates[candidateIndex++];
+      if (!address) {
+        onEvent({ kind: "error", error: "Koneksi ke Device A timeout" });
         return;
       }
-      onEvent({ kind: "connected", hostId: target.hostId });
-    });
-    ws.on("message", handleMessage);
-    ws.on("close", () => onEvent({ kind: "disconnected" }));
-    ws.on("error", (err) => onEvent({ kind: "error", error: err.message }));
+      const socketHost = String(address).includes(":") ? `[${address}]` : address;
+      try { ws = new WebSocket(`ws://${socketHost}:${target.port}`); }
+      catch (_) { tryNext(); return; }
+
+      connectTimer = setTimeout(tryNext, Math.max(2000, Math.floor(CONNECT_TIMEOUT_MS / candidates.length)));
+      if (connectTimer.unref) connectTimer.unref();
+      const onConnectError = () => tryNext();
+      ws.once("open", () => {
+        if (connectTimer) { clearTimeout(connectTimer); connectTimer = null; }
+        ws.removeListener("error", onConnectError);
+        ws.on("error", (err) => onEvent({ kind: "error", error: err.message }));
+        const hwid = getHwid();
+        try { ws.send(JSON.stringify({ type: "hello", hwid, deviceName })); }
+        catch (err) { onEvent({ kind: "error", error: err.message }); return; }
+        onEvent({ kind: "connected", hostId: target.hostId });
+      });
+      ws.on("message", handleMessage);
+      ws.once("error", onConnectError);
+      ws.on("close", () => onEvent({ kind: "disconnected" }));
+    };
+    tryNext();
 
     return { ok: true };
   }

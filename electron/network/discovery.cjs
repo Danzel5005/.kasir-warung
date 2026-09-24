@@ -9,6 +9,11 @@
 const SERVICE_TYPE = "ykk-pos";
 const SERVICE_PROTOCOL = "tcp";
 
+function connectionHost(service) {
+  return (service.addresses || []).find((address) => /^\d{1,3}(\.\d{1,3}){3}$/.test(address) && !address.startsWith("127."))
+    || service.host;
+}
+
 function createDiscovery({ hostId, deviceName, port }) {
   let bonjour = null;
   let published = null;
@@ -31,7 +36,6 @@ function createDiscovery({ hostId, deviceName, port }) {
       type: SERVICE_TYPE,
       protocol: SERVICE_PROTOCOL,
       port: advertisePort || port,
-      host: hostId, // dipakai client sebagai identifier stabil
       txt: {
         hostId,
         name: hostName || deviceName || "DEN POS",
@@ -63,7 +67,7 @@ function createDiscovery({ hostId, deviceName, port }) {
       const entry = {
         hostId: service.txt?.hostId || service.host || service.name,
         name: service.txt?.name || service.name,
-        host: service.host,
+        host: connectionHost(service),
         port: service.port,
         addresses: service.addresses || [],
       };
@@ -93,4 +97,4 @@ function createDiscovery({ hostId, deviceName, port }) {
   return { advertise, stopAdvertise, browse, destroy };
 }
 
-module.exports = { createDiscovery, SERVICE_TYPE, SERVICE_PROTOCOL };
+module.exports = { createDiscovery, connectionHost, SERVICE_TYPE, SERVICE_PROTOCOL };

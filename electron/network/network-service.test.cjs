@@ -3,6 +3,7 @@ import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
 const { createNetworkService, DEFAULT_PORT } = require("./network-service.cjs");
+const { connectionHost } = require("./discovery.cjs");
 
 // ---------------------------------------------------------------------------
 // Fase 1 — network-service: verifikasi IPC handler terdaftar & kontrak balasan.
@@ -14,6 +15,12 @@ const { createNetworkService, DEFAULT_PORT } = require("./network-service.cjs");
 const advertised = [];
 const browsed = [];
 const destroyed = [];
+
+describe("discovery: connection address", () => {
+  it("memakai alamat IPv4 LAN, bukan Host ID dari service.host", () => {
+    expect(connectionHost({ host: "F53C86A69259C739", addresses: ["fe80::1", "192.168.43.10"] })).toBe("192.168.43.10");
+  });
+});
 
 function fakeDiscoveryFactory() {
   return {
