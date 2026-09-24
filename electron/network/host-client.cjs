@@ -14,10 +14,13 @@ const { buildGrantPayload } = require("./host-license.cjs");
 
 const CONNECT_TIMEOUT_MS = 8000;
 
-// createHostClient({ getHwid, deviceName, hostLicenseStore, onEvent })
+// createHostClient({ getHwid, deviceName, hostLicenseStore, onEvent, snapshotApplier })
 //   onEvent(evt) — evt.kind: "connecting" | "connected" | "waiting" |
-//                  "approved" | "rejected" | "disconnected" | "error"
-function createHostClient({ getHwid, deviceName = "DEN POS", hostLicenseStore, onEvent = () => {} }) {
+//                  "approved" | "rejected" | "snapshot" | "disconnected" | "error"
+//   snapshotApplier(snapshot) — opsional; dipakai untuk menulis snapshot awal
+//                  (menu/settings/open-bill) ke storage lokal Client. Kalau tidak
+//                  ada, snapshot tetap di-emit supaya renderer bisa mengurusnya.
+function createHostClient({ getHwid, deviceName = "DEN POS", hostLicenseStore, onEvent = () => {}, snapshotApplier = null }) {
   let ws = null;
   let target = null; // { host, port, hostId, name }
   let connectTimer = null;
@@ -56,6 +59,18 @@ function createHostClient({ getHwid, deviceName = "DEN POS", hostLicenseStore, o
       case "rejected":
         onEvent({ kind: "rejected", reason: msg.reason || "Ditolak Device A" });
         break;
+      case "snapshot": {
+        // Snapshot awal dikirim SEKALI saat Host approve (plan §3 langkah 8).
+        // Terapkan ke storage lokal dulu (kalau applier tersedia) supaya Client
+        // langsung punya menu/kasir/open-bill, lalu teruskan ke renderer.
+        let applied = false;
+        if (snapshotApplier && msg.snapshot) {
+          try { snapshotApplier(msg.snapshot); applied = true; }
+          catch (err) { console.warn("[Client] snapshotApplier error:", err?.message || err); }
+        }
+        onEvent({ kind: "snapshot", snapshot: msg.snapshot || {}, applied, sentAt: msg.sentAt });
+        break;
+      }
       case "ping":
         try { ws && ws.send(JSON.stringify({ type: "pong" })); } catch (_) { /* ignore */ }
         break;

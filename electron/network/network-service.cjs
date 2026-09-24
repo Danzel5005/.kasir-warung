@@ -13,14 +13,21 @@ const { createHostServer } = require("./host-server.cjs");
 const { createDiscovery } = require("./discovery.cjs");
 const { createHostClient } = require("./host-client.cjs");
 const { createHostLicenseStore } = require("./host-license.cjs");
+const { createPairing } = require("./pairing.cjs");
 const { getHardwareId } = require("../license.cjs");
 
 const DEFAULT_PORT = 47474;
 
-function createNetworkService({ ipcMain, app, emit = () => {}, discoveryFactory = createDiscovery }) {
+function createNetworkService({ ipcMain, app, emit = () => {}, discoveryFactory = createDiscovery, snapshotProvider = () => ({}), getUsers = () => [], clientSnapshotApplier = null }) {
   const hostId = getHostId();
   let deviceName = "DEN POS";
   let port = DEFAULT_PORT;
+
+  // ── Fase 3: pairing (assign akun + snapshot awal) ──────────────────────
+  // Pairing perlu hostServer yang sudah jadi, tapi hostServer perlu emit yang
+  // meneruskan `join-request` ke pairing. Kita rangkai lewat referensi (let)
+  // supaya tidak ada siklus konstruksi.
+  let pairing = null;
 
   // Store grant aktivasi-via-host (`.ykk_hostlic`). Hanya dibuat kalau `app`
   // tersedia (dibutuhkan getPath). Di test, store disuntik lewat hostLicenseStore.
@@ -29,6 +36,19 @@ function createNetworkService({ ipcMain, app, emit = () => {}, discoveryFactory 
   const hostServer = createHostServer({
     hostId,
     port,
+    onEvent: (evt) => {
+      // Teruskan join-request/disconnect ke pairing supaya daftar pending pada
+      // Host UI tetap sinkron, lalu ke renderer sebagai event live.
+      if (evt?.kind === "join-request" && pairing) pairing.trackRequest({ hwid: evt.hwid, deviceName: evt.deviceName });
+      if (evt?.kind === "follower-disconnected" && pairing) pairing.forget(evt.hwid);
+      emit("hosting:event", evt);
+    },
+  });
+
+  pairing = createPairing({
+    hostServer,
+    getUsers,
+    buildSnapshot: snapshotProvider,
     onEvent: (evt) => emit("hosting:event", evt),
   });
 
@@ -40,6 +60,7 @@ function createNetworkService({ ipcMain, app, emit = () => {}, discoveryFactory 
     getHwid: () => getHardwareId(),
     deviceName,
     hostLicenseStore,
+    snapshotApplier: clientSnapshotApplier,
     onEvent: (evt) => emit("client:event", evt),
   });
 
@@ -84,6 +105,15 @@ function createNetworkService({ ipcMain, app, emit = () => {}, discoveryFactory 
     ipcMain.handle("client-status", () => hostClient.status());
     ipcMain.handle("host-license-status", () => (hostLicenseStore ? hostLicenseStore.status() : { activated: false }));
     ipcMain.handle("host-license-clear", () => (hostLicenseStore ? hostLicenseStore.clear() : { ok: false, error: "tidak tersedia" }));
+
+    // ── Fase 3: pairing (Host) — assign akun + push snapshot awal ──────────
+    ipcMain.handle("pairing-list", () => ({ ok: true, requests: pairing.listRequests() }));
+    ipcMain.handle("pairing-assignable-users", () => {
+      try { return { ok: true, users: pairing.listAssignableUsers(getUsers()) }; }
+      catch (err) { return { ok: false, error: err.message, users: [] }; }
+    });
+    ipcMain.handle("pairing-approve", async (_e, { hwid, userId } = {}) => pairing.approve({ hwid, userId }));
+    ipcMain.handle("pairing-reject", (_e, { hwid, reason } = {}) => pairing.reject({ hwid, reason }));
   }
 
   function shutdown() {
@@ -92,7 +122,7 @@ function createNetworkService({ ipcMain, app, emit = () => {}, discoveryFactory 
     return hostServer.stop();
   }
 
-  return { registerHandlers, shutdown, getHostId: () => hostId, hostServer, hostClient, hostLicenseStore };
+  return { registerHandlers, shutdown, getHostId: () => hostId, hostServer, hostClient, hostLicenseStore, pairing };
 }
 
 module.exports = { createNetworkService, DEFAULT_PORT };

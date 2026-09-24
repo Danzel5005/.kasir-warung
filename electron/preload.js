@@ -119,6 +119,11 @@ settleTrx: (id, actor) => ipcRenderer.invoke("trx-settle", id, actor),
     ipcRenderer.on("client:event", listener);
     return () => ipcRenderer.removeListener("client:event", listener);
   },
+  // Pairing (Fase 3) — Host: daftar pending, assign akun non-admin, snapshot awal
+  pairingList:            ()      => ipcRenderer.invoke("pairing-list"),
+  pairingAssignableUsers: ()      => ipcRenderer.invoke("pairing-assignable-users"),
+  pairingApprove:         (d)     => ipcRenderer.invoke("pairing-approve", d),
+  pairingReject:          (d)     => ipcRenderer.invoke("pairing-reject", d),
   // Devices registry (Fase 3)
   loadDevices:  ()      => ipcRenderer.invoke("devices-list"),
   upsertDevice: (d)     => ipcRenderer.invoke("device-upsert", d),

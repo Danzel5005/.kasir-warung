@@ -29,9 +29,9 @@ function makeFakeIpcMain() {
   return { handlers, handle: (channel, fn) => handlers.set(channel, fn) };
 }
 
-function makePair(emit = () => {}) {
+function makePair(emit = () => {}, options = {}) {
   const ipcMain = makeFakeIpcMain();
-  const svc = createNetworkService({ ipcMain, app: {}, emit, discoveryFactory: fakeDiscoveryFactory });
+  const svc = createNetworkService({ ipcMain, app: {}, emit, discoveryFactory: fakeDiscoveryFactory, ...options });
   svc.registerHandlers();
   return { ipcMain, svc };
 }
@@ -44,6 +44,7 @@ describe("network-service: IPC contract", () => {
       "discovery-browse-start", "discovery-browse-stop",
       "client-join", "client-disconnect", "client-status",
       "host-license-status", "host-license-clear",
+      "pairing-list", "pairing-assignable-users", "pairing-approve", "pairing-reject",
     ]) {
       expect(ipcMain.handlers.has(ch)).toBe(true);
     }
@@ -133,5 +134,81 @@ describe("network-service: Fase 2 — client join & host-license", () => {
     const { ipcMain } = makePair();
     const res = ipcMain.handlers.get("host-license-clear")({});
     expect(res).toHaveProperty("ok");
+  });
+});
+
+describe("network-service: Fase 3 — pairing (assign + snapshot)", () => {
+  const users = [
+    { username: "admin", nama: "Admin", role: "admin" },
+    { username: "kasir1", nama: "Kasir Satu", role: "cashier" },
+  ];
+
+  it("pairing-list kosong di awal", async () => {
+    const { ipcMain } = makePair();
+    const res = ipcMain.handlers.get("pairing-list")({});
+    expect(res.ok).toBe(true);
+    expect(res.requests).toEqual([]);
+  });
+
+  it("pairing-assignable-users mengecualikan admin", () => {
+    const { ipcMain } = makePair(() => {}, { getUsers: () => users });
+    const res = ipcMain.handlers.get("pairing-assignable-users")({});
+    expect(res.ok).toBe(true);
+    expect(res.users.map((u) => u.username)).toEqual(["kasir1"]);
+  });
+
+  it("join-request via WS dicatat lalu bisa di-approve (snapshot dikirim)", async () => {
+    const WebSocket = require("ws");
+    const emitted = [];
+    const { ipcMain, svc } = makePair((ch, payload) => emitted.push({ ch, payload }), {
+      getUsers: () => users,
+      snapshotProvider: () => ({ menu: [{ id: 1 }], settings: {} }),
+    });
+
+    await ipcMain.handlers.get("hosting-start")({}, { port: 0 });
+    await new Promise((r) => setTimeout(r, 60));
+    const port = ipcMain.handlers.get("hosting-status")({}).port;
+
+    const ws = new WebSocket(`ws://127.0.0.1:${port}`);
+    const messages = [];
+    ws.on("message", (raw) => { try { messages.push(JSON.parse(raw.toString())); } catch (_) { /* ignore */ } });
+    await new Promise((resolve) => ws.on("open", () => {
+      ws.send(JSON.stringify({ type: "hello", hwid: "HW-NET", deviceName: "Kasir Net" }));
+      resolve();
+    }));
+
+    // tunggu join-request tercatat
+    for (let i = 0; i < 50 && ipcMain.handlers.get("pairing-list")({}).requests.length === 0; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    const list = ipcMain.handlers.get("pairing-list")({}).requests;
+    expect(list.find((r) => r.hwid === "HW-NET")).toBeTruthy();
+
+    const res = await ipcMain.handlers.get("pairing-approve")({}, { hwid: "HW-NET", userId: "kasir1" });
+    expect(res.ok).toBe(true);
+    expect(res.snapshotSent).toBe(true);
+
+    // follower menerima approved + snapshot
+    for (let i = 0; i < 50 && !messages.find((m) => m.type === "snapshot"); i++) {
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    expect(messages.find((m) => m.type === "approved")?.assignedUserId).toBe("kasir1");
+    expect(messages.find((m) => m.type === "snapshot").snapshot.menu).toEqual([{ id: 1 }]);
+
+    ws.close();
+    await svc.shutdown();
+  });
+
+  it("pairing-approve tanpa hwid/userId mengembalikan error, bukan crash", async () => {
+    const { ipcMain } = makePair();
+    const res = await ipcMain.handlers.get("pairing-approve")({}, {});
+    expect(res.ok).toBe(false);
+    expect(res.error).toBeTruthy();
+  });
+
+  it("pairing-reject tanpa hwid mengembalikan error", () => {
+    const { ipcMain } = makePair();
+    const res = ipcMain.handlers.get("pairing-reject")({}, {});
+    expect(res.ok).toBe(false);
   });
 });

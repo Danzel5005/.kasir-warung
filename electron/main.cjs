@@ -75,6 +75,31 @@ const network = createNetworkService({
       if (!win.isDestroyed()) win.webContents.send(channel, payload);
     }
   },
+  // Snapshot awal (Fase 3) — satu-satunya full-dump yang dikirim Host ke
+  // follower saat di-approve. Dibaca lewat sumber data yang sama dengan
+  // renderer supaya tidak ada jalur baca yang berbeda/divergen.
+  snapshotProvider: async () => ({
+    menu: database.loadMenuList(),
+    cats: backup.rJSON(FILES.cats) || [],
+    settings: backup.rJSON(FILES.settings) || {},
+    bills: backup.rJSON(FILES.bills) || [],
+    resep: backup.rJSON(FILES.resep) || {},
+    bahanBaku: backup.rJSON(FILES.bahanBaku) || [],
+    generatedAt: new Date().toISOString(),
+  }),
+  getUsers: () => backup.rJSON(FILES.users) || [],
+  // Sisi Client (Fase 3): terapkan snapshot awal dari Host ke storage lokal
+  // saat pertama kali di-assign. Ini satu-satunya full-dump yang ditulis.
+  clientSnapshotApplier: (snapshot) => {
+    if (!snapshot || typeof snapshot !== "object") return;
+    try { if (Array.isArray(snapshot.menu)) database.replaceMenuList(snapshot.menu); }
+    catch (err) { console.warn("[Main] apply snapshot menu error:", err.message); }
+    if (snapshot.settings && typeof snapshot.settings === "object") backup.atomicWrite(FILES.settings, snapshot.settings);
+    if (Array.isArray(snapshot.cats)) backup.atomicWrite(FILES.cats, snapshot.cats);
+    if (Array.isArray(snapshot.bills)) backup.atomicWrite(FILES.bills, snapshot.bills);
+    if (snapshot.resep && typeof snapshot.resep === "object") backup.atomicWrite(FILES.resep, snapshot.resep);
+    if (Array.isArray(snapshot.bahanBaku)) backup.atomicWrite(FILES.bahanBaku, snapshot.bahanBaku);
+  },
 });
 
 function registerFileHandlers() {

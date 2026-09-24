@@ -3,6 +3,7 @@
 // Tab ini muncul untuk semua user, tetapi hanya admin yang bisa MENYALAKAN
 // hosting (device Host = Device A). Non-admin hanya melihat penjelasan supaya
 // mereka paham alur "Aktifkan Aplikasi Melalui Device Lain".
+import { useState } from "react";
 import { BD, COLOR_PALETTE, LT, MT, RADIUS, TYPOGRAPHY, W, G, row, inp } from "../../../constants/design.js";
 import { isAdmin } from "../../../utilities/permissions.js";
 import { useHosting } from "../../../hooks/useHosting.js";
@@ -29,10 +30,18 @@ function CopyField({ label, value }) {
 }
 
 export function HostingSettingsTab({ authH }) {
-  const { status, starting, error, startHosting, stopHosting, hostBridgeAvailable } = useHosting();
+  const {
+    status, starting, error, startHosting, stopHosting, hostBridgeAvailable,
+    requests, assignableUsers, busyHwid, approveRequest, rejectRequest,
+  } = useHosting();
+  // Pilihan akun per-hwid (dropdown "assign akun kasir"). Default: akun pertama.
+  const [pickedUser, setPickedUser] = useState({});
   const canHost = isAdmin(authH?.currentUser);
   const hosting = !!status.hosting;
   const followers = status.followers || [];
+  const firstUser = assignableUsers[0]?.username || "";
+
+  const userFor = (hwid) => pickedUser[hwid] ?? firstUser;
 
   if (!canHost) {
     return <div>
@@ -79,19 +88,48 @@ export function HostingSettingsTab({ authH }) {
 
     {/* Daftar device terhubung / pending */}
     <div style={{ paddingTop: 12, borderTop: `1px solid ${BD}` }}>
-      <div style={{ fontSize: TYPOGRAPHY.label.fontSize, fontWeight: 600, color: G, marginBottom: 8 }}>Perangkat Terhubung ({followers.length}):</div>
-      {followers.length === 0
-        ? <div style={{ fontSize: TYPOGRAPHY.small.fontSize, color: MT, fontStyle: "italic", padding: "8px 0" }}>Belum ada perangkat yang terhubung. Ketika kasir lain membuka aplikasi dan memilih &quot;Aktifkan via Device Lain&quot;, namanya akan muncul di sini untuk disetujui.</div>
-        : <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {followers.map((f) => <div key={f.hwid || f.deviceName} style={{ ...row, padding: "8px 10px", background: LT, borderRadius: RADIUS.md }}>
-            <div>
-              <div style={{ fontSize: TYPOGRAPHY.small.fontSize, fontWeight: 600, color: G }}>{f.deviceName || "Perangkat"}</div>
-              <div style={{ fontSize: TYPOGRAPHY.caption.fontSize, color: MT, fontFamily: "monospace" }}>{f.hwid || "-"}</div>
-            </div>
-            <StatusPill active={f.status === "active"}>{f.status === "active" ? "Aktif" : "Menunggu"}</StatusPill>
-          </div>)}
+      <div style={{ fontSize: TYPOGRAPHY.label.fontSize, fontWeight: 600, color: G, marginBottom: 8 }}>Perangkat Menunggu Persetujuan ({requests.length}):</div>
+      {requests.length === 0
+        ? <div style={{ fontSize: TYPOGRAPHY.small.fontSize, color: MT, fontStyle: "italic", padding: "8px 0" }}>Belum ada perangkat yang mengikuti. Ketika kasir lain membuka aplikasi dan memilih &quot;Aktifkan via Device Lain&quot;, namanya akan muncul di sini untuk disetujui.</div>
+        : <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {requests.map((r) => {
+            const approved = r.status === "approved";
+            const rejected = r.status === "rejected";
+            const busy = busyHwid === r.hwid;
+            return <div key={r.hwid || r.deviceName} style={{ padding: "10px", background: LT, borderRadius: RADIUS.md, border: `1px solid ${BD}` }}>
+              <div style={{ ...row, marginBottom: approved || rejected ? 0 : 8 }}>
+                <div>
+                  <div style={{ fontSize: TYPOGRAPHY.small.fontSize, fontWeight: 600, color: G }}>{r.deviceName || "Perangkat"}</div>
+                  <div style={{ fontSize: TYPOGRAPHY.caption.fontSize, color: MT, fontFamily: "monospace" }}>{r.hwid || "-"}</div>
+                </div>
+                <StatusPill active={approved}>{approved ? "Aktif" : rejected ? "Ditolak" : "Menunggu"}</StatusPill>
+              </div>
+              {!approved && !rejected && <div style={{ ...row, gap: 6 }}>
+                {assignableUsers.length === 0
+                  ? <span style={{ fontSize: TYPOGRAPHY.caption.fontSize, color: P.warning, fontWeight: 600, flex: 1 }}>Belum ada akun kasir non-admin. Buat akun dulu di tab Pengguna.</span>
+                  : <select
+                      value={userFor(r.hwid)}
+                      onChange={(e) => setPickedUser((prev) => ({ ...prev, [r.hwid]: e.target.value }))}
+                      disabled={busy}
+                      style={{ ...inp, flex: 1, fontSize: TYPOGRAPHY.small.fontSize }}
+                    >
+                      {assignableUsers.map((u) => <option key={u.username} value={u.username}>{u.nama} ({u.username})</option>)}
+                    </select>}
+                <button
+                  onClick={() => approveRequest({ hwid: r.hwid, userId: userFor(r.hwid) })}
+                  disabled={busy || assignableUsers.length === 0 || !userFor(r.hwid)}
+                  style={{ padding: "8px 14px", background: (busy || assignableUsers.length === 0) ? "#aaa" : P.primary, color: W, border: "none", borderRadius: RADIUS.md, cursor: (busy || assignableUsers.length === 0) ? "not-allowed" : "pointer", fontFamily: "inherit", fontSize: TYPOGRAPHY.small.fontSize, fontWeight: 700 }}
+                >{busy ? "Memproses..." : "Terima"}</button>
+                <button
+                  onClick={() => rejectRequest({ hwid: r.hwid })}
+                  disabled={busy}
+                  style={{ padding: "8px 12px", background: "transparent", color: P.danger, border: `1px solid ${P.danger}`, borderRadius: RADIUS.md, cursor: busy ? "wait" : "pointer", fontFamily: "inherit", fontSize: TYPOGRAPHY.small.fontSize, fontWeight: 600 }}
+                >Tolak</button>
+              </div>}
+              {approved && <div style={{ fontSize: TYPOGRAPHY.caption.fontSize, color: MT, marginTop: 4 }}>Akun: <b>{assignableUsers.find(u => u.username === r.userId)?.nama || r.userId || "-"}</b> · data menu, kasir, &amp; open-bill sudah dikirim.</div>}
+            </div>;
+          })}
         </div>}
-      <div style={{ fontSize: TYPOGRAPHY.caption.fontSize, color: MT, marginTop: 8 }}>Persetujuan &amp; pembagian akun kasir (assign) tersedia di Fase 3.</div>
     </div>
   </div>;
 }

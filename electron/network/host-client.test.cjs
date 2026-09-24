@@ -125,3 +125,54 @@ describe("host-client: join flow", () => {
     expect(client.status().connected).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Fase 3 — sisi Client: menerima `snapshot` awal dari Host, meneruskannya ke
+// `snapshotApplier` (persist lokal), lalu meng-emit event `snapshot`.
+// ---------------------------------------------------------------------------
+describe("host-client: Fase 3 snapshot awal", () => {
+  it("menerapkan snapshot lewat snapshotApplier dan meng-emit event snapshot", async () => {
+    const hostEvents = [];
+    const { server, port } = await startServer((evt) => hostEvents.push(evt));
+
+    const applied = [];
+    const clientEvents = [];
+    const client = createHostClient({
+      getHwid: () => "CLIENT-HWID-SNAP",
+      deviceName: "Kasir Snapshot",
+      onEvent: (evt) => clientEvents.push(evt),
+      snapshotApplier: (snap) => applied.push(snap),
+    });
+
+    client.join({ host: "127.0.0.1", port, hostId: HOST_ID });
+    await waitForEvent(hostEvents, (e) => e.kind === "join-request" && e.hwid === "CLIENT-HWID-SNAP");
+
+    const snapshot = { menu: [{ id: 7, nama: "Teh", stok: 3 }], bills: [{ id: 1 }] };
+    server.sendTo("CLIENT-HWID-SNAP", { type: "snapshot", snapshot, sentAt: "now" });
+
+    const evt = await waitForEvent(clientEvents, (e) => e.kind === "snapshot");
+    expect(evt.applied).toBe(true);
+    expect(evt.snapshot).toEqual(snapshot);
+    expect(applied).toEqual([snapshot]);
+
+    client.disconnect();
+  });
+
+  it("tetap emit snapshot walau snapshotApplier tidak diberi", async () => {
+    const hostEvents = [];
+    const { server, port } = await startServer((evt) => hostEvents.push(evt));
+    const clientEvents = [];
+    const client = createHostClient({
+      getHwid: () => "CLIENT-HWID-NOSNAP",
+      onEvent: (evt) => clientEvents.push(evt),
+    });
+    client.join({ host: "127.0.0.1", port, hostId: HOST_ID });
+    await waitForEvent(hostEvents, (e) => e.kind === "join-request" && e.hwid === "CLIENT-HWID-NOSNAP");
+
+    server.sendTo("CLIENT-HWID-NOSNAP", { type: "snapshot", snapshot: { menu: [] } });
+    const evt = await waitForEvent(clientEvents, (e) => e.kind === "snapshot");
+    expect(evt.applied).toBe(false);
+    expect(evt.snapshot).toEqual({ menu: [] });
+    client.disconnect();
+  });
+});
