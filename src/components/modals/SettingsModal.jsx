@@ -9,6 +9,7 @@ import {
   PricingSettingsTab,
   BackupSettingsTab,
   UsersSettingsTab,
+  HostingSettingsTab,
   AdvancedSettingsTab,
 } from "./settings-tabs/index.js";
 
@@ -21,6 +22,7 @@ const SETTINGS_TABS = [
   ["pricing", "Harga"],
   ["backup", "Backup"],
   ["users", "Kelola Pengguna"],
+  ["hosting", "Hosting LAN"],
   ["advanced", "Fitur Lanjutan"],
 ];
 
@@ -39,6 +41,7 @@ function SettingsPanel({ tab, settingsH, authH, menu, cats }) {
     case "pricing": return <PricingSettingsTab {...panelProps} />;
     case "backup": return <BackupSettingsTab {...panelProps} />;
     case "users": return <UsersSettingsTab authH={authH} />;
+    case "hosting": return <HostingSettingsTab authH={authH} />;
     case "advanced": return <AdvancedSettingsTab {...panelProps} />;
     default: return null;
   }

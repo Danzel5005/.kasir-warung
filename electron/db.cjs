@@ -40,13 +40,30 @@ function createDatabaseService({ ipcMain, files, ensureDir, rJSON, atomicWrite, 
           note TEXT,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE TABLE IF NOT EXISTS devices (
+          hwid TEXT PRIMARY KEY,
+          name TEXT,
+          assigned_user_id TEXT,
+          status TEXT DEFAULT 'pending',
+          last_seen DATETIME,
+          granted_at DATETIME,
+          revoked_at DATETIME
+        );
         CREATE INDEX IF NOT EXISTS idx_trx_created ON transactions(created_at);
         CREATE INDEX IF NOT EXISTS idx_shifts_created ON shifts(created_at);
         CREATE INDEX IF NOT EXISTS idx_trx_created_date ON transactions(date(created_at));
         CREATE INDEX IF NOT EXISTS idx_products_menu_id ON products(menu_id);
         CREATE INDEX IF NOT EXISTS idx_products_kategori ON products(kategori);
         CREATE INDEX IF NOT EXISTS idx_stock_movements_product ON stock_movements(product_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_devices_status ON devices(status);
       `);
+      // Kolom `updated_at` di products (Fase sync delta): client perlu tahu baris
+      // mana yang lebih baru saat reconnect. ALTER di-guard karena SQLite tak
+      // punya "ADD COLUMN IF NOT EXISTS".
+      try {
+        const cols = db.prepare("PRAGMA table_info(products)").all().map((c) => c.name);
+        if (!cols.includes("updated_at")) db.exec("ALTER TABLE products ADD COLUMN updated_at DATETIME");
+      } catch (err) { console.warn("[DB] products.updated_at migration skipped:", err.message); }
       console.log("[Main] Tables created");
       console.log("[DB] SQLite initialized successfully");
       return true;
@@ -418,6 +435,19 @@ function createDatabaseService({ ipcMain, files, ensureDir, rJSON, atomicWrite, 
       } catch (err) { console.error("[trx-load-filtered] Error:", err.message); return { transactions: [], total: 0, page, pageSize }; }
     });
 
+    // `trx-count-for-day` — hitung TOTAL transaksi pada satu tanggal (YYYY-MM-DD),
+    // tanpa batas paginasi. Dipakai generateTrxId supaya nomor urut harian
+    // (TRX-ddmmyyN) dihitung dari data lengkap, bukan dari state paginasi renderer
+    // yang cuma memuat 100 baris per halaman (bug P0: nomor urut salah/duplikat).
+    ipcMain.handle("trx-count-for-day", (_e, { date } = {}) => {
+      if (!db) return { ok: false, count: 0 };
+      try {
+        if (!date) return { ok: false, count: 0 };
+        const { count } = db.prepare("SELECT COUNT(*) as count FROM transactions WHERE date(created_at) = ?").get(String(date));
+        return { ok: true, count: Number(count) || 0 };
+      } catch (err) { console.error("[trx-count-for-day] Error:", err.message); return { ok: false, count: 0 }; }
+    });
+
     const filter = (fFrom, fTo, shiftId) => {
       const conditions = []; const params = [];
       if (fFrom) { conditions.push("date(created_at) >= date(?)"); params.push(fFrom); }
@@ -716,6 +746,47 @@ ipcMain.handle("trx-restore", (_e, list) => {
       if (!db) { atomicWrite(files.shifts, list); return { ok: true }; }
       try { db.exec("DELETE FROM shifts"); const stmt = db.prepare("INSERT INTO shifts (id, data) VALUES (?, ?)"); db.transaction((items) => items.forEach((item) => stmt.run(item.id || null, JSON.stringify(item))))(list); return { ok: true }; }
       catch (err) { console.error("[shifts-save] Error:", err.message); return { ok: false, error: err.message }; }
+    });
+
+    // ── devices: registry device follower Host (Fase 1 & 3) ──────────────────
+    ipcMain.handle("devices-list", () => {
+      if (!db) return [];
+      try { return db.prepare("SELECT * FROM devices ORDER BY last_seen DESC").all(); }
+      catch (err) { console.error("[devices-list] Error:", err.message); return []; }
+    });
+    ipcMain.handle("device-upsert", (_e, { hwid, name, status = "pending" } = {}) => {
+      if (!db) return { ok: false, error: "database belum siap" };
+      if (!hwid) return { ok: false, error: "hwid wajib" };
+      try {
+        db.prepare(`INSERT INTO devices (hwid, name, status, last_seen) VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(hwid) DO UPDATE SET name = excluded.name, status = excluded.status, last_seen = CURRENT_TIMESTAMP`)
+          .run(String(hwid), name || null, status);
+        return { ok: true, device: db.prepare("SELECT * FROM devices WHERE hwid = ?").get(String(hwid)) };
+      } catch (err) { console.error("[device-upsert] Error:", err.message); return { ok: false, error: err.message }; }
+    });
+    ipcMain.handle("device-assign", (_e, { hwid, userId } = {}) => {
+      if (!db) return { ok: false, error: "database belum siap" };
+      if (!hwid || !userId) return { ok: false, error: "hwid & userId wajib" };
+      try {
+        const info = db.prepare("UPDATE devices SET assigned_user_id = ?, status = 'active', granted_at = CURRENT_TIMESTAMP WHERE hwid = ?").run(String(userId), String(hwid));
+        if (!info.changes) return { ok: false, error: "device tak ada" };
+        return { ok: true, device: db.prepare("SELECT * FROM devices WHERE hwid = ?").get(String(hwid)) };
+      } catch (err) { console.error("[device-assign] Error:", err.message); return { ok: false, error: err.message }; }
+    });
+    ipcMain.handle("device-revoke", (_e, { hwid } = {}) => {
+      if (!db) return { ok: false, error: "database belum siap" };
+      if (!hwid) return { ok: false, error: "hwid wajib" };
+      try {
+        const info = db.prepare("UPDATE devices SET status = 'revoked', assigned_user_id = NULL, revoked_at = CURRENT_TIMESTAMP WHERE hwid = ?").run(String(hwid));
+        if (!info.changes) return { ok: false, error: "device tak ada" };
+        return { ok: true };
+      } catch (err) { console.error("[device-revoke] Error:", err.message); return { ok: false, error: err.message }; }
+    });
+    ipcMain.handle("device-remove", (_e, { hwid } = {}) => {
+      if (!db) return { ok: false, error: "database belum siap" };
+      if (!hwid) return { ok: false, error: "hwid wajib" };
+      try { db.prepare("DELETE FROM devices WHERE hwid = ?").run(String(hwid)); return { ok: true }; }
+      catch (err) { console.error("[device-remove] Error:", err.message); return { ok: false, error: err.message }; }
     });
   }
 

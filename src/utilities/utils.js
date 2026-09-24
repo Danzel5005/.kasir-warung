@@ -146,6 +146,22 @@ async deleteTrx(id, opts) {
     const transactions = filtered.slice(page * pageSize, (page + 1) * pageSize);
     return { transactions, total, page, pageSize };
   },
+
+  // Hitung TOTAL transaksi pada satu tanggal (YYYY-MM-DD) tanpa paginasi.
+  // Dipakai generateTrxId supaya nomor urut harian tidak terpotong page aktif.
+  async countTrxForDay(date) {
+    if (window.kasirAPI?.countTrxForDay) return window.kasirAPI.countTrxForDay(date);
+    // Fallback localStorage — hitung dari seluruh data, bukan state paginasi.
+    const all = (LS("ykk_trx") || []).map(healVoidedTrx);
+    const target = String(date || "");
+    const count = all.filter((t) => {
+      const d = new Date(t.timestamp);
+      if (Number.isNaN(d.getTime())) return false;
+      const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      return ds === target;
+    }).length;
+    return { ok: true, count };
+  },
   
   async getTrxDailyStats({ fFrom, fTo, shiftId }) {
     if (window.kasirAPI) return window.kasirAPI.getTrxDailyStats({ fFrom, fTo, shiftId });

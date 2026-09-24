@@ -413,7 +413,9 @@ const processPayment = useCallback(async ({
     ?? globalThis.METODE_LABELS?.[metode]
     ?? metode.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   
-  const trxId = generateTrxId();
+  // generateTrxId sekarang async (hitung nomor urut dari total transaksi hari
+  // itu di backend, bukan dari state paginasi). processPayment sudah async.
+  const trxId = await generateTrxId();
   const trx = {
     id: trxId, ...t, items: withUnitLabel(items),
     subtotal, pajak: p, service: s, discount: d, total: tot,

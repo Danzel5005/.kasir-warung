@@ -376,10 +376,11 @@ describe("db.cjs: initDB & registerHandlers", () => {
     services.svc.registerHandlers();
     expect(Object.keys(services.registry).sort()).toEqual([
       "apply-stock", "customer-totals",
+      "device-assign", "device-remove", "device-revoke", "device-upsert", "devices-list",
       "menu-bulk-upsert", "menu-delete", "menu-load", "menu-replace", "menu-upsert",
       "process-payment", "shifts-load", "shifts-save",
       "stock-in", "stock-movements", "stock-opname", "stock-set",
-      "trx-clear", "trx-delete", "trx-get-daily-stats", "trx-get-shift-ids",
+      "trx-clear", "trx-count-for-day", "trx-delete", "trx-get-daily-stats", "trx-get-shift-ids",
       "trx-load", "trx-load-filtered", "trx-restore", "trx-restore-cleared",
       "trx-restore-preview",
       "trx-save", "trx-settle", "trx-void",
@@ -520,6 +521,20 @@ describe("db.cjs: CRUD transaksi (jalur SQLite)", () => {
     expect(page1.transactions).toHaveLength(2);
     expect(page2.transactions).toHaveLength(2);
     expect(page1.transactions.map((t) => t.id)).not.toEqual(page2.transactions.map((t) => t.id));
+  });
+
+  it("trx-count-for-day menghitung total hari tanpa terpotong paginasi", () => {
+    const today = new Date();
+    const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    // 5 transaksi (semua bertimestamp hari ini di fake db).
+    for (let i = 0; i < 5; i += 1) call("trx-save", { id: `d${i}`, total: i });
+    const res = call("trx-count-for-day", { date: iso });
+    expect(res.ok).toBe(true);
+    expect(res.count).toBe(5);
+    // Tanggal lain -> 0.
+    expect(call("trx-count-for-day", { date: "2000-01-01" }).count).toBe(0);
+    // Tanpa date -> ok:false.
+    expect(call("trx-count-for-day", {}).ok).toBe(false);
   });
 });
 

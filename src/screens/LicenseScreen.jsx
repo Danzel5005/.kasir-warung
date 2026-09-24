@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { G, W, LT, BD, MT } from "../constants/design.js";
 import { SnakeLoader } from "../components/SnakeLoader.jsx";
+import JoinHostModal from "../components/modals/JoinHostModal.jsx";
+import { useLicenseHost } from "../hooks/useLicenseHost.js";
 
 export default function LicenseScreen({
   licenseH,
@@ -9,6 +12,9 @@ export default function LicenseScreen({
   setSnakeLoaderTrigger,
   setLicenseTransitioning,
 }) {
+  const [showJoin, setShowJoin] = useState(false);
+  const hostH = useLicenseHost();
+
   return (
     <div style={{minHeight:"100vh",background:`linear-gradient(135deg,${G} 0%,#0f3d24 100%)`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Segoe UI',sans-serif"}}>
       <div style={{background:W,borderRadius:18,padding:"36px 32px",width:400,maxWidth:"95vw",boxShadow:"0 24px 80px rgba(0,0,0,0.4)"}}>
@@ -57,7 +63,32 @@ export default function LicenseScreen({
         <div style={{textAlign:"center",marginTop:16,fontSize:10,color:MT,lineHeight:1.7}}>
           License terikat ke perangkat ini.<br/>Pindah PC? Hubungi penjual untuk reset aktivasi.
         </div>
+
+        {/* Fase 2: aktivasi-via-host — jalur kedua, di bawah aktivasi manual. */}
+        <div style={{display:"flex",alignItems:"center",gap:10,margin:"18px 0 14px"}}>
+          <div style={{flex:1,height:1,background:BD}} />
+          <div style={{fontSize:10,color:MT,fontWeight:600}}>ATAU</div>
+          <div style={{flex:1,height:1,background:BD}} />
+        </div>
+        <button
+          onClick={()=>setShowJoin(true)}
+          disabled={!hostH.available}
+          title={hostH.available?"":"Hanya tersedia di aplikasi desktop (Electron)"}
+          style={{width:"100%",padding:12,background:W,color:hostH.available?G:MT,border:`1.5px solid ${BD}`,borderRadius:9,cursor:hostH.available?"pointer":"not-allowed",fontFamily:"inherit",fontSize:12.5,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}
+        >
+          🔗 Aktifkan Aplikasi Melalui Device Lain
+        </button>
+        {!hostH.available && (
+          <div style={{textAlign:"center",marginTop:8,fontSize:10,color:MT}}>Fitur ini hanya tersedia di aplikasi desktop.</div>
+        )}
       </div>
+
+      <JoinHostModal
+        open={showJoin}
+        onClose={()=>setShowJoin(false)}
+        hostH={hostH}
+        onApproved={()=>{ /* Fase 3: reload memakai snapshot Host */ }}
+      />
     </div>
   );
 }

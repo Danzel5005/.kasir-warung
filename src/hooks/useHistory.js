@@ -20,23 +20,30 @@ function useHistory({ toast_, addUndo, getNow, authH, applyBahanUsage = null }) 
   const [shiftIdFilter, setShiftIdFilter] = useState(null);
   const [sortOrder, setSortOrder] = useState("desc");
 
-  // Generate TRX ID in format: TRX-ddmmyyN where N is sequential for the day
-  const generateTrxId = useCallback((date = new Date()) => {
+  // Generate TRX ID in format: TRX-ddmmyyN where N is sequential for the day.
+  // Async: nomor urut dihitung dari TOTAL transaksi hari itu di backend, BUKAN
+  // dari `history` (state yang terpaginasi 100/halaman) — kalau pakai history,
+  // hari dengan >pageSize transaksi bikin nomor urut salah/duplikat (bug P0).
+  const generateTrxId = useCallback(async (date = new Date()) => {
     const d = getNow ? getNow() : {
       tgl: String(date.getDate()).padStart(2, "0"),
       blnNum: String(date.getMonth() + 1).padStart(2, "0"),
       thn: String(date.getFullYear())
     };
     const dateStr = `${d.tgl}${d.blnNum}${d.thn.slice(-2)}`;
-    // Count transactions for this date from loaded history
-    const count = history.filter(t => {
-      const tDate = new Date(t.timestamp);
-      return tDate.getDate() === date.getDate() &&
-             tDate.getMonth() === date.getMonth() &&
-             tDate.getFullYear() === date.getFullYear();
-    }).length + 1;
-    return `TRX-${dateStr}${count}`;
-  }, [history, getNow]);
+    // Tanggal kalender untuk query backend (YYYY-MM-DD), sumber: `getNow()`.
+    const yyyymmdd = getNow
+      ? `${d.thn}-${d.blnNum}-${d.tgl}`
+      : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    let total = 0;
+    try {
+      const res = await api.countTrxForDay(yyyymmdd);
+      total = Number(res?.count) || 0;
+    } catch (err) {
+      console.error("[useHistory] generateTrxId count error:", err);
+    }
+    return `TRX-${dateStr}${total + 1}`;
+  }, [getNow]);
 
   // ── Core: Load filtered & paginated transactions from backend
   const loadFiltered = useCallback(async (page = 0, filters = {}) => {

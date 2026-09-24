@@ -13,6 +13,7 @@ const kasirAPI = {
 settleTrx: (id, actor) => ipcRenderer.invoke("trx-settle", id, actor),
   // New: Filtered & paginated transactions
   loadTrxFiltered: (filters) => ipcRenderer.invoke("trx-load-filtered", filters),
+  countTrxForDay: (date) => ipcRenderer.invoke("trx-count-for-day", { date }),
   getTrxDailyStats: (filters) => ipcRenderer.invoke("trx-get-daily-stats", filters),
   getTrxShiftIds: () => ipcRenderer.invoke("trx-get-shift-ids"),
   // Open Bills
@@ -91,6 +92,39 @@ settleTrx: (id, actor) => ipcRenderer.invoke("trx-settle", id, actor),
   // Info
   getDataPath:  ()      => ipcRenderer.invoke("get-data-path"),
   processPayment: (data) => ipcRenderer.invoke("process-payment", data),
+  // Hosting LAN (Fase 1)
+  hostingStart: (opts) => ipcRenderer.invoke("hosting-start", opts),
+  hostingStop:  ()     => ipcRenderer.invoke("hosting-stop"),
+  hostingStatus: ()    => ipcRenderer.invoke("hosting-status"),
+  discoveryBrowseStart: (opts) => ipcRenderer.invoke("discovery-browse-start", opts),
+  discoveryBrowseStop:  ()     => ipcRenderer.invoke("discovery-browse-stop"),
+  onHostingEvent: (callback) => {
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on("hosting:event", listener);
+    return () => ipcRenderer.removeListener("hosting:event", listener);
+  },
+  onDiscoveryHosts: (callback) => {
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on("discovery:hosts", listener);
+    return () => ipcRenderer.removeListener("discovery:hosts", listener);
+  },
+  // Client join / aktivasi-via-host (Fase 2)
+  clientJoin:       (hostInfo) => ipcRenderer.invoke("client-join", hostInfo),
+  clientDisconnect: ()         => ipcRenderer.invoke("client-disconnect"),
+  clientStatus:     ()         => ipcRenderer.invoke("client-status"),
+  hostLicenseStatus: ()        => ipcRenderer.invoke("host-license-status"),
+  hostLicenseClear:  ()        => ipcRenderer.invoke("host-license-clear"),
+  onClientEvent: (callback) => {
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on("client:event", listener);
+    return () => ipcRenderer.removeListener("client:event", listener);
+  },
+  // Devices registry (Fase 3)
+  loadDevices:  ()      => ipcRenderer.invoke("devices-list"),
+  upsertDevice: (d)     => ipcRenderer.invoke("device-upsert", d),
+  assignDevice: (d)     => ipcRenderer.invoke("device-assign", d),
+  revokeDevice: (d)     => ipcRenderer.invoke("device-revoke", d),
+  removeDevice: (d)     => ipcRenderer.invoke("device-remove", d),
   onBarcodeScanned: (callback) => {
     const listener = (_event, code) => callback(code);
     ipcRenderer.on("barcode-scanned", listener);

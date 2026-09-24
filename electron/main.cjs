@@ -8,6 +8,7 @@ const { createDatabaseService } = require("./db.cjs");
 const { createPrintingService } = require("./printing.cjs");
 const { registerAuthHandlers } = require("./auth-ipc.cjs");
 const { checkForUpdate } = require("./update-check.cjs");
+const { createNetworkService } = require("./network/network-service.cjs");
 
 let NodePrinterDriver = null;
 try { NodePrinterDriver = require("electron-printer"); }
@@ -63,6 +64,18 @@ const backup = createBackupService({ dataDir: DATA_DIR, files: FILES });
 const license = createLicenseService(app);
 const database = createDatabaseService({ ipcMain, files: FILES, ensureDir: backup.ensureDir, rJSON: backup.rJSON, atomicWrite: backup.atomicWrite, walAppend: backup.walAppend, walClear: backup.walClear });
 const backupRestore = createBackupRestoreService({ app, ipcMain, dialog, files: FILES, ensureDir: backup.ensureDir, rJSON: backup.rJSON, closeDB: database.closeDB, initDB: database.initDB, migrateJSONToSQLite: database.migrateJSONToSQLite, loadTrx: database.loadTrx, loadShifts: database.loadShifts });
+// Layanan hosting LAN (Fase 1): diteruskan ke semua window yang masih hidup
+// sebagai event `hosting:event` / `discovery:hosts` supaya UI Host/Client
+// bisa update live tanpa polling.
+const network = createNetworkService({
+  ipcMain,
+  app,
+  emit: (channel, payload) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send(channel, payload);
+    }
+  },
+});
 
 function registerFileHandlers() {
   ipcMain.handle("bills-load", () => backup.rJSON(FILES.bills) || []);
@@ -140,6 +153,7 @@ registerAuthHandlers({
 });
 database.registerHandlers();
 backupRestore.registerHandlers();
+network.registerHandlers();
 registerLicenseHandlers();
 createPrintingService({ app, ipcMain, BrowserWindow, dialog, dataDir: DATA_DIR, ensureDir: backup.ensureDir, rJSON: backup.rJSON, files: FILES, nodePrinterDriver: NodePrinterDriver });
 
@@ -172,5 +186,8 @@ app.whenReady().then(() => {
 
 app.on("window-all-closed", () => {
   database.closeDB();
+  network.shutdown();
   if (process.platform !== "darwin") app.quit();
 });
+
+app.on("before-quit", () => { network.shutdown(); });
