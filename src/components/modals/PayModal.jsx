@@ -182,15 +182,15 @@ export default function PayModal({ cartH, processPayment, setPayModal, paymentMe
             {!processPayment.__isAsync ? (
               <button
                 onClick={processPayment}
-                disabled={!cartH.canPay}
-                style={{ padding:10, border:"none", borderRadius:RADIUS.md, background:cartH.canPay ? OR : "#f0c89a", color:W, cursor:cartH.canPay ? "pointer" : "not-allowed", fontFamily:"inherit", fontSize:TYPOGRAPHY.small.fontSize, fontWeight:700 }}
-              >Konfirmasi Bayar</button>
+                disabled={!cartH.canPay || cartH.reservingStock}
+                style={{ padding:10, border:"none", borderRadius:RADIUS.md, background:(cartH.canPay && !cartH.reservingStock) ? OR : "#f0c89a", color:W, cursor:(cartH.canPay && !cartH.reservingStock) ? "pointer" : "not-allowed", fontFamily:"inherit", fontSize:TYPOGRAPHY.small.fontSize, fontWeight:700 }}
+              >{cartH.reservingStock ? "Memeriksa stok…" : "Konfirmasi Bayar"}</button>
             ) : (
               <button
                 onClick={() => processPayment().then(() => setPayModal(false))}
-                disabled={!cartH.canPay}
-                style={{ padding:10, border:"none", borderRadius:RADIUS.md, background:cartH.canPay ? OR : "#f0c89a", color:W, cursor:cartH.canPay ? "pointer" : "not-allowed", fontFamily:"inherit", fontSize:TYPOGRAPHY.small.fontSize, fontWeight:700 }}
-              >Konfirmasi Bayar</button>
+                disabled={!cartH.canPay || cartH.reservingStock}
+                style={{ padding:10, border:"none", borderRadius:RADIUS.md, background:(cartH.canPay && !cartH.reservingStock) ? OR : "#f0c89a", color:W, cursor:(cartH.canPay && !cartH.reservingStock) ? "pointer" : "not-allowed", fontFamily:"inherit", fontSize:TYPOGRAPHY.small.fontSize, fontWeight:700 }}
+              >{cartH.reservingStock ? "Memeriksa stok…" : "Konfirmasi Bayar"}</button>
             )}
           </div>
         </div>

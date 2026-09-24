@@ -92,6 +92,7 @@ settleTrx: (id, actor) => ipcRenderer.invoke("trx-settle", id, actor),
   // Info
   getDataPath:  ()      => ipcRenderer.invoke("get-data-path"),
   processPayment: (data) => ipcRenderer.invoke("process-payment", data),
+  transactionSync: (trx) => ipcRenderer.invoke("transaction-sync", trx),
   // Hosting LAN (Fase 1)
   hostingStart: (opts) => ipcRenderer.invoke("hosting-start", opts),
   hostingStop:  ()     => ipcRenderer.invoke("hosting-stop"),
@@ -124,6 +125,11 @@ settleTrx: (id, actor) => ipcRenderer.invoke("trx-settle", id, actor),
   pairingAssignableUsers: ()      => ipcRenderer.invoke("pairing-assignable-users"),
   pairingApprove:         (d)     => ipcRenderer.invoke("pairing-approve", d),
   pairingReject:          (d)     => ipcRenderer.invoke("pairing-reject", d),
+  // Reserve-stock (Fase 4) — Client minta Host memotong stok secara synchronous;
+  // Host offline → fallback lokal + outbox (§5.3).
+  reserveStock: (deltas, meta) => ipcRenderer.invoke("reserve-stock", { deltas, meta }),
+  outboxStatus: ()             => ipcRenderer.invoke("outbox-status"),
+  outboxFlush:  ()             => ipcRenderer.invoke("outbox-flush"),
   // Devices registry (Fase 3)
   loadDevices:  ()      => ipcRenderer.invoke("devices-list"),
   upsertDevice: (d)     => ipcRenderer.invoke("device-upsert", d),

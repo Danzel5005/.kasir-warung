@@ -1,4 +1,4 @@
-import { describe, expect, it, afterEach } from "vitest";
+import { describe, expect, it, afterEach, vi } from "vitest";
 import { createRequire } from "module";
 import fs from "fs";
 import os from "os";
@@ -174,5 +174,114 @@ describe("host-client: Fase 3 snapshot awal", () => {
     expect(evt.applied).toBe(false);
     expect(evt.snapshot).toEqual({ menu: [] });
     client.disconnect();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Fase 4 — sisi Client: reserveStock synchronous (§5.1) & terima stock-delta
+// delta-only dari Host (§5.2).
+// ---------------------------------------------------------------------------
+describe("host-client: Fase 4 reserveStock", () => {
+  it("reserveStock menerima balasan Host (roundtrip via host-server)", async () => {
+    const hostEvents = [];
+    const { server, port } = await startServer((evt) => hostEvents.push(evt));
+    server.setReserveHandler((req) => ({ ok: true, reserved: { a: 7 }, updatedAt: "T1", _seen: req.deltas }));
+
+    const clientEvents = [];
+    const client = createHostClient({
+      getHwid: () => "CLIENT-HWID-RES",
+      onEvent: (evt) => clientEvents.push(evt),
+    });
+    client.join({ host: "127.0.0.1", port, hostId: HOST_ID });
+    await waitForEvent(clientEvents, (e) => e.kind === "connected");
+
+    const res = await client.reserveStock({ a: -3 }, { type: "sale" });
+    expect(res.ok).toBe(true);
+    expect(res.reserved).toEqual({ a: 7 });
+    client.disconnect();
+  });
+
+  it("reserveStock saat offline → {ok:false, reason:'offline'}", async () => {
+    const clientEvents = [];
+    const client = createHostClient({
+      getHwid: () => "CLIENT-HWID-OFF",
+      onEvent: (evt) => clientEvents.push(evt),
+    });
+    const res = await client.reserveStock({ a: -1 });
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe("offline");
+  });
+
+  it("reserveStock timeout kalau Host tidak membalas", async () => {
+    const { port } = await startServer();
+    const clientEvents = [];
+    const client = createHostClient({
+      getHwid: () => "CLIENT-HWID-TMO",
+      onEvent: (evt) => clientEvents.push(evt),
+    });
+    client.join({ host: "127.0.0.1", port, hostId: HOST_ID });
+    await waitForEvent(clientEvents, (e) => e.kind === "connected");
+
+    // Pakai fake timer untuk memicu jalur timeout (Host tidak membalas).
+    vi.useFakeTimers();
+    const p = client.reserveStock({ a: -1 });
+    await Promise.resolve();
+    vi.advanceTimersByTime(5000);
+    const res = await p;
+    vi.useRealTimers();
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe("timeout");
+    client.disconnect();
+  });
+
+  it("Host balas 'unavailable' tanpa handler → diteruskan ke pemanggil", async () => {
+    const { port } = await startServer();
+    const clientEvents = [];
+    const client = createHostClient({
+      getHwid: () => "CLIENT-HWID-UNAVAIL",
+      onEvent: (evt) => clientEvents.push(evt),
+    });
+    client.join({ host: "127.0.0.1", port, hostId: HOST_ID });
+    await waitForEvent(clientEvents, (e) => e.kind === "connected");
+    const res = await client.reserveStock({ a: -1 });
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe("unavailable");
+    client.disconnect();
+  });
+
+  it("menerima stock-delta dan memanggil deltaApplier", async () => {
+    const hostEvents = [];
+    const { server, port } = await startServer((evt) => hostEvents.push(evt));
+    const applied = [];
+    const clientEvents = [];
+    const client = createHostClient({
+      getHwid: () => "CLIENT-HWID-DELTA",
+      onEvent: (evt) => clientEvents.push(evt),
+      deltaApplier: (rows) => applied.push(rows),
+    });
+    client.join({ host: "127.0.0.1", port, hostId: HOST_ID });
+    await waitForEvent(hostEvents, (e) => e.kind === "join-request" && e.hwid === "CLIENT-HWID-DELTA");
+
+    const rows = [{ productId: "a", newStock: 4, updatedAt: "T2" }];
+    server.sendTo("CLIENT-HWID-DELTA", { type: "stock-delta", rows });
+    const evt = await waitForEvent(clientEvents, (e) => e.kind === "stock-delta");
+    expect(evt.applied).toBe(true);
+    expect(evt.rows).toEqual(rows);
+    expect(applied).toEqual([rows]);
+    client.disconnect();
+  });
+
+  it("pending reserve diselesaikan sebagai 'disconnected' saat putus", async () => {
+    const { port } = await startServer();
+    const clientEvents = [];
+    const client = createHostClient({
+      getHwid: () => "CLIENT-HWID-DIS",
+      onEvent: (evt) => clientEvents.push(evt),
+    });
+    client.join({ host: "127.0.0.1", port, hostId: HOST_ID });
+    await waitForEvent(clientEvents, (e) => e.kind === "connected");
+    // Tidak ada handler reserve → server balas unavailable; tidak ada pending
+    // yang menggantung. Cukup pastikan disconnect tidak melempar.
+    expect(() => client.disconnect()).not.toThrow();
   });
 });

@@ -100,6 +100,41 @@ const network = createNetworkService({
     if (snapshot.resep && typeof snapshot.resep === "object") backup.atomicWrite(FILES.resep, snapshot.resep);
     if (Array.isArray(snapshot.bahanBaku)) backup.atomicWrite(FILES.bahanBaku, snapshot.bahanBaku);
   },
+
+  // ── Fase 4: otoritas stok (reserve-stock synchronous, §5.1) ─────────────
+  // Host memegang satu-satunya sumber kebenaran stok. Client mengirim
+  // reserve-stock; Host decrement dalam satu SQLite transaction lalu
+  // mem-broadcast HANYA baris yang berubah (§5.2).
+  applyStockDelta: (deltas, meta) => database.applyStockDelta(deltas, meta),
+  // Pembaca stok untuk pemeriksaan kecukupan SEBELUM decrement. Memakai
+  // loadMenuList (sumber yang sama dengan renderer) supaya tidak divergen.
+  loadStock: (ids) => {
+    const wanted = new Set((ids || []).map((id) => String(id)));
+    const map = {};
+    for (const item of database.loadMenuList() || []) {
+      if (wanted.has(String(item.id))) map[String(item.id)] = item.stok === undefined ? null : item.stok;
+    }
+    return map;
+  },
+  // Sisi Client (Fase 4): terapkan delta stok yang di-broadcast Host ke
+  // storage lokal. Delta = baris final dari Host (bukan delta negatif), jadi
+  // kita SET stok ke nilai itu — idempoten & tahan replay.
+  clientDeltaApplier: (rows) => {
+    if (!Array.isArray(rows) || !rows.length) return;
+    const menu = database.loadMenuList() || [];
+    let changed = false;
+    const byId = new Map(rows.map((r) => [String(r.productId), r]));
+    for (const item of menu) {
+      const row = byId.get(String(item.id));
+      if (!row) continue;
+      if (item.stok !== row.newStock) { item.stok = row.newStock; changed = true; }
+    }
+    if (changed) database.replaceMenuList(menu);
+  },
+  saveRemoteTransaction: (trx) => {
+    if (!trx || !trx.id) return { ok: false, error: "transaksi tidak valid" };
+    return database.saveTransactionFromSync ? database.saveTransactionFromSync(trx) : { ok: false, error: "sync transaksi belum tersedia" };
+  },
 });
 
 function registerFileHandlers() {

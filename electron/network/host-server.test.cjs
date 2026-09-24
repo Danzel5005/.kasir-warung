@@ -138,3 +138,92 @@ describe("host-server: registry & approve", () => {
     await fresh.stop();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Fase 4 — reserve-stock roundtrip (§5.1).
+// ---------------------------------------------------------------------------
+
+async function startServerWithReserve(handler, onEvent) {
+  const server = createHostServer({ hostId: HOST_ID, port: 0, onEvent, onReserve: handler });
+  server.start();
+  let st = server.status();
+  for (let i = 0; i < 50 && !st.listening; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    st = server.status();
+  }
+  current = { server, port: st.port };
+  return current;
+}
+
+function connect(port) {
+  const ws = new WebSocket(`ws://127.0.0.1:${port}`);
+  return new Promise((resolve) => ws.on("open", () => resolve(ws)));
+}
+
+describe("host-server: reserve-stock", () => {
+  it("meneruskan request ke handler & membalas reserve-stock-result", async () => {
+    const seen = [];
+    const { port } = await startServerWithReserve((req) => {
+      seen.push(req);
+      return { ok: true, reserved: { a: 7 }, updatedAt: "T1" };
+    });
+    const ws = await connect(port);
+    const resPromise = waitFor(ws, (m) => m.type === "reserve-stock-result");
+    ws.send(JSON.stringify({ type: "reserve-stock", reqId: "r1", deltas: { a: -3 }, meta: { type: "sale" } }));
+    const res = await resPromise;
+    expect(res.reqId).toBe("r1");
+    expect(res.ok).toBe(true);
+    expect(res.reserved).toEqual({ a: 7 });
+    expect(seen[0].deltas).toEqual({ a: -3 });
+    ws.close();
+  });
+
+  it("meneruskan shortfall insufficient apa adanya", async () => {
+    const { port } = await startServerWithReserve(() => ({
+      ok: false, reason: "insufficient",
+      shortfalls: [{ productId: "a", available: 1, needed: 5 }],
+    }));
+    const ws = await connect(port);
+    const resPromise = waitFor(ws, (m) => m.type === "reserve-stock-result");
+    ws.send(JSON.stringify({ type: "reserve-stock", reqId: "r2", deltas: { a: -5 } }));
+    const res = await resPromise;
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe("insufficient");
+    expect(res.shortfalls[0].needed).toBe(5);
+    ws.close();
+  });
+
+  it("tanpa handler → membalas unavailable (Client tidak menggantung)", async () => {
+    const { port } = await startServerWithReserve(null);
+    const ws = await connect(port);
+    const resPromise = waitFor(ws, (m) => m.type === "reserve-stock-result");
+    ws.send(JSON.stringify({ type: "reserve-stock", reqId: "r3", deltas: { a: -1 } }));
+    const res = await resPromise;
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe("unavailable");
+    ws.close();
+  });
+
+  it("setReserveHandler memasang handler setelah start", async () => {
+    const { server, port } = await startServerWithReserve(null);
+    server.setReserveHandler(() => ({ ok: true, reserved: { z: 0 } }));
+    const ws = await connect(port);
+    const resPromise = waitFor(ws, (m) => m.type === "reserve-stock-result");
+    ws.send(JSON.stringify({ type: "reserve-stock", reqId: "r4", deltas: { z: -1 } }));
+    const res = await resPromise;
+    expect(res.ok).toBe(true);
+    ws.close();
+  });
+
+  it("handler yang throw → membalas error, bukan menggantung", async () => {
+    const { port } = await startServerWithReserve(() => { throw new Error("db rusak"); });
+    const ws = await connect(port);
+    const resPromise = waitFor(ws, (m) => m.type === "reserve-stock-result");
+    ws.send(JSON.stringify({ type: "reserve-stock", reqId: "r5", deltas: { a: -1 } }));
+    const res = await resPromise;
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe("error");
+    expect(res.error).toBe("db rusak");
+    ws.close();
+  });
+});

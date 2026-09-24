@@ -14,10 +14,14 @@ const { createGrantSecret, signGrant } = require("./host-identity.cjs");
 
 const PING_INTERVAL_MS = 15000;
 
-function createHostServer({ hostId, port = 47474, onEvent = () => {} }) {
+// onReserve(request) -> Promise<{ ok, reserved?, reason?, shortfalls?, error? }>
+// Disuntik dari network-service (stock-authority.cjs). Kalau tidak ada,
+// reserve-stock dibalas dengan error supaya Client tidak menggantung.
+function createHostServer({ hostId, port = 47474, onEvent = () => {}, onReserve = null, onTransaction = null }) {
   let wss = null;
   let pingTimer = null;
   let listening = false;
+  let reserveHandler = onReserve;
   const clients = new Map(); // ws -> { hwid, deviceName, status, userId, lastSeen }
   let grantSecret = null;
 
@@ -59,7 +63,41 @@ function createHostServer({ hostId, port = 47474, onEvent = () => {} }) {
       case "ping":
         ws.send(JSON.stringify({ type: "pong" }));
         break;
-      // Fase 3/4 handlers (approve, reserve-stock, dll.) ditambahkan di sini.
+      case "reserve-stock": {
+        // §5.1 — synchronous: Client menunggu balasan per permintaan.
+        const reqId = msg.reqId || null;
+        const reply = (payload) => {
+          try { ws.send(JSON.stringify({ type: "reserve-stock-result", reqId, ...payload })); }
+          catch (err) { console.warn("[Host] reserve reply error:", err.message); }
+        };
+        if (!reserveHandler) { reply({ ok: false, reason: "unavailable", error: "Host belum siap menerima reserve-stock" }); break; }
+        // Bungkus dalam try + Promise.resolve supaya throw sinkron MAUPUN
+        // reject async sama-sama dibalas sebagai {ok:false, reason:"error"} —
+        // kalau tidak, throw sinkron lolos ke handler WS dan menjatuhkan Host.
+        let pending;
+        try {
+          pending = Promise.resolve(reserveHandler({ hwid: meta.hwid, deltas: msg.deltas, meta: msg.meta }));
+        } catch (err) {
+          reply({ ok: false, reason: "error", error: err?.message || String(err) });
+          break;
+        }
+        pending
+          .then((res) => reply(res && typeof res === "object" ? res : { ok: false, reason: "error" }))
+          .catch((err) => reply({ ok: false, reason: "error", error: err?.message || String(err) }));
+        break;
+      }
+      case "transaction": {
+        if (typeof onTransaction !== "function") {
+          ws.send(JSON.stringify({ type: "transaction-result", reqId: msg.reqId || null, ok: false, reason: "unavailable" }));
+          break;
+        }
+        let pending;
+        try { pending = Promise.resolve(onTransaction({ hwid: meta.hwid, userId: meta.userId, trx: msg.trx })); }
+        catch (err) { pending = Promise.reject(err); }
+        pending.then((res) => ws.send(JSON.stringify({ type: "transaction-result", reqId: msg.reqId || null, ...(res || { ok: false }) })))
+          .catch((err) => ws.send(JSON.stringify({ type: "transaction-result", reqId: msg.reqId || null, ok: false, error: err?.message || String(err) })));
+        break;
+      }
       default:
         onEvent({ kind: "message", hwid: meta.hwid, msg });
         break;
@@ -154,7 +192,9 @@ function createHostServer({ hostId, port = 47474, onEvent = () => {} }) {
     return { ok: false, error: "device tidak terhubung" };
   }
 
-  return { start, stop, status, broadcast, sendTo, approveFollower, getGrantSecret: () => grantSecret };
+  function setReserveHandler(fn) { reserveHandler = typeof fn === "function" ? fn : null; }
+
+  return { start, stop, status, broadcast, sendTo, approveFollower, setReserveHandler, getGrantSecret: () => grantSecret };
 }
 
 module.exports = { createHostServer };

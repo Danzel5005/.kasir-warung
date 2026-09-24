@@ -45,6 +45,7 @@ describe("network-service: IPC contract", () => {
       "client-join", "client-disconnect", "client-status",
       "host-license-status", "host-license-clear",
       "pairing-list", "pairing-assignable-users", "pairing-approve", "pairing-reject",
+      "reserve-stock", "outbox-status", "outbox-flush",
     ]) {
       expect(ipcMain.handlers.has(ch)).toBe(true);
     }
@@ -210,5 +211,106 @@ describe("network-service: Fase 3 — pairing (assign + snapshot)", () => {
     const { ipcMain } = makePair();
     const res = ipcMain.handlers.get("pairing-reject")({}, {});
     expect(res.ok).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Fase 4 — reserve-stock & outbox (§5.1–5.3).
+// ---------------------------------------------------------------------------
+describe("network-service: Fase 4 — reserve-stock fallback lokal", () => {
+  it("Host offline → terapkan lokal + catat outbox, balas {ok:true, offline:true}", async () => {
+    const applied = [];
+    const store = [];
+    const outbox = {
+      walAppend: (e) => store.push(e), count: () => store.length,
+      flush: async () => ({ ok: true, flushed: 0, failed: 0 }),
+    };
+    const { ipcMain, svc } = makePair(() => {}, {
+      applyStockDelta: (deltas, meta) => { applied.push({ deltas, meta }); return { p1: 4 }; },
+      outbox,
+    });
+    const res = await ipcMain.handlers.get("reserve-stock")({}, { deltas: { p1: -1 }, meta: { type: "sale" } });
+    expect(res.ok).toBe(true);
+    expect(res.offline).toBe(true);
+    expect(res.reserved).toEqual({ p1: 4 });
+    expect(applied[0].meta.type).toBe("sale-outbox");
+    expect(svc.syncOutbox.count()).toBe(1);
+  });
+
+  it("applyStockDelta throw → balas error, tidak crash", async () => {
+    const { ipcMain } = makePair(() => {}, {
+      applyStockDelta: () => { throw new Error("db rusak"); },
+      outbox: { walAppend: () => {}, count: () => 0, flush: async () => ({}) },
+    });
+    const res = await ipcMain.handlers.get("reserve-stock")({}, { deltas: { p1: -1 } });
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe("error");
+  });
+
+  it("outbox-status melaporkan jumlah pending", async () => {
+    const store = [];
+    const { ipcMain } = makePair(() => {}, {
+      applyStockDelta: () => ({}),
+      outbox: {
+        walAppend: (e) => store.push(e), count: () => store.length,
+        flush: async () => ({ ok: true, flushed: 0, failed: 0 }),
+      },
+    });
+    expect(ipcMain.handlers.get("outbox-status")({}).pending).toBe(0);
+    await ipcMain.handlers.get("reserve-stock")({}, { deltas: { p1: -2 } });
+    expect(ipcMain.handlers.get("outbox-status")({}).pending).toBe(1);
+  });
+
+  it("outbox-flush saat Host offline → {ok:false, error:'Host offline'}", async () => {
+    const { ipcMain } = makePair(() => {}, {
+      applyStockDelta: () => ({}),
+      outbox: {
+        walAppend: () => {}, count: () => 3,
+        flush: async () => ({ ok: true, flushed: 3, failed: 0 }),
+      },
+    });
+    const res = await ipcMain.handlers.get("outbox-flush")({});
+    expect(res.ok).toBe(false);
+    expect(res.error).toBe("Host offline");
+    expect(res.pending).toBe(3);
+  });
+
+  it("tanpa dataDir/outbox → reserve-stock tetap sukses lokal, queued:false", async () => {
+    const { ipcMain } = makePair(() => {}, { applyStockDelta: () => ({ p1: 9 }) });
+    const res = await ipcMain.handlers.get("reserve-stock")({}, { deltas: { p1: -1 } });
+    expect(res.ok).toBe(true);
+    expect(res.queued).toBe(false);
+    expect(res.reserved).toEqual({ p1: 9 });
+  });
+});
+
+describe("network-service: Fase 4 — reserve-stock via Host nyata", () => {
+  it("Client terhubung → reserve diteruskan ke Host (sumber kebenaran)", async () => {
+    const emitted = [];
+    const { ipcMain, svc } = makePair((ch, payload) => emitted.push({ ch, payload }), {
+      applyStockDelta: (deltas) => {
+        const out = {};
+        for (const id of Object.keys(deltas)) out[id] = 5;
+        return out;
+      },
+      loadStock: () => ({ p1: 5 }),
+    });
+    await ipcMain.handlers.get("hosting-start")({}, { port: 0 });
+    const port = ipcMain.handlers.get("hosting-status")({}).port;
+
+    // Connect client ke host yang sama.
+    const joinRes = ipcMain.handlers.get("client-join")({}, { host: "127.0.0.1", port });
+    expect(joinRes.ok).toBe(true);
+    for (let i = 0; i < 100 && !svc.hostClient.status().connected; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    expect(svc.hostClient.status().connected).toBe(true);
+
+    const res = await ipcMain.handlers.get("reserve-stock")({}, { deltas: { p1: -1 }, meta: { type: "sale" } });
+    expect(res.ok).toBe(true);
+    expect(res.offline).toBeUndefined();
+    expect(res.reserved).toEqual({ p1: 5 });
+
+    await svc.shutdown();
   });
 });

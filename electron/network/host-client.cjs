@@ -13,6 +13,7 @@ const WebSocket = require("ws");
 const { buildGrantPayload } = require("./host-license.cjs");
 
 const CONNECT_TIMEOUT_MS = 8000;
+const RESERVE_TIMEOUT_MS = 5000;
 
 // createHostClient({ getHwid, deviceName, hostLicenseStore, onEvent, snapshotApplier })
 //   onEvent(evt) — evt.kind: "connecting" | "connected" | "waiting" |
@@ -20,13 +21,31 @@ const CONNECT_TIMEOUT_MS = 8000;
 //   snapshotApplier(snapshot) — opsional; dipakai untuk menulis snapshot awal
 //                  (menu/settings/open-bill) ke storage lokal Client. Kalau tidak
 //                  ada, snapshot tetap di-emit supaya renderer bisa mengurusnya.
-function createHostClient({ getHwid, deviceName = "DEN POS", hostLicenseStore, onEvent = () => {}, snapshotApplier = null }) {
+//   deltaApplier(rows) — opsional; dipakai saat Host mem-broadcast delta stok
+//                  ({productId, newStock, updatedAt}[]) ke Client (§5.2).
+function createHostClient({ getHwid, deviceName = "DEN POS", hostLicenseStore, onEvent = () => {}, snapshotApplier = null, deltaApplier = null }) {
   let ws = null;
   let target = null; // { host, port, hostId, name }
   let connectTimer = null;
+  let reqSeq = 0;
+  const pendingReserves = new Map(); // reqId -> { resolve, timer }
+
+  function settleReserve(reqId, payload) {
+    const pending = pendingReserves.get(reqId);
+    if (!pending) return;
+    pendingReserves.delete(reqId);
+    if (pending.timer) clearTimeout(pending.timer);
+    pending.resolve(payload);
+  }
 
   function cleanup() {
     if (connectTimer) { clearTimeout(connectTimer); connectTimer = null; }
+    // Gagalkan semua reserve yang masih menunggu (koneksi putus).
+    for (const [reqId, pending] of pendingReserves) {
+      if (pending.timer) clearTimeout(pending.timer);
+      pending.resolve({ ok: false, reason: "disconnected" });
+      pendingReserves.delete(reqId);
+    }
     if (ws) {
       try { ws.removeAllListeners(); ws.close(); } catch (_) { /* ignore */ }
       ws = null;
@@ -69,6 +88,20 @@ function createHostClient({ getHwid, deviceName = "DEN POS", hostLicenseStore, o
           catch (err) { console.warn("[Client] snapshotApplier error:", err?.message || err); }
         }
         onEvent({ kind: "snapshot", snapshot: msg.snapshot || {}, applied, sentAt: msg.sentAt });
+        break;
+      }
+      case "reserve-stock-result":
+        settleReserve(msg.reqId, msg);
+        break;
+      case "stock-delta": {
+        // §5.2 — Host hanya mengirim baris yang berubah.
+        const rows = Array.isArray(msg.rows) ? msg.rows : [];
+        let applied = false;
+        if (deltaApplier && rows.length) {
+          try { deltaApplier(rows); applied = true; }
+          catch (err) { console.warn("[Client] deltaApplier error:", err?.message || err); }
+        }
+        onEvent({ kind: "stock-delta", rows, applied });
         break;
       }
       case "ping":
@@ -133,6 +166,45 @@ function createHostClient({ getHwid, deviceName = "DEN POS", hostLicenseStore, o
     return { ok: true };
   }
 
+  // §5.1 — reserve-stock synchronous. Mengembalikan Promise yang resolve
+  // dengan balasan Host ({ok, reserved,...}) atau {ok:false, reason:"offline"}
+  // kalau Client tidak terhubung. Renderer menampilkan state loading saat ini.
+  function reserveStock(deltas, meta) {
+    return new Promise((resolve) => {
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        onEvent({ kind: "reserve-offline" });
+        resolve({ ok: false, reason: "offline" });
+        return;
+      }
+      const reqId = `rs-${++reqSeq}-${Date.now()}`;
+      const timer = setTimeout(() => {
+        pendingReserves.delete(reqId);
+        onEvent({ kind: "reserve-timeout" });
+        resolve({ ok: false, reason: "timeout" });
+      }, RESERVE_TIMEOUT_MS);
+      if (timer.unref) timer.unref();
+      pendingReserves.set(reqId, { resolve, timer });
+      try {
+        ws.send(JSON.stringify({ type: "reserve-stock", reqId, deltas, meta: meta || {} }));
+      } catch (err) {
+        settleReserve(reqId, { ok: false, reason: "error", error: err.message });
+      }
+    });
+  }
+
+  function sendTransaction(trx) {
+    return new Promise((resolve) => {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return resolve({ ok: false, reason: "offline" });
+      const reqId = `tx-${++reqSeq}-${Date.now()}`;
+      const timer = setTimeout(() => resolve({ ok: false, reason: "timeout" }), RESERVE_TIMEOUT_MS);
+      if (timer.unref) timer.unref();
+      const done = (msg) => { clearTimeout(timer); ws?.off("message", listener); resolve(msg); };
+      const listener = (raw) => { try { const msg = JSON.parse(raw.toString()); if (msg.type === "transaction-result" && msg.reqId === reqId) done(msg); } catch {} };
+      ws.on("message", listener);
+      try { ws.send(JSON.stringify({ type: "transaction", reqId, trx })); } catch (err) { done({ ok: false, error: err.message }); }
+    });
+  }
+
   function status() {
     return {
       connected: !!ws && ws.readyState === WebSocket.OPEN,
@@ -141,7 +213,7 @@ function createHostClient({ getHwid, deviceName = "DEN POS", hostLicenseStore, o
     };
   }
 
-  return { join, disconnect, status };
+  return { join, disconnect, status, reserveStock, sendTransaction };
 }
 
-module.exports = { createHostClient, CONNECT_TIMEOUT_MS };
+module.exports = { createHostClient, CONNECT_TIMEOUT_MS, RESERVE_TIMEOUT_MS };

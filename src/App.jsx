@@ -34,6 +34,7 @@ import ViewLaporan from "./views/ViewLaporan.jsx";
 import ViewKelola from "./views/ViewKelola.jsx";
 import ViewFiturLanjutan from "./views/ViewFiturLanjutan.jsx";
 import CustomerPicker from "./components/CustomerPicker.jsx";
+import LanSyncStatus from "./components/LanSyncStatus.jsx";
 
   import { useHistoryVoid } from "./hooks/useHistoryVoid.js";
 
@@ -487,6 +488,9 @@ const executeConfirmDel = useCallback((restoreStock = false) => {
         navigate={navigate}
         logoRef={logoRef}
       />
+      <div style={{ display: "flex", justifyContent: "flex-end", padding: "5px 16px", background: W, borderBottom: `1px solid ${BD}` }}>
+        <LanSyncStatus />
+      </div>
 
       {/* ══ BODY ══════════════════════════════════════════════════════════════ */}
       <div style={{flex:1,display:"flex",overflow:"hidden",position:"relative"}}>

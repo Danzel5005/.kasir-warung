@@ -254,6 +254,22 @@ async deleteTrx(id, opts) {
   },
   // Alias eksplisit supaya pemanggil tidak perlu tahu `applyStock`.
   async adjustStock(deltas, meta) { return this.applyStock(deltas, meta); },
+  // ── LAN sync (Fase 4) ──────────────────────────────────────────────────
+  // reserveStock = satu-satunya jalur yang boleh MENGURANGI stok saat app
+  // berjalan sebagai Client (LAN). Client mengirim permintaan ke Host dan
+  // menunggu balasan synchronous (§5.1). Kalau Host offline, main process
+  // jatuh ke fallback lokal + outbox (§5.3) dan mengembalikan { offline:true }.
+  // Kalau bukan Client (standalone), langsung applyStock lokal supaya tidak
+  // mengubah perilaku app yang belum pakai LAN.
+  async reserveStock(deltas, meta) {
+    if (window.kasirAPI?.reserveStock) return window.kasirAPI.reserveStock(deltas, meta);
+    // Fallback browser murni: perlakukan sebagai lokal.
+    const res = await this.applyStock(deltas, meta);
+    return { ok: true, offline: true, reserved: res?.stock || {}, browser: true };
+  },
+  async outboxStatus() { return window.kasirAPI?.outboxStatus ? window.kasirAPI.outboxStatus() : { ok: true, pending: 0 }; },
+  async outboxFlush()  { return window.kasirAPI?.outboxFlush ? window.kasirAPI.outboxFlush() : { ok: false, error: "tidak tersedia" }; },
+  async transactionSync(trx) { return window.kasirAPI?.transactionSync ? window.kasirAPI.transactionSync(trx) : { ok: false, reason: "offline" }; },
   // Stok masuk (restock). Browser fallback: tambah stok + catat mutasi di LS.
   async stockIn({ id, qty, modalBaru, note, actor } = {}) {
     if (window.kasirAPI?.stockIn) return window.kasirAPI.stockIn({ id, qty, modalBaru, note, actor });

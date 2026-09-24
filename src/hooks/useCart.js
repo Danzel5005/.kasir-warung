@@ -58,6 +58,10 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
   const [metode, setMetode]     = useState("cash");
   const [paid, setPaid]         = useState("");
   const [activeBill, setActiveBill] = useState(null);
+  // Fase 4: true saat menunggu konfirmasi stok dari Host (reserve-stock §5.1).
+  // Dipakai tombol bayar untuk menampilkan state loading — bagian dari fitur,
+  // bukan kosmetik (Rule 6: loading/failure states).
+  const [reservingStock, setReservingStock] = useState(false);
   const [additionalsModal, setAdditionalsModal] = useState({ open: false, item: null });
   const [pendingItem, setPendingItem] = useState(null);
   // Reactive state for receiptAdditionals - initialized from props, can be updated via setter
@@ -330,8 +334,22 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
     // Stok dihitung di main process (Langkah 2) dan persist ke SQLite/JSON;
     // view di-patch dari hasil { stock } supaya UI tetap akurat.
     if (stockDelta && Object.keys(stockDelta).length > 0) {
-      const res = await api.applyStock(stockDelta, { type: "openbill", ref: activeBill?.id || billId });
-      if (res?.ok && res.stock && applyStockView) applyStockView(res.stock);
+      // Fase 4: lewat reserve-stock supaya race "stok habis di device lain"
+      // bisa dicegah saat app jalan sebagai Client LAN (§5.1). Di standalone,
+      // main process meneruskan ini ke applyStock lokal seperti biasa.
+      const res = await api.reserveStock(stockDelta, { type: "openbill", ref: activeBill?.id || billId });
+      if (res?.ok) {
+        if (res.offline) toast_("Host offline — stok dipotong lokal, akan disinkron nanti", "warn");
+        const patch = res.reserved || res.stock;
+        if (patch && applyStockView) applyStockView(patch);
+      } else if (res?.reason === "insufficient") {
+        const short = res.shortfalls?.[0];
+        toast_(short ? `Stok "${short.productId}" tidak cukup: butuh ${short.needed}, tersedia ${short.available}` : "Stok tidak mencukupi", "err");
+        return;
+      } else {
+        toast_(`Gagal memotong stok${res?.error ? `: ${res.error}` : ""}`, "err");
+        return;
+      }
     }
     
     await persistBills(updatedBills);
@@ -433,13 +451,62 @@ const processPayment = useCallback(async ({
     customerTelepon: customer?.phone || "",
     ...receiptAdditionalData, // Include receipt additional fields
   };
-  // Stok TIDAK dihitung di renderer (Langkah 2). Main process yang
+  // ── Fase 4: reserve stok synchronous sebelum finalisasi (LAN) ───────────
+  // Semua yang mengurangi stok lewat reserve-stock supaya race "stok habis di
+  // device lain" bisa dicegah (§5.1). Di standalone, main process meneruskan
+  // ini ke applyStock lokal; hasilnya sama seperti sebelumnya.
+  // Bayar dari open-bill TIDAK reserve lagi (stok sudah dipotong saat bill
+  // dibuat), sama seperti main process menskip lewat activeBillId.
+  let stockReserved = false;
+  if (!billIdToClose) {
+    const deltas = {};
+    for (const it of trx.items || []) {
+      if (!it || it.id === undefined || it.id === null) continue;
+      const qty = Number(it.baseQty ?? it.qty) || 0;
+      if (qty === 0) continue;
+      deltas[String(it.id)] = (deltas[String(it.id)] || 0) - qty;
+    }
+    if (Object.keys(deltas).length > 0) {
+      if (setReservingStock) setReservingStock(true); // indikator "menunggu konfirmasi stok"
+      try {
+        const reserved = await api.reserveStock(deltas, { type: "sale", ref: trx.id });
+        if (!reserved?.ok) {
+          if (reserved?.reason === "insufficient") {
+            const short = reserved.shortfalls?.[0];
+            toast_(short
+              ? `Stok habis — "${short.productId}" baru saja terjual di device lain. Tersedia ${short.available}.`
+              : "Stok habis — item ini baru saja terjual di device lain.", "err");
+          } else {
+            toast_(`Gagal memastikan stok${reserved?.error ? `: ${reserved.error}` : ""}. Coba lagi.`, "err");
+          }
+          return null;
+        }
+        stockReserved = true;
+        if (reserved.offline) toast_("Host offline — transaksi disimpan lokal, akan disinkron nanti", "warn");
+      } finally {
+        if (setReservingStock) setReservingStock(false);
+      }
+    }
+  }
+
+  // Stok TIDAK dihitung ulang di renderer (Langkah 2). Main process yang
   // menghitung & menulis delta di dalam SATU transaksi SQLite bersama
   // INSERT transaksi. Open bill: stok sudah dikurangi saat bill dibuat,
   // main process melewatkan deduksi ulang karena activeBillId dikirim.
-  const result = await api.processPayment({ trx, activeBillId: billIdToClose });
+  // Fase 4: kalau Client LAN sudah reserve stok (stockReserved), main process
+  // juga melewati deduksi supaya tidak dobel.
+  const result = await api.processPayment({ trx, activeBillId: billIdToClose, stockReserved });
 
   if (!result.ok) { toast_("Gagal menyimpan transaksi", "err"); return null; }
+  // Fase 5: Client mengirim transaksi yang sudah tersimpan lokal ke Host.
+  // Host memakai INSERT OR IGNORE sehingga retry/reconnect aman dan tidak
+  // menggandakan riwayat. Kegagalan jaringan tidak membatalkan transaksi lokal.
+  if (!result.offline) {
+    const synced = await api.transactionSync(trx);
+    if (synced?.reason === "offline" || synced?.reason === "timeout") {
+      toast_("Transaksi tersimpan lokal — belum tersinkron ke Device A", "warn");
+    }
+  }
 
   if (result.stock && applyStockView) applyStockView(result.stock); // patch view setelah IPC sukses
   // Bahan baku: potong sesuai resep hanya untuk penjualan langsung (bukan
@@ -463,6 +530,7 @@ const processPayment = useCallback(async ({
     saveOpenBill, loadBillToCart, processPayment, checkRequiredAdditionals, getCanPay,
     setReceiptAdditionals,
     setPricingConfig,
+    reservingStock,
   };
 }
 

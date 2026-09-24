@@ -715,7 +715,7 @@ ipcMain.handle("trx-restore", (_e, list) => {
       return deltas;
     }
 
-    ipcMain.handle("process-payment", (_e, { trx, updatedMenu, activeBillId }) => {
+    ipcMain.handle("process-payment", (_e, { trx, updatedMenu, activeBillId, stockReserved }) => {
       try {
         if (!db) {
           const allTrx = rJSON(files.trx) || []; allTrx.unshift(trx); atomicWrite(files.trx, allTrx);
@@ -726,10 +726,12 @@ ipcMain.handle("trx-restore", (_e, list) => {
         walAppend(trx);
         // INSERT transaksi + potong stok dalam SATU transaksi SQLite. Kalau
         // bayar dari open bill, stok sudah dipotong saat bill dibuat -> skip.
+        // Fase 4: kalau `stockReserved` true (Client LAN sudah reserve stok di
+        // Host lewat reserve-stock §5.1), JANGAN potong ulang di sini.
         let stock = {};
         const run = db.transaction(() => {
           db.prepare("INSERT INTO transactions (id, data) VALUES (?, ?)").run(trx.id || null, JSON.stringify(trx));
-          if (!activeBillId) stock = applyStockDelta(stockDeltasFromTrx(trx, -1), { type: "sale", ref: trx?.id });
+          if (!activeBillId && !stockReserved) stock = applyStockDelta(stockDeltasFromTrx(trx, -1), { type: "sale", ref: trx?.id });
         });
         run();
         if (activeBillId) atomicWrite(files.bills, (rJSON(files.bills) || []).filter((bill) => String(bill.id) !== String(activeBillId)));
@@ -805,7 +807,16 @@ ipcMain.handle("trx-restore", (_e, list) => {
     catch (err) { console.error("[loadShifts] Error:", err.message); return null; }
   }
 
-  return { initDB, migrateJSONToSQLite, migrateMenuToProducts, closeDB, registerHandlers, applyStockDelta, loadMenuList, replaceMenuList, restoreStockFromTrx, loadTrx, loadShifts };
+  function saveTransactionFromSync(trx) {
+    if (!trx || !trx.id) return { ok: false, error: "transaksi tidak valid" };
+    if (!db) return { ok: false, error: "database belum siap" };
+    try {
+      db.prepare("INSERT OR IGNORE INTO transactions (id, data) VALUES (?, ?)").run(trx.id, JSON.stringify(trx));
+      return { ok: true, duplicate: false };
+    } catch (err) { return { ok: false, error: err.message }; }
+  }
+
+  return { initDB, migrateJSONToSQLite, migrateMenuToProducts, closeDB, registerHandlers, applyStockDelta, loadMenuList, replaceMenuList, restoreStockFromTrx, loadTrx, loadShifts, saveTransactionFromSync };
 }
 
 module.exports = { createDatabaseService };

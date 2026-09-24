@@ -729,6 +729,20 @@ describe("db.cjs: process-payment", () => {
     expect(services.walCleared).toBe(1);
   });
 
+  it("stockReserved:true tidak mendekrement stok lagi (reserve Host sudah terjadi)", () => {
+    services.svc.initDB();
+    services.svc.registerHandlers();
+    call("menu-upsert", { id: "m-res", nama: "Kopi", stok: 8 });
+    const res = call("process-payment", {
+      trx: { id: "p-res", total: 100, items: [{ id: "m-res", nama: "Kopi", qty: 2 }] },
+      stockReserved: true,
+    });
+    expect(res.ok).toBe(true);
+    expect(res.stock).toEqual({});
+    expect(call("menu-load").find((m) => m.id === "m-res").stok).toBe(8);
+    expect(call("trx-load").map((t) => t.id)).toContain("p-res");
+  });
+
   it("jalur fallback (tanpa SQLite) memakai JSON store dan tetap sukses", () => {
     services.svc.registerHandlers();
     fs.writeFileSync(files.menu, JSON.stringify([{ id: "m2", nama: "Teh", stok: 5 }]), "utf-8");
