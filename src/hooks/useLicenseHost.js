@@ -70,7 +70,7 @@ export function useLicenseHost() {
     if (!available) return;
     setHosts([]);
     setBrowsing(true);
-    setPhase("searching");
+    setPhase("idle");
     await bridge.discoveryBrowseStart({});
   }, [available, bridge]);
 
