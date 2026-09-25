@@ -93,10 +93,12 @@ export function bahanBakuUsage(bahanId = "", resep = {}, menu = []) {
     const lines = Array.isArray(resepMap[menuId]) ? resepMap[menuId] : [];
     const hits = lines.filter((l) => String(l?.bahanId || "").trim() === key);
     if (hits.length === 0) continue;
+    const nama = nameMap.get(String(menuId).trim());
+    if (!nama) continue;
     const qty = hits.reduce((sum, l) => sum + Number(l?.qty || 0), 0);
     out.push({
       menuId,
-      nama: nameMap.get(String(menuId).trim()) || `Menu ${menuId}`,
+      nama,
       qty,
     });
   }

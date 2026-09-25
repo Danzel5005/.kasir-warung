@@ -1,4 +1,4 @@
-import { W, BD, MT, TX, RADIUS, TYPOGRAPHY } from "../../constants/design.js";
+import { W, BD, MT, TX, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/design.js";
 
 // BahanListModal — modal daftar SEMUA bahan baku (dibuka dari tombol
 // "Lihat semua bahan" di panel Bahan Baku pada halaman Fitur Lanjutan).
@@ -12,8 +12,10 @@ import { W, BD, MT, TX, RADIUS, TYPOGRAPHY } from "../../constants/design.js";
 //   search     - nilai kata kunci pencarian saat ini
 //   onSearch   - callback perubahan kata kunci
 //   onPick     - callback saat sebuah bahan dipilih (buka detail)
+//   onEdit     - callback saat tombol edit dipilih
+//   onDelete   - callback saat tombol hapus dipilih
 //   onClose    - callback tutup
-export default function BahanListModal({ list = [], search = "", onSearch, onPick, onClose }) {
+export default function BahanListModal({ list = [], search = "", onSearch, onPick, onEdit, onDelete, onClose }) {
   return (
     <div
       style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100 }}
@@ -26,7 +28,7 @@ export default function BahanListModal({ list = [], search = "", onSearch, onPic
         <div style={{ padding: "12px 16px", borderBottom: `1px solid ${BD}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <div style={{ fontSize: TYPOGRAPHY.body.fontSize, fontWeight: 700, color: TX }}>Semua Bahan Baku</div>
-            <div style={{ fontSize: TYPOGRAPHY.label.fontSize, color: MT }}>{list.length} bahan &middot; klik bahan untuk lihat detail</div>
+            <div style={{ fontSize: TYPOGRAPHY.label.fontSize, color: MT }}>{list.length} bahan</div>
           </div>
           <button
             onClick={onClose}
@@ -56,13 +58,17 @@ export default function BahanListModal({ list = [], search = "", onSearch, onPic
             </div>
           ) : (
             list.map((b) => (
-              <div
-                key={b.id}
-                style={{ padding: "8px 2px", borderBottom: `1px solid ${BD}`, cursor: "pointer", fontSize: TYPOGRAPHY.small.fontSize, fontWeight: 600, color: TX }}
-                onClick={() => onPick?.(b)}
-                title="Klik untuk lihat detail bahan"
-              >
-                {b.nama} <span style={{ color: MT, fontWeight: 400 }}>({b.satuan || "-"})</span>
+              <div key={b.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: `1px solid ${BD}` }}>
+                <button
+                  type="button"
+                  style={{ flex: 1, minWidth: 0, padding: "4px 2px", border: 0, background: "transparent", textAlign: "left", cursor: "pointer", fontFamily: "inherit", fontSize: TYPOGRAPHY.small.fontSize, fontWeight: 600, color: TX }}
+                  onClick={() => onPick?.(b)}
+                  title="Klik untuk lihat detail bahan"
+                >
+                  {b.nama} <span style={{ color: MT, fontWeight: 400 }}>({b.satuan || "-"})</span>
+                </button>
+                <button type="button" onClick={() => onEdit?.(b)} style={{ border: 0, borderRadius: RADIUS.sm, padding: "5px 9px", background: COLOR_PALETTE.infoLight, color: COLOR_PALETTE.info, cursor: "pointer", fontFamily: "inherit", fontSize: TYPOGRAPHY.label.fontSize, fontWeight: 600 }}>Edit</button>
+                <button type="button" onClick={() => onDelete?.(b)} style={{ border: 0, borderRadius: RADIUS.sm, padding: "5px 9px", background: COLOR_PALETTE.dangerLight, color: COLOR_PALETTE.danger, cursor: "pointer", fontFamily: "inherit", fontSize: TYPOGRAPHY.label.fontSize, fontWeight: 600 }}>Hapus</button>
               </div>
             ))
           )}

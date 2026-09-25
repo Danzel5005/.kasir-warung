@@ -17,14 +17,14 @@ describe("cash flow shift browsing", () => {
     const html = renderToStaticMarkup(<CashFlowShifts shifts={shifts} />);
     expect(html).toContain("Shift 23");
     expect(html).not.toContain("Shift 12");
-    expect(html).toContain("Tampilkan Semua shift");
+    expect(html).toContain("Tampilkan Semua Shift");
     expect(html).toContain("Memuat arus kas");
   });
 
   it("keeps history accessible when no shifts are active", () => {
     const html = renderToStaticMarkup(<CashFlowShifts shifts={[shifts[0]]} />);
     expect(html).toContain("Tidak ada shift aktif");
-    expect(html).toContain("Tampilkan Semua shift");
+    expect(html).toContain("Tampilkan Semua Shift");
   });
 
   it("includes a restored active shift without duplicating an existing one", () => {

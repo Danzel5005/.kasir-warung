@@ -1,7 +1,7 @@
 import { memo } from "react";
-import { G, W, LT, BD, MT, TX, RADIUS, TYPOGRAPHY } from "../constants/design.js";
+import { G, W, BD, MT, RADIUS, TYPOGRAPHY } from "../constants/design.js";
 import AdvancedDataPanel from "../components/AdvancedDataPanel.jsx";
-import { ADVANCED_FEATURE_GROUPS, DEFAULT_ADVANCED_FEATURES } from "../constants/advancedFeatures.js";
+import { DEFAULT_ADVANCED_FEATURES } from "../constants/advancedFeatures.js";
 
 // ViewFiturLanjutan — halaman terpisah untuk seluruh fitur tingkat lanjut
 // (import Excel menu/bahan/resep, bahan baku, supplier, loyalty tier, resep &
@@ -17,7 +17,7 @@ import { ADVANCED_FEATURE_GROUPS, DEFAULT_ADVANCED_FEATURES } from "../constants
 //   advancedData - nilai balik useAdvancedData()
 //   settings     - objek settings (untuk isAdvancedFeatureOn)
 //   toast_       - feedback opsional
-function ViewFiturLanjutan({ menu, cats, advancedData, settings, toast_, onImported }) {
+function ViewFiturLanjutan({ menu, cats, advancedData, settings, toast_, addUndo, onImported }) {
   const adv = settings?.advancedFeatures || DEFAULT_ADVANCED_FEATURES;
 
   return (
@@ -31,59 +31,18 @@ function ViewFiturLanjutan({ menu, cats, advancedData, settings, toast_, onImpor
       </div>
 
       <div style={{ flex: 1, overflowY: "auto", paddingBottom: 16 }}>
-        {/* Ringkasan fitur yang sedang aktif */}
-        <div style={{ padding: "10px 16px 0" }}>
-          <div style={{ background: LT, border: `1px solid ${BD}`, borderRadius: RADIUS.md, padding: "10px 12px" }}>
-            <div style={{ fontSize: TYPOGRAPHY.label.fontSize, fontWeight: 700, color: TX, marginBottom: 6 }}>
-              Ringkasan status
-            </div>
-            {ADVANCED_FEATURE_GROUPS.map((group) => (
-              <div key={group.fase} style={{ marginBottom: 6 }}>
-                <div style={{ fontSize: TYPOGRAPHY.label.fontSize, color: MT, fontWeight: 600 }}>{group.fase}</div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 3 }}>
-                  {group.items.map((item) => {
-                    const on = !!adv[item.key];
-                    return (
-                      <span
-                        key={item.key}
-                        title={item.desc}
-                        style={{
-                          fontSize: TYPOGRAPHY.label.fontSize,
-                          padding: "2px 8px",
-                          borderRadius: RADIUS.sm,
-                          background: on ? "#e8f5ee" : COLORS.off,
-                          color: on ? G : MT,
-                          border: `1px solid ${on ? "#a8d5b8" : BD}`,
-                          fontWeight: 600,
-                        }}
-                      >
-                        {on ? "\u2713" : "\u2013"} {item.label}
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-            <div style={{ fontSize: TYPOGRAPHY.label.fontSize, color: MT, marginTop: 6 }}>
-              Catatan: laporan tambahan (Insight Penjualan, Ekspor PDF, Cash Flow) tetap ada di halaman Laporan.
-              Fitur yang belum dinyalakan disembunyikan dari daftar di bawah.
-            </div>
-          </div>
-        </div>
-
         <AdvancedDataPanel
           settings={settings}
           advancedData={advancedData}
           menu={menu}
           cats={cats}
           toast_={toast_}
+          addUndo={addUndo}
           onImported={onImported}
         />
       </div>
     </div>
   );
 }
-
-const COLORS = { off: "#f4f4f0" };
 
 export default memo(ViewFiturLanjutan);

@@ -5,7 +5,7 @@ import { fmt } from "../utilities/receipt.js";
 import { G, W, BD, TX, MT } from "../constants/design.js";
 
 const card = { background: W, border: `1px solid ${BD}`, borderRadius: 9, padding: "12px 14px" };
-const button = { background: W, color: G, border: `1px solid ${BD}`, borderRadius: 7, padding: "8px 12px", fontFamily: "inherit", cursor: "pointer" };
+const button = { padding: "8px 12px", background: W, color: G, border: `1px solid ${BD}`, borderRadius: 8, cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 700 };
 
 export function filterCashFlowShifts(shifts, search) {
   const query = search.trim().toLocaleLowerCase();
@@ -79,8 +79,8 @@ function AllShiftsModal({ shifts, onClose, ...displayProps }) {
   const currentPage = Math.min(page, pages - 1);
   const displayed = matches.slice(currentPage * 5, currentPage * 5 + 5);
   return (
-    <dialog ref={dialogRef} aria-labelledby="cashflow-shifts-title" onCancel={onClose} onClick={e => { if (e.target === e.currentTarget) onClose(); }} style={{ ...card, width: "min(850px, 92vw)", maxHeight: "90vh", padding: 0, color: TX }}>
-      <style>{`dialog[aria-labelledby="cashflow-shifts-title"]::backdrop { background: rgba(17,24,39,0.4); }`}</style>
+    <dialog ref={dialogRef} aria-labelledby="cashflow-shifts-title" onCancel={onClose} onClick={e => { if (e.target === e.currentTarget) onClose(); }} style={{ ...card, position: "fixed", inset: 0, margin: "auto", width: "min(850px, 92vw)", maxHeight: "90vh", padding: 0, color: TX }}>
+      <style>{`dialog[aria-labelledby="cashflow-shifts-title"]::backdrop { background: rgba(10,20,15,0.68); backdrop-filter: blur(4px); }`}</style>
       <div style={{ padding: 16 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
           <h2 id="cashflow-shifts-title" style={{ fontSize: 16 }}>Arus Kas — Semua Shift</h2>
@@ -114,7 +114,7 @@ export default function CashFlowShifts({ shifts, activeShift, ...displayProps })
     <section aria-label="Arus Kas" style={{ marginBottom: 20 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 10 }}>
         <h2 style={{ fontSize: 12, color: G }}>Arus Kas — Shift Aktif</h2>
-        <button type="button" style={button} onClick={() => setShowAll(true)}>Tampilkan Semua shift</button>
+        <button type="button" style={button} onClick={() => setShowAll(true)}>Tampilkan Semua Shift</button>
       </div>
       <div style={{ display: "grid", gap: 12 }}>
         {openShifts.length ? openShifts.map(shift => <CashFlowShift key={shift.id} shift={shift} {...displayProps} />) : <div style={{ ...card, color: MT }}>Tidak ada shift aktif.</div>}

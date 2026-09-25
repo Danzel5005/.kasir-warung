@@ -1,5 +1,5 @@
 import { memo, useMemo, useRef, useState } from "react";
-import { BD, LT, MT, W, row, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../constants/design.js";
+import { BD, LT, MT, TX, W, row, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../constants/design.js";
 import { isAdvancedFeatureOn } from "../constants/advancedFeatures.js";
 import { DEFAULT_LOYALTY_TIERS } from "../utilities/loyalty.js";
 import { useExcelImport } from "../hooks/useExcelImport.js";
@@ -103,7 +103,8 @@ const RESEP_MENU_LIMIT = 10;
 // ---------------------------------------------------------------------------
 // Bahan Baku
 // ---------------------------------------------------------------------------
-function BahanBakuPanel({ advancedData, toast_, suppliers, menu }) {
+function BahanBakuPanel({ advancedData, toast_, addUndo, suppliers, menu }) {
+  const panelRef = useRef(null);
   const [form, setForm] = useState({ id: "", nama: "", satuan: "", stok: "", minStok: "", hargaSatuan: "", supplierId: "" });
   const [detail, setDetail] = useState(null);
   const [search, setSearch] = useState("");
@@ -123,7 +124,7 @@ function BahanBakuPanel({ advancedData, toast_, suppliers, menu }) {
     reset();
   };
 
-  const editRow = (b) =>
+  const editRow = (b) => {
     setForm({
       id: b.id,
       nama: b.nama,
@@ -133,9 +134,19 @@ function BahanBakuPanel({ advancedData, toast_, suppliers, menu }) {
       hargaSatuan: String(b.hargaSatuan),
       supplierId: b.supplierId || "",
     });
+    setShowAll(false);
+    setDetail(null);
+    requestAnimationFrame(() => {
+      panelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById("bahan-nama")?.focus({ preventScroll: true });
+    });
+  };
 
   const remove = async (b) => {
+    const snapshot = { ...b };
     advancedData.deleteBahan(b.id);
+    addUndo?.(`Hapus bahan "${b.nama}"`, () => advancedData.upsertBahan(snapshot));
+    if (detail?.id === b.id) setDetail(null);
     toast_?.(`Bahan "${b.nama}" dihapus`, "ok");
   };
 
@@ -155,7 +166,7 @@ function BahanBakuPanel({ advancedData, toast_, suppliers, menu }) {
   const collapseLabel = q ? "Lihat semua hasil" : "Lihat semua bahan";
 
   return (
-    <div style={card}>
+    <div ref={panelRef} style={card}>
       <div style={{ ...sectionTitle, display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
         <span>Bahan Baku ({list.length})</span>
         {q && (
@@ -164,6 +175,24 @@ function BahanBakuPanel({ advancedData, toast_, suppliers, menu }) {
           </span>
         )}
       </div>
+
+      {advancedData.lowStock?.length > 0 && (
+        <div role="alert" style={{ background: "#fff5f5", border: "1px solid #f5c0c0", borderRadius: RADIUS.sm, padding: "8px 10px", marginBottom: 10 }}>
+          <div style={{ fontSize: TYPOGRAPHY.small.fontSize, fontWeight: 700, color: COLOR_PALETTE.danger, marginBottom: 6 }}>
+            ⚠️ {advancedData.lowStock.length} bahan baku stok menipis atau habis
+          </div>
+          <div style={{ display: "grid", gap: 4 }}>
+            {advancedData.lowStock.map((bahan) => (
+              <div key={bahan.id} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: TYPOGRAPHY.label.fontSize, color: TX }}>
+                <span>{bahan.nama}</span>
+                <span style={{ color: COLOR_PALETTE.danger, fontWeight: 700 }}>
+                  Sisa {bahan.stok} {bahan.satuan} · Minimal {bahan.minStok} {bahan.satuan}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
         <div>
@@ -262,6 +291,8 @@ function BahanBakuPanel({ advancedData, toast_, suppliers, menu }) {
           search={search}
           onSearch={setSearch}
           onPick={(b) => setDetail(b)}
+          onEdit={editRow}
+          onDelete={remove}
           onClose={() => setShowAll(false)}
         />
       )}
@@ -1054,7 +1085,7 @@ function ImportExcelPanel({ menu, cats, advancedData, toast_, onImported }) {
   );
 }
 
-function AdvancedDataPanel({ settings, advancedData, menu, cats, toast_, onImported }) {
+function AdvancedDataPanel({ settings, advancedData, menu, cats, toast_, addUndo, onImported }) {
   const showBahan = isAdvancedFeatureOn(settings, "bahanBaku");
   const showSupplier = isAdvancedFeatureOn(settings, "supplier");
   const showLoyalty = isAdvancedFeatureOn(settings, "loyalty");
@@ -1067,7 +1098,7 @@ function AdvancedDataPanel({ settings, advancedData, menu, cats, toast_, onImpor
       <ImportExcelPanel menu={menu} cats={cats} advancedData={advancedData} toast_={toast_} onImported={onImported} />
       {showResep && <ResepPanel advancedData={advancedData} menu={menu} toast_={toast_} />}
       {showBahan && (
-        <BahanBakuPanel advancedData={advancedData} toast_={toast_} suppliers={advancedData.supplier} menu={menu} />
+        <BahanBakuPanel advancedData={advancedData} toast_={toast_} addUndo={addUndo} suppliers={advancedData.supplier} menu={menu} />
       )}
       {showSupplier && <SupplierPanel advancedData={advancedData} toast_={toast_} />}
       {showLoyalty && <LoyaltyPanel advancedData={advancedData} toast_={toast_} />}
