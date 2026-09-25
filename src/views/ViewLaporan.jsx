@@ -665,17 +665,13 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
       {/* CSV cards */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:12}}>
         {[
-          {title:"Laporan Keuangan",
-            desc:"Ringkasan per hari: pendapatan, modal, laba/rugi.",
-            btn:"Unduh CSV Laporan Keuangan",
-              fn:()=>doCSV(`Laporan_Keuangan_${selectedShiftId==="all"?"Semua":`Shift${selShift?.shiftNum||""}` }`,
-              csvLaporan(shiftTrx,at(), { openingCash: reportOpeningCash, totalExpenses: reportTotalExpenses }))},
+
           {title:"Sales Rate",
             desc:"Top 10 terlaku, top 10 paling sedikit, dan semua menu yang belum terjual sama sekali.",
             btn:"Unduh CSV Sales Rate",
               fn:()=>doCSV(`Sales_Rate_${selectedShiftId==="all"?"Semua":`Shift${selShift?.shiftNum||""}`}`,
                 csvSalesRate(shiftTrx,menu,at()))},
-          {title:"Rangkuman Per item",
+          {title:"Sales Report",
             desc:"Total qty, pendapatan, modal, laba, dan margin % untuk setiap item.",
             btn:"Unduh CSV Per Item",
             fn:()=>doCSV(`Rangkuman_Per_Menu_${selectedShiftId==="all"?"Semua":`Shift${selShift?.shiftNum||""}`}`,
