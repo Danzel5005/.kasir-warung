@@ -437,7 +437,7 @@ const executeConfirmDel = useCallback((restoreStock = false) => {
   const doCSV = historyH.doCSV;
 
   const showLicenseScreen = licenseH.licenseStatus !== null && (!licenseH.licenseStatus.valid || licenseTransitioning);
-  const showLoginScreen = licenseH.licenseStatus !== null && (!authH.activeShift || loginTransitioning);
+  const showLoginScreen = licenseH.licenseStatus !== null && (!authH.activeShift || !authH.currentUser || loginTransitioning);
 
   let content;
 

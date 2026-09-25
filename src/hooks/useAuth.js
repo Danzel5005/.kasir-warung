@@ -50,7 +50,7 @@ function useAuth({ getNow, toast_ }) {
   const loadInitial = useCallback((savedShifts, savedUsers) => {
     const allShifts = savedShifts || [];
     setShifts(allShifts);
-    const openShift = allShifts.find(s => s.status === "open");
+    const openShift = allShifts.find(s => s.status === "open" && s.username === LS(SESSION_KEY));
     if (openShift) {
       setActiveShift(openShift);
       setSelectedShiftId(openShift.id);
@@ -89,7 +89,7 @@ function useAuth({ getNow, toast_ }) {
   const doLogin = useCallback(async () => {
     const result = await api.authLogin({ username: loginForm.username, password: loginForm.password });
     if (!result?.ok || !result.user) {
-      setLoginForm(f => ({ ...f, error: "Username atau password salah" }));
+      setLoginForm(f => ({ ...f, error: result?.reason === "lan-assignment" ? "Gunakan akun yang ditugaskan oleh Device A" : "Username atau password salah" }));
       return false;
     }
     const u = result.user;

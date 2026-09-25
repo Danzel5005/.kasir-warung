@@ -70,11 +70,12 @@ describe("auth.cjs: verifikasi dengan fallback plaintext (data lama)", () => {
 // IPC handlers — memakai registry palsu, jadi main.cjs tidak perlu di-require.
 // ---------------------------------------------------------------------------
 
-function makeHarness(initialUsers = []) {
+function makeHarness(initialUsers = [], lan = null) {
   const registry = {};
   let disk = JSON.parse(JSON.stringify(initialUsers));
   let writes = 0;
   registerAuthHandlers({
+    lan,
     ipcMain: { handle: (name, fn) => { registry[name] = fn; } },
     store: {
       read: () => JSON.parse(JSON.stringify(disk)),
@@ -89,6 +90,21 @@ function makeHarness(initialUsers = []) {
 }
 
 describe("auth-ipc: auth-login", () => {
+  it("restricts client login to assignment and disconnects only after valid admin login", () => {
+    let disconnected = 0;
+    const h = makeHarness([
+      { username: "assigned", role: "cashier", password: hashPassword("secret") },
+      { username: "other", role: "cashier", password: "secret" },
+      { username: "admin", role: "admin", password: "admin123" },
+    ], { assignment: () => ({ assignedUserId: "assigned" }), disconnect: () => { disconnected++; } });
+    expect(h.call("auth-login", { username: "assigned", password: "secret" }).ok).toBe(true);
+    expect(h.call("auth-login", { username: "other", password: "secret" }).reason).toBe("lan-assignment");
+    expect(h.call("auth-login", { username: "admin", password: "wrong" }).ok).toBe(false);
+    expect(disconnected).toBe(0);
+    expect(h.call("auth-login", { username: "admin", password: "admin123" }).ok).toBe(true);
+    expect(disconnected).toBe(1);
+  });
+
   it("migrasi lazy: plaintext lama di-hash setelah login sukses", () => {
     const h = makeHarness([{ username: "admin", password: "admin123", nama: "Administrator", role: "admin" }]);
     expect(isHashed(h.getDisk()[0].password)).toBe(false);

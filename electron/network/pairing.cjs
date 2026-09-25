@@ -26,6 +26,7 @@
 //   getUsers()   — async/sync → daftar user {username,nama,role,...}
 //   buildSnapshot() — async/sync → objek snapshot awal untuk Client
 //   onEvent(evt) — evt.kind: "request" | "approved" | "rejected" | "snapshot-sent"
+const { hashPassword, isHashed } = require('../auth.cjs');
 function createPairing({ hostServer, getUsers = () => [], buildSnapshot = () => ({}), onEvent = () => {} } = {}) {
   // hwid -> { hwid, deviceName, firstSeen, status: "pending"|"approved"|"rejected", userId }
   const requests = new Map();
@@ -69,6 +70,14 @@ function createPairing({ hostServer, getUsers = () => [], buildSnapshot = () => 
       return { ok: false, error: "perangkat sudah ditolak" };
     }
 
+    const user = (await getUsers()).find((u) => u.username === userId);
+    if (!user || user.role === 'admin' || user.username === 'admin' || typeof user.password !== 'string' || !user.password) {
+      return { ok: false, error: 'akun non-admin dengan password wajib dipilih' };
+    }
+    let snapshot;
+    try {
+      snapshot = { ...(await buildSnapshot()), users: [{ ...user, password: isHashed(user.password) ? user.password : hashPassword(user.password) }] };
+    } catch (err) { return { ok: false, error: err.message }; }
     // host-server yang memegang koneksi & secret — dia yang menandatangani.
     const res = hostServer.approveFollower(hwid, userId);
     if (!res?.ok) return { ok: false, error: res?.error || "perangkat tidak terhubung" };
@@ -80,9 +89,6 @@ function createPairing({ hostServer, getUsers = () => [], buildSnapshot = () => 
     }
 
     // Snapshot awal — satu kali, hanya ke device yang baru di-approve.
-    let snapshot = {};
-    try { snapshot = (await buildSnapshot()) || {}; }
-    catch (err) { console.warn("[Pairing] buildSnapshot error:", err?.message || err); }
     const sent = hostServer.sendTo(hwid, { type: "snapshot", snapshot, sentAt: new Date().toISOString() });
 
     onEvent({ kind: "approved", hwid, userId, grantSignature: res.grantSignature, activatedAt: res.activatedAt, snapshotSent: !!sent });

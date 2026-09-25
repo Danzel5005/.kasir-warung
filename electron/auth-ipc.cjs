@@ -2,7 +2,7 @@ const { hashPassword, verifyPasswordWithLegacy, isHashed } = require("./auth.cjs
 
 // Handler autentikasi dipisah dari main.cjs supaya bisa diuji tanpa Electron.
 // `ipcMain` cukup punya `.handle(name, fn)`; `store` butuh `read()`/`write(list)`.
-function registerAuthHandlers({ ipcMain, store }) {
+function registerAuthHandlers({ ipcMain, store, lan = null }) {
   // Login: verifikasi password. Bila user masih memakai plaintext lama (data
   // sebelum hashing) dan login SUKSES, langsung di-upgrade ke hash scrypt.
   ipcMain.handle("auth-login", (_e, { username, password } = {}) => {
@@ -14,7 +14,11 @@ function registerAuthHandlers({ ipcMain, store }) {
     if (index < 0) return { ok: false, reason: "not-found" };
 
     const user = users[index];
+    const assignment = lan?.assignment();
+    const admin = user.role === 'admin' || user.username === 'admin';
+    if (assignment && !admin && uname !== assignment.assignedUserId) return { ok: false, reason: 'lan-assignment' };
     if (!verifyPasswordWithLegacy(password, user.password)) return { ok: false, reason: "wrong-password" };
+    if (admin) lan?.disconnect();
 
     let migrated = false;
     if (!isHashed(user.password)) {
@@ -30,6 +34,7 @@ function registerAuthHandlers({ ipcMain, store }) {
 
   // Set / ubah password: selalu disimpan dalam bentuk hash.
   ipcMain.handle("auth-set-password", (_e, { username, newPassword } = {}) => {
+    if (lan?.assignment()) return { ok: false, reason: 'lan-assignment' };
     const uname = String(username ?? "").trim();
     if (!uname || typeof newPassword !== "string" || newPassword.length === 0) {
       return { ok: false, reason: "invalid" };
@@ -46,6 +51,7 @@ function registerAuthHandlers({ ipcMain, store }) {
 
   // Ganti password milik sendiri: butuh password lama yang benar.
   ipcMain.handle("auth-change-own-password", (_e, { username, oldPassword, newPassword } = {}) => {
+    if (lan?.assignment()) return { ok: false, reason: 'lan-assignment' };
     const uname = String(username ?? "").trim();
     if (!uname || typeof oldPassword !== "string" || typeof newPassword !== "string" || newPassword.length === 0) {
       return { ok: false, reason: "invalid" };
@@ -63,6 +69,7 @@ function registerAuthHandlers({ ipcMain, store }) {
 
   // Buat user baru / timpa password secara paksa (dipakai admin menambah user).
   ipcMain.handle("auth-create-user", (_e, { user } = {}) => {
+    if (lan?.assignment()) return { ok: false, reason: 'lan-assignment' };
     if (!user || typeof user !== "object" || !user.username) return { ok: false, reason: "invalid" };
     if (typeof user.password !== "string" || user.password.length === 0) return { ok: false, reason: "invalid" };
 

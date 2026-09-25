@@ -27,6 +27,16 @@ function ViewLaporan({
   const reportShiftId = selectedShiftId === "all" ? undefined : selectedShiftId || activeShift?.id;
   const [shiftTrx, setShiftTrx] = useState([]);
   const [isReportLoading, setIsReportLoading] = useState(true);
+  const [allCashTrx, setAllCashTrx] = useState([]);
+  const [showAllShifts, setShowAllShifts] = useState(false);
+  const [shiftSearch, setShiftSearch] = useState("");
+  useEffect(() => {
+    let cancelled = false;
+    if (advancedFeatures?.enabled && advancedFeatures?.cashFlow) {
+      loadAllForReport().then((rows) => { if (!cancelled) setAllCashTrx((rows || []).filter((t) => !isVoided(t))); });
+    }
+    return () => { cancelled = true; };
+  }, [loadAllForReport, history, shifts, advancedFeatures?.enabled, advancedFeatures?.cashFlow]);
 
   useEffect(() => {
     let cancelled = false;
@@ -157,7 +167,9 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
     const found = expenseCategories.find((cat) => String(cat.key || "").trim() === normalizedKey);
     return found?.label || normalizedKey;
   };
-  const cashFlow = showCashFlow ? buildCashFlow(shiftTrx, selectedShiftList, getExpenseCategoryLabel, labelOf) : null;
+  const activeCashShifts = shifts.filter((s) => s.status === "open");
+  const cashTransactions = allCashTrx.filter((t) => activeCashShifts.some((s) => s.id === t.shiftId));
+  const cashFlow = showCashFlow ? buildCashFlow(cashTransactions, activeCashShifts, getExpenseCategoryLabel, labelOf) : null;
   // Rincian grafik arus kas per shift. Kalau sebuah shift berjalan lebih dari
   // sehari (mis. lupa ditutup berhari-hari), grafiknya memakai mode harian
   // (sumbu X = tanggal) karena sumbu jam tak lagi bermakna.
@@ -171,10 +183,10 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
     const daysOf = (list) => new Set(
       list.map((b) => b?.date).filter(Boolean)
     ).size;
-    return [...selectedShiftList]
+    return [...activeCashShifts]
       .reverse() // paling baru di atas, paling lama di bawah
       .map((s) => {
-        const trx = shiftTrx.filter((t) => t.shiftId === s.id);
+        const trx = allCashTrx.filter((t) => t.shiftId === s.id);
         const cf = buildCashFlow(trx, [s], getExpenseCategoryLabel, labelOf);
         const multiDay = (cf.spanDays || 0) > 1;
         const start = jamParts(s?.startJam);
@@ -183,12 +195,10 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
         const hourRange = start != null && end != null && end >= start ? { start, end } : null;
         return { shift: s, cashFlow: cf, hourRange, mode: multiDay ? "day" : "hour", days: daysOf(cf.daily || []) };
       });
-  }, [selectedShiftList, shiftTrx, getExpenseCategoryLabel, labelOf]);
+  }, [activeCashShifts, allCashTrx, getExpenseCategoryLabel, labelOf]);
   // Tampilkan rincian per-shift hanya kalau memang perlu: "Semua Shift" yang
   // mencakup >1 hari, atau satu shift tunggal yang berjalan >1 hari.
-  const showShiftSplits = shiftChartSplits.length > 1
-    ? new Set(selectedShiftList.map((s) => s?.dateKey).filter(Boolean)).size > 1
-    : shiftChartSplits.length === 1 && shiftChartSplits[0].mode === "day";
+  const showShiftSplits = shiftChartSplits.length > 0;
 //Pelunasan manual (buku hutang): tandai piutang pelanggan jadi lunas.
   const handleSettleDebt = async (debt) => {
     const name = String(debt?.name || "").trim();
@@ -464,7 +474,26 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
 
       {showCashFlow && cashFlow && (
         <div style={{marginBottom:20}}>
-          <div style={{fontSize:11,fontWeight:700,color:G,marginBottom:10}}>Arus Kas</div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+            <strong style={{fontSize:11,color:G}}>Arus Kas — Shift Aktif</strong>
+            <button type="button" onClick={() => { setShiftSearch(""); setShowAllShifts(true); }} style={{padding:"8px 12px",background:W,color:G,border:`1px solid ${BD}`,borderRadius:8,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700}}>
+              Tampilkan Semua Grafik Shift
+            </button>
+          </div>
+          {showAllShifts && (
+            <div onClick={() => setShowAllShifts(false)} style={{position:"fixed",inset:0,background:"rgba(17,24,39,0.4)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+              <section role="dialog" aria-modal="true" aria-label="Semua shift" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => { if (e.key === "Escape") setShowAllShifts(false); }} style={{background:W,borderRadius:12,padding:20,width:800,maxWidth:"95vw",maxHeight:"85vh",overflowY:"auto"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}><strong>Arus Kas — Semua Shift</strong><button type="button" onClick={() => setShowAllShifts(false)} style={{padding:"8px 12px",background:W,color:G,border:`1px solid ${BD}`,borderRadius:8,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700}}>Tutup</button></div>
+                <input autoFocus aria-label="Cari akun atau tanggal shift" placeholder="Cari nama akun atau tanggal shift…" value={shiftSearch} onChange={(e) => setShiftSearch(e.target.value)} style={{width:"100%",boxSizing:"border-box",padding:10,marginBottom:16}} />
+                {[...shifts].reverse().filter((s) => `${s.shiftNum} ${s.username || ""} ${s.operator || ""} ${s.hari || ""} ${s.tgl || ""} ${s.bln || ""} ${s.thn || ""} ${s.dateKey || ""}`.toLowerCase().includes(shiftSearch.trim().toLowerCase())).map((s) => {
+                  const cf = buildCashFlow(allCashTrx.filter((t) => t.shiftId === s.id), [s], getExpenseCategoryLabel, labelOf);
+                  const dateLabel = [s.hari, s.tgl, s.bln, s.thn].filter(Boolean).join(" ");
+                  const operator = s.username || s.operator || "Akun tidak diketahui";
+                  return <div key={s.id} style={{border:`1px solid ${BD}`,borderRadius:8,padding:12,marginBottom:12}}><strong>Shift {s.shiftNum} · {operator} · {dateLabel} · {s.status === "open" ? "Aktif" : "Ditutup"}</strong><CashFlowChart mode={cf.spanDays > 1 ? "day" : "hour"} data={cf.spanDays > 1 ? cf.daily : null} hourly={cf.hourly} /></div>;
+                })}
+              </section>
+            </div>
+          )}
           {!cashFlow.hasData ? (
             <div style={{background:W,border:`1px solid ${BD}`,borderRadius:9,padding:"12px 14px",color:MT,fontSize:12}}>Belum ada data arus kas pada periode ini.</div>
           ) : (

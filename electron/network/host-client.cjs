@@ -89,7 +89,8 @@ function createHostClient({ getHwid, deviceName = "DEN POS", hostLicenseStore, o
           try { snapshotApplier(msg.snapshot); applied = true; }
           catch (err) { console.warn("[Client] snapshotApplier error:", err?.message || err); }
         }
-        onEvent({ kind: "snapshot", snapshot: msg.snapshot || {}, applied, sentAt: msg.sentAt });
+        const { users: _credentials, ...safeSnapshot } = msg.snapshot || {};
+        onEvent({ kind: "snapshot", snapshot: safeSnapshot, applied, sentAt: msg.sentAt });
         if (pendingGrant) {
           onEvent({ kind: "approved", grant: pendingGrant });
           pendingGrant = null;
@@ -173,6 +174,7 @@ function createHostClient({ getHwid, deviceName = "DEN POS", hostLicenseStore, o
   function disconnect() {
     cleanup();
     target = null;
+    onEvent({ kind: "disconnected" });
     return { ok: true };
   }
 

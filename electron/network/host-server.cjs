@@ -17,7 +17,7 @@ const PING_INTERVAL_MS = 15000;
 // onReserve(request) -> Promise<{ ok, reserved?, reason?, shortfalls?, error? }>
 // Disuntik dari network-service (stock-authority.cjs). Kalau tidak ada,
 // reserve-stock dibalas dengan error supaya Client tidak menggantung.
-function createHostServer({ hostId, port = 47474, onEvent = () => {}, onReserve = null, onTransaction = null }) {
+function createHostServer({ hostId, port = 47474, onEvent = () => {}, onReserve = null, onTransaction = null, onEntity = null }) {
   let wss = null;
   let pingTimer = null;
   let listening = false;
@@ -28,7 +28,7 @@ function createHostServer({ hostId, port = 47474, onEvent = () => {}, onReserve 
   function broadcast(payload, filter = () => true) {
     const data = JSON.stringify(payload);
     for (const [ws, meta] of clients) {
-      if (ws.readyState === ws.OPEN && filter(meta)) {
+      if (meta.status === 'active' && ws.readyState === ws.OPEN && filter(meta)) {
         try { ws.send(data); } catch (err) { console.warn("[Host] broadcast error:", err.message); }
       }
     }
@@ -50,6 +50,10 @@ function createHostServer({ hostId, port = 47474, onEvent = () => {}, onReserve 
     const meta = clients.get(ws);
     if (!meta) return;
     meta.lastSeen = Date.now();
+    if (['reserve-stock', 'transaction', 'entity'].includes(msg.type) && meta.status !== 'active' && !(msg.type === 'reserve-stock' && typeof reserveHandler !== 'function')) {
+      ws.send(JSON.stringify({ type: `${msg.type}-result`, reqId: msg.reqId, ok: false, reason: 'unauthorized' }));
+      return;
+    }
 
     switch (msg.type) {
       case "hello": {
@@ -86,16 +90,19 @@ function createHostServer({ hostId, port = 47474, onEvent = () => {}, onReserve 
           .catch((err) => reply({ ok: false, reason: "error", error: err?.message || String(err) }));
         break;
       }
+      case "entity":
       case "transaction": {
-        if (typeof onTransaction !== "function") {
-          ws.send(JSON.stringify({ type: "transaction-result", reqId: msg.reqId || null, ok: false, reason: "unavailable" }));
+        const handler = msg.type === 'entity' ? onEntity : onTransaction;
+        if (typeof handler !== "function") {
+          ws.send(JSON.stringify({ type: `${msg.type}-result`, reqId: msg.reqId || null, ok: false, reason: "unavailable" }));
           break;
         }
         let pending;
-        try { pending = Promise.resolve(onTransaction({ hwid: meta.hwid, userId: meta.userId, trx: msg.trx })); }
+        try { pending = Promise.resolve(handler({ hwid: meta.hwid, userId: meta.userId, trx: msg.trx, delta: msg.delta })); }
         catch (err) { pending = Promise.reject(err); }
-        pending.then((res) => ws.send(JSON.stringify({ type: "transaction-result", reqId: msg.reqId || null, ...(res || { ok: false }) })))
-          .catch((err) => ws.send(JSON.stringify({ type: "transaction-result", reqId: msg.reqId || null, ok: false, error: err?.message || String(err) })));
+        const reply = (res) => { if (ws.readyState === ws.OPEN) ws.send(JSON.stringify({ type: `${msg.type}-result`, reqId: msg.reqId || null, ...res })); };
+        pending.then((res) => reply(res || { ok: false }))
+          .catch((err) => reply({ ok: false, error: err?.message || String(err) }));
         break;
       }
       default:

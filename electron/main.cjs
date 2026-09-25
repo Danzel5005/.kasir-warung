@@ -92,6 +92,11 @@ const network = createNetworkService({
   // saat pertama kali di-assign. Ini satu-satunya full-dump yang ditulis.
   clientSnapshotApplier: (snapshot) => {
     if (!snapshot || typeof snapshot !== "object") return;
+    if (Array.isArray(snapshot.users)) {
+      const assigned = snapshot.users.filter((u) => u && u.username !== "admin" && u.role !== "admin" && typeof u.password === "string");
+      const usernames = new Set(assigned.map((u) => u.username));
+      backup.atomicWrite(FILES.users, [...(backup.rJSON(FILES.users) || []).filter((u) => !usernames.has(u.username)), ...assigned]);
+    }
     try { if (Array.isArray(snapshot.menu)) database.replaceMenuList(snapshot.menu); }
     catch (err) { console.warn("[Main] apply snapshot menu error:", err.message); }
     if (snapshot.settings && typeof snapshot.settings === "object") backup.atomicWrite(FILES.settings, snapshot.settings);
@@ -206,6 +211,13 @@ function startRawScannerFallback(win) {
 registerFileHandlers();
 registerAuthHandlers({
   ipcMain,
+  lan: {
+    assignment: () => network.hostLicenseStore?.read(),
+    disconnect: () => {
+      network.hostClient.disconnect();
+      network.hostLicenseStore?.clear();
+    },
+  },
   store: {
     read: () => backup.rJSON(FILES.users) || [],
     write: (list) => backup.atomicWrite(FILES.users, list),
