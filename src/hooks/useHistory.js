@@ -247,7 +247,7 @@ function useHistory({ toast_, addUndo, getNow, authH, applyBahanUsage = null }) 
     }
   }, [fFrom, fTo, shiftIdFilter, sortOrder]);
 
-  const loadAllForReport = useCallback(async (shiftId) => {
+  const loadAllForReport = useCallback(async (shiftId, { throwOnError = false } = {}) => {
     try {
       const pageSizeForReport = 10000;
       const transactions = [];
@@ -268,6 +268,7 @@ function useHistory({ toast_, addUndo, getNow, authH, applyBahanUsage = null }) 
       return transactions;
     } catch (err) {
       console.error("[useHistory] loadAllForReport error:", err);
+      if (throwOnError) throw err;
       return [];
     }
   }, [sortOrder]);
