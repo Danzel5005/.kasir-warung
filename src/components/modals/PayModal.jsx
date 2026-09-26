@@ -1,7 +1,7 @@
 import { fmt, getCashPaymentNote } from "../../utilities/receipt.js";
 import { G, OR, W, LT, BD, TX, MT, row, inp, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/design.js";
 
-export default function PayModal({ cartH, processPayment, setPayModal, paymentMethods = [], receiptAdditionals = [] }) {
+export default function PayModal({ cartH, processPayment, setPayModal, paymentMethods = [], receiptAdditionals = [], paxEnabled = false, tableEnabled = false }) {
   // Group payment methods by category
   const groupedMethods = (paymentMethods || []).reduce((acc, method) => {
     const cat = method.category || "custom";
@@ -68,6 +68,7 @@ export default function PayModal({ cartH, processPayment, setPayModal, paymentMe
 
         {/* Body (scrollable) */}
         <div style={{ padding:"0 20px 20px 20px", overflowY:"auto", flex:"1 1 auto" }}>
+
 
           {/* Ringkasan order */}
           <div style={{ background:LT, borderRadius:RADIUS.md, padding:"9px 11px", marginBottom:11 }}>

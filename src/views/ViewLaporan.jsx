@@ -50,6 +50,8 @@ function ViewLaporan({
   const paidOf=(t)=>{const total=Number(t?.total||0);const bayar=t?.bayar??t?.paid;const paid=bayar==null?total:Number(bayar);return Math.max(0,Math.min(paid,total));};
 const revList=shiftTrx.reduce((s,t)=>s+Number(t?.total||0),0);
 const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
+  const totalPax = shiftTrx.reduce((sum, trx) => sum + Math.max(0, Math.floor(Number(trx?.pax) || 0)), 0);
+  const spendPerPax = totalPax ? rev / totalPax : 0;
   const mod=shiftTrx.reduce((s,t)=>{t.items.forEach(i=>{s+=(i.modal||0)*i.qty;});return s;},0);
   const sub=shiftTrx.reduce((s,t)=>s+t.subtotal,0);
   const laba=revList-mod;
@@ -280,6 +282,9 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
       </div>
 
       <div style={{fontSize:11,fontWeight:700,color:G,marginBottom:10}}>{shiftLabel} — {isReportLoading ? "memuat..." : `${shiftTrx.length} transaksi`}</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))",gap:10,marginBottom:12}}>
+        {[{l:"Total Pax",v:isReportLoading?"Memuat...":fmtNum(totalPax),s:"jumlah pengunjung dari transaksi ber-Pax"},{l:"Rata-rata Belanja / Pax",v:totalPax?fmt(spendPerPax):"—",s:"pendapatan dibagi jumlah Pax"}].map(card=><div key={card.l} style={{background:W,border:`1px solid ${BD}`,borderRadius:9,padding:"12px 14px"}}><div style={{fontSize:10,color:MT,marginBottom:4}}>{card.l}</div><div style={{fontSize:15,fontWeight:700,color:G}}>{card.v}</div><div style={{fontSize:9,color:MT,marginTop:2}}>{card.s}</div></div>)}
+      </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))",gap:10,marginBottom:20}}>
         {[
           {l:"Total Pendapatan",v:fmt(rev),c:G,s:`dari ${shiftTrx.length} trx`,key:"income"},

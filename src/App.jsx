@@ -96,6 +96,8 @@ function KasirWorkspace() {
     toast_: toastH.toast_, 
     onChange: (newSettings) => {
       cartH.setReceiptAdditionals(newSettings.receiptAdditionals || []);
+      cartH.setPaxEnabled(newSettings.receiptPaxEnabled === true);
+      cartH.setTableEnabled(newSettings.receiptTableEnabled === true);
       cartH.setPricingConfig({
         discounts: newSettings.discounts || [],
         pajak: newSettings.pajak || { enabled: false, value: 0 },
@@ -310,7 +312,9 @@ function KasirWorkspace() {
     persistBills: billsH.persistBills, setBillId: billsH.setBillId,
     applyStockView: menuH.applyStockView, // Langkah 2: patch view dari { stock } IPC
     customer: customersH.selectedCustomer, // denormalized into the open bill
-  }), [cartH.saveOpenBill, billsH.bills, billsH.billId, billsH.persistBills, billsH.setBillId, menuH.applyStockView, customersH.selectedCustomer]);
+    paxEnabled: settingsH.settings.receiptPaxEnabled,
+    tableEnabled: settingsH.settings.receiptTableEnabled,
+  }), [cartH.saveOpenBill, billsH.bills, billsH.billId, billsH.persistBills, billsH.setBillId, menuH.applyStockView, customersH.selectedCustomer, settingsH.settings.receiptPaxEnabled, settingsH.settings.receiptTableEnabled]);
 
   // processPayment butuh potongan dari useHistory, useMenu, useAuth, useBills
   // FIX: Use cartH.activeBill?.id directly to avoid race condition with setTimeout
@@ -325,11 +329,14 @@ function KasirWorkspace() {
     billIdToClose: cartH.activeBill?.id,     // Use activeBill directly instead of ref
     paymentMethods: settingsH.settings.paymentMethods || [], // NEW: payment methods for label resolution
     customer: customersH.selectedCustomer, // GAP 5: denormalized into trx for receipt
+    paxEnabled: settingsH.settings.receiptPaxEnabled,
+    tableEnabled: settingsH.settings.receiptTableEnabled,
   }), [
     cartH.processPayment, historyH.generateTrxId, authH.activeShift,
     menuH.applyStockView, historyH.appendHistory,
     cartH.setDrawerOpen, cartH.clearCart, billsH.removeBillLocal,
     settingsH.settings.paymentMethods, // NEW deps
+    settingsH.settings.receiptPaxEnabled, settingsH.settings.receiptTableEnabled,
     customersH.selectedCustomer, // GAP 5
     customersH.setSelectedCustomerId, // GAP 5
   ]);
@@ -499,6 +506,8 @@ const executeConfirmDel = useCallback((restoreStock = false) => {
             search={menuH.search} setSearch={menuH.setSearch} displayMenu={menuH.displayMenu} cats={menuH.cats}
             cart={cartH.cart} drawerOpen={cartH.drawerOpen} setDrawerOpen={cartH.setDrawerOpen}
             receiptAdditionalValues={cartH.receiptAdditionalValues} receiptAdditionals={cartH.receiptAdditionals} updateReceiptAdditionalValue={cartH.updateReceiptAdditionalValue}
+            pax={cartH.pax} setPax={cartH.setPax} tableNumber={cartH.tableNumber} setTableNumber={cartH.setTableNumber}
+            paxEnabled={settingsH.settings.receiptPaxEnabled === true} tableEnabled={settingsH.settings.receiptTableEnabled === true}
             customerPicker={<CustomerPicker customers={customersH.customers} selectedCustomer={customersH.selectedCustomer} setSelectedCustomerId={customersH.setSelectedCustomerId} upsertCustomer={customersH.upsertCustomer} />}
             customerEnabled={settingsH.settings.customerEnabled !== false}
             loyaltyTier={

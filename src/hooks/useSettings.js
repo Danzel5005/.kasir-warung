@@ -51,6 +51,8 @@ function useSettings({ toast_, onChange }) {
     pajak: { enabled: false, value: 0 },
     service: { enabled: false, value: 0 },
     customerEnabled: true,
+    receiptPaxEnabled: false,
+    receiptTableEnabled: false,
     advancedFeatures: DEFAULT_ADVANCED_FEATURES,
     loyaltyTierBasis: DEFAULT_LOYALTY_TIER_BASIS,
   });
@@ -99,6 +101,8 @@ function useSettings({ toast_, onChange }) {
     if (typeof s.receiptFooterText !== "string") s.receiptFooterText = "";
     // Customer/member feature — enabled by default, must be a boolean
     if (typeof s.customerEnabled !== "boolean") s.customerEnabled = true;
+    if (typeof s.receiptPaxEnabled !== "boolean") s.receiptPaxEnabled = false;
+    if (typeof s.receiptTableEnabled !== "boolean") s.receiptTableEnabled = false;
     // Fitur Tingkat Lanjut — selalu objek yang sudah dinormalisasi (semua
     // kunci ada, nilai non-boolean diperbaiki). Ini juga jalur migrasi untuk
     // settings lama yang belum punya field ini sama sekali.

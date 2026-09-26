@@ -34,6 +34,11 @@ describe("receipt.js - Receipt utilities and HTML builders", () => {
   });
 
   describe("buildReceiptHTML", () => {
+    it("prints table number and Pax when present", () => {
+      const html = buildReceiptHTML({ ...mockTrxCash, tableNumber: "4", pax: 4 }, null, [], {});
+      expect(html).toContain("Table</span><span class=\"v\">4");
+      expect(html).toContain("Pax</span><span class=\"v\">4");
+    });
     const mockTrxCash = {
       id: "TRX-101",
       hari: "Senin",

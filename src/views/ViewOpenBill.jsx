@@ -91,7 +91,7 @@ function ViewOpenBill({
               fontWeight: 600,
               display: "flex",
               alignItems: "center",
-              gap: SPACING.xs
+              gap: 14
             }}
           >
             Hapus Semua
@@ -113,7 +113,7 @@ function ViewOpenBill({
               Tidak ada tagihan terbuka
             </div>
             <div style={{ fontSize: TYPOGRAPHY.caption.fontSize, color: MT }}>
-              Tagihan baru akan muncul di sini saat pelanggan memesan
+              Tagihan baru akan muncul di sini saat pelanggan membuat pesanan
             </div>
           </div>
         ) : (
@@ -155,7 +155,7 @@ function ViewOpenBill({
                   <div style={{ ...row, justifyContent: "space-between", alignItems: "flex-start", marginBottom: SPACING.sm }}>
                     <div style={{ display: "flex", alignItems: "center", gap: SPACING.sm, flex: 1, minWidth: 0 }}>
                       <Tag label="BELUM DIBAYAR" bg="#fff4e0" tc="#b87a00" size="sm" />
-                      {bill.tableNum && (
+                      {(bill.tableNumber || bill.tableNum) && (
                         <span style={{
                           fontSize: TYPOGRAPHY.body.fontSize,
                           fontWeight: 700,
@@ -165,7 +165,20 @@ function ViewOpenBill({
                           borderRadius: RADIUS.md,
                           border: "1px solid #a8d5b8"
                         }}>
-                          Meja {bill.tableNum}
+                          Meja {(bill.tableNumber || bill.tableNum).toString().trim()}
+                        </span>
+                      )}
+                      {customerEnabled && bill.customerNama && (
+                        <span style={{
+                          fontSize: 13,
+                          fontWeight: 700,
+                          color: G,
+                          background: "#f0fdf4",
+                          padding: `${SPACING.xs} ${SPACING.sm}`,
+                          borderRadius: RADIUS.md,
+                          border: "1px solid #a8d5b8"
+                        }}>
+                         {String(bill.customerNama).trim()}
                         </span>
                       )}
                     </div>
@@ -197,13 +210,13 @@ function ViewOpenBill({
                   <div style={{ ...row, justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: SPACING.sm }}>
                     <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1, minWidth: 120 }}>
                       <span style={{ fontSize: TYPOGRAPHY.caption.fontSize, color: MT }}>Subtotal</span>
-                      <span style={{ fontSize: TYPOGRAPHY.body.fontSize, fontWeight: 600, color: G }}>
+                      <span style={{ fontSize: 16, fontWeight: 700, color: G }}>
                         {fmt(sub)}
                       </span>
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1, minWidth: 120, textAlign: "right" }}>
                       <span style={{ fontSize: TYPOGRAPHY.caption.fontSize, color: MT }}>Total</span>
-                      <span style={{ fontSize: TYPOGRAPHY.h3.fontSize, fontWeight: 700, color: OR }}>
+                      <span style={{ fontSize: 20, fontWeight: 800, color: OR }}>
                         {fmt(tot)}
                       </span>
                     </div>
@@ -301,3 +314,5 @@ function ViewOpenBill({
 }
 
 export default memo(ViewOpenBill);
+
+

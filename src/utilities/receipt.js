@@ -249,6 +249,8 @@ ${buildPrintCSS(paperWidthMm)}
         <div class="store-line center">${trx.hari}, ${trx.tgl} ${trx.bln} ${trx.thn} &bull; ${trx.jam}:${trx.mnt}:${trx.dtk}</div>
         <div class="kv"><span class="k">NO TRX</span><span class="v">${trx.id}</span></div>
         ${addFields}
+        ${trx.tableNumber ? `<div class="kv"><span class="k">Table</span><span class="v">${escapeHtml(trx.tableNumber)}</span></div>` : ""}
+        ${Number(trx.pax) > 0 ? `<div class="kv"><span class="k">Pax</span><span class="v">${Math.floor(Number(trx.pax))}</span></div>` : ""}
         <div class="kv"><span class="k">KASIR</span><span class="v">${operatorName}</span></div>
         ${customerLine}
         <div class="kv"><span class="k">METODE</span><span class="v">${metodeLabel}</span></div>

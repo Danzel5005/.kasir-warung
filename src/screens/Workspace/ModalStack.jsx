@@ -46,7 +46,7 @@ export default function ModalStack({
     <>
       {/* ══ MODAL: PEMBAYARAN ══════════════════════════════════════════════ */}
       {payModal && (
-        <PayModal cartH={cartH} processPayment={processPayment} setPayModal={setPayModal} paymentMethods={settingsH.settings.paymentMethods} receiptAdditionals={settingsH.settings.receiptAdditionals} />
+        <PayModal cartH={cartH} processPayment={processPayment} setPayModal={setPayModal} paymentMethods={settingsH.settings.paymentMethods} receiptAdditionals={settingsH.settings.receiptAdditionals} paxEnabled={settingsH.settings.receiptPaxEnabled} tableEnabled={settingsH.settings.receiptTableEnabled} />
         )}
 
         {/* VOID MODAL */}

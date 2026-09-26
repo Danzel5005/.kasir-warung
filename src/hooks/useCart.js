@@ -55,6 +55,10 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
   const [cart, setCart]         = useState({});
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [receiptAdditionalValues, setReceiptAdditionalValues] = useState({}); // { "nomor_meja": "5", "jumlah_pax": "2" }
+  const [pax, setPax] = useState("");
+  const [paxEnabled, setPaxEnabled] = useState(false);
+  const [tableEnabled, setTableEnabled] = useState(false);
+  const [tableNumber, setTableNumber] = useState("");
   const [metode, setMetode]     = useState("cash");
   const [paid, setPaid]         = useState("");
   const [activeBill, setActiveBill] = useState(null);
@@ -108,7 +112,8 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
   });
 
   // Use checkRequiredAdditionals to validate all required receipt additionals (not just tableNum)
-  const canPay    = items.length > 0 && stockErrors.length === 0 && checkRequiredAdditionals(receiptAdditionals) && (metode !== "cash" || paidNum > 0 || total === 0);
+  const canPay    = items.length > 0 && stockErrors.length === 0 && checkRequiredAdditionals(receiptAdditionals) && (!paxEnabled || Number(pax) > 0) && (metode !== "cash" || paidNum > 0 || total === 0);
+  const getCanPay = useCallback((additionals) => items.length > 0 && stockErrors.length === 0 && checkRequiredAdditionals(additionals) && (!paxEnabled || Number(pax) > 0) && (metode !== "cash" || paidNum > 0 || total === 0), [items, stockErrors, checkRequiredAdditionals, metode, paidNum, total, paxEnabled, pax]);
 
   // PENTING: pakai functional update setCart(c=>...), TIDAK baca `cart`
   // langsung dari closure — pattern paling stabil. Tapi memanggil toast_,
@@ -209,7 +214,7 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
 
   // deps kosong aman: semua setter dengan nilai konstan, tidak baca state.
   const clearCart = useCallback(() => {
-    setCart({}); setPaid(""); setMetode("cash"); setActiveBill(null); setReceiptAdditionalValues({}); setAdditionalsModal({ open: false, item: null }); setDrawerOpen(false);
+    setCart({}); setPaid(""); setMetode("cash"); setActiveBill(null); setReceiptAdditionalValues({}); setPax(""); setTableNumber(""); setAdditionalsModal({ open: false, item: null }); setDrawerOpen(false);
   }, []);
 
   // Update a single receipt additional field value
@@ -218,12 +223,6 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
   }, []);
 
   // Dynamic canPay - includes receipt additionals validation
-  const getCanPay = useCallback((additionals) => {
-    if (items.length === 0) return false;
-    if (stockErrors.length > 0) return false;
-    if (!checkRequiredAdditionals(additionals)) return false;
-    return metode !== "cash" || paidNum > 0 || total === 0;
-  }, [items, stockErrors, checkRequiredAdditionals, metode, paidNum, total]);
   // saveOpenBill & loadBillToCart tinggal di sini (bukan useBills) karena
   // mereka menulis langsung ke state cart/activeBill yang dimiliki hook ini.
   // `bills`/`billId`/`persistBills`/`setBillId` adalah ARGUMEN PANGGILAN
@@ -238,9 +237,9 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
   const saveOpenBill = useCallback(async ({ 
     bills, billId, persistBills, setBillId,
     applyStockView,  // NEW (Langkah 2): stok dihitung di main process
-    customer = null, // Selected customer/member snapshot (denormalized into bill)
+    customer = null, paxEnabled = false, tableEnabled = false,
   }) => {
-    if (!items.length || !checkRequiredAdditionals(receiptAdditionals)) { toast_("Isi field wajib dan pesanan dulu", "err"); return; }
+    if (!items.length || !checkRequiredAdditionals(receiptAdditionals) || (paxEnabled && Number(pax) <= 0)) { toast_("Isi field wajib dan pesanan dulu", "err"); return; }
     if (stockErrors.length > 0) {
       const e = stockErrors[0];
       toast_(`Stok "${e.nama}" tidak mencukupi: butuh ${e.needed}, tersedia ${e.available}`, "err");
@@ -255,6 +254,10 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
       customerId: customer?.id || null,
       customerNama: customer?.name || "",
       customerTelepon: customer?.phone || "",
+    };
+    const partyData = {
+      ...(paxEnabled ? { pax: Math.max(1, Math.floor(Number(pax) || 1)) } : {}),
+      ...(tableEnabled ? { tableNumber: String(tableNumber || "").trim() } : {}),
     };
 
     // Build receipt additional values for the bill
@@ -306,7 +309,7 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
       
       updatedBills = bills.map(b =>
         String(b.id) === String(activeBill.id)
-          ? { ...b, items: withUnitLabel(items), updatedAt: t.timestamp, ...customerData, ...receiptAdditionalData }
+          ? { ...b, items: withUnitLabel(items), updatedAt: t.timestamp, ...customerData, ...partyData, ...receiptAdditionalData }
           : b
       );
       toast_('Open Bill diperbarui', "ok");
@@ -320,7 +323,7 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
       // Bahan baku: potong sesuai resep untuk seluruh item bill baru.
       if (applyBahanUsage) applyBahanUsage(items, -1);
       
-      const bill = { id: billId, items: withUnitLabel(items), createdAt: t.timestamp, updatedAt: t.timestamp, status: "open", ...customerData, ...receiptAdditionalData };
+      const bill = { id: billId, items: withUnitLabel(items), createdAt: t.timestamp, updatedAt: t.timestamp, status: "open", ...customerData, ...partyData, ...receiptAdditionalData };
       updatedBills = [...bills, bill];
       setBillId(n => n + 1);
       toast_('Open Bill dibuat', "ok");
@@ -337,7 +340,7 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
     await persistBills(updatedBills);
     clearCart();
     setDrawerOpen(false);
-  }, [items, receiptAdditionalValues, receiptAdditionals, activeBill, toast_, getNow, clearCart, stockErrors, applyBahanUsage]);
+  }, [items, receiptAdditionalValues, receiptAdditionals, activeBill, toast_, getNow, clearCart, stockErrors, applyBahanUsage, pax, tableNumber]);
 
   // deps: needs receiptAdditionals to read current receipt additionals config
   const loadBillToCart = useCallback((bill) => {
@@ -346,6 +349,8 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
     // tidak saling menimpa (bug ini sudah ada untuk additionals).
     bill.items.forEach(i => { c[i.cartKey || i.id] = { ...i }; });
     setCart(c);
+    setPax(bill.pax == null ? "" : String(bill.pax));
+    setTableNumber(bill.tableNumber || "");
     // Load receipt additional values from bill
     if (receiptAdditionals) {
       receiptAdditionals
@@ -378,6 +383,8 @@ const processPayment = useCallback(async ({
   billIdToClose,
   paymentMethods = [],
   customer = null, // Selected customer/member snapshot (denormalized into trx)
+  paxEnabled = false,
+  tableEnabled = false,
 }) => {
     if (stockErrors.length > 0) {
       const e = stockErrors[0];
@@ -429,6 +436,8 @@ const processPayment = useCallback(async ({
     customerId: customer?.id || null,
     customerNama: customer?.name || "",
     customerTelepon: customer?.phone || "",
+    ...(paxEnabled ? { pax: Math.max(1, Math.floor(Number(pax) || 1)) } : {}),
+    ...(tableEnabled ? { tableNumber: String(tableNumber || "").trim() } : {}),
     ...receiptAdditionalData, // Include receipt additional fields
   };
   // Stok TIDAK dihitung di renderer (Langkah 2). Main process yang
@@ -449,10 +458,10 @@ const processPayment = useCallback(async ({
   clearCart();
   if (onSuccess) onSuccess(trx);
   return trx;
-}, [items, subtotal, pricingConfig, metode, paidNum, kembalian, cart, toast_, getNow, clearCart, stockErrors, applyBahanUsage]);
+}, [items, subtotal, pricingConfig, metode, paidNum, kembalian, cart, toast_, getNow, clearCart, stockErrors, applyBahanUsage, pax, tableNumber]);
 
   return {
-    cart, drawerOpen, receiptAdditionalValues, receiptAdditionals, metode, paid, activeBill,
+    cart, drawerOpen, receiptAdditionalValues, receiptAdditionals, metode, paid, activeBill, pax, setPax, setPaxEnabled, setTableEnabled, tableNumber, setTableNumber,
     items, subtotal, pajak, service, discount, total, pricingConfig, paidNum, kembalian, canPay,
     stockErrors,
     setDrawerOpen, updateReceiptAdditionalValue, setMetode, setPaid,

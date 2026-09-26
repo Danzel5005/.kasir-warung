@@ -130,7 +130,7 @@ export default function BillDetailModal({
           <div style={{ flex: 1 }}>
             <div style={{ ...row, alignItems: "center", gap: SPACING.sm, marginBottom: SPACING.xs }}>
               <Tag label="BELUM DIBAYAR" bg="#fff4e0" tc="#b87a00" size="sm" />
-              {bill.tableNum && (
+              {(bill.tableNumber || bill.tableNum) && (
                 <span style={{
                   fontSize: TYPOGRAPHY.body.fontSize,
                   fontWeight: 700,
@@ -140,12 +140,13 @@ export default function BillDetailModal({
                   borderRadius: RADIUS.md,
                   border: "1px solid #a8d5b8"
                 }}>
-                  Meja {bill.tableNum}
+                  Meja {bill.tableNumber || bill.tableNum}
                 </span>
               )}
             </div>
             <div style={{ fontSize: TYPOGRAPHY.caption.fontSize, color: MT }}>
               {dateStr} • {timeStr}
+              {Number(bill.pax) > 0 && <> • 👥 {bill.pax} Pax</>}
               {customerEnabled && customerNama && <> • 👤 {customerNama}</>}
             </div>
           </div>

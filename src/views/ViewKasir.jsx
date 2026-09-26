@@ -13,6 +13,7 @@ function ViewKasir({
   // dari cartH
   cart, drawerOpen, setDrawerOpen,
   receiptAdditionalValues, receiptAdditionals, updateReceiptAdditionalValue,
+  pax, setPax, tableNumber, setTableNumber, paxEnabled = false, tableEnabled = false,
   customerPicker = null,
   customerEnabled = true,
   loyaltyTier = null,
@@ -144,9 +145,13 @@ function ViewKasir({
           </div>
         )}
 
-        {/* Meja & Pax - Dynamic from receiptAdditionals */}
-        <div style={{padding:"8px 12px",borderBottom:`1px solid ${BD}`,background:"#f9faf9"}}>
+        {/* Order details stay in the cart drawer so they are saved with open bills. */}
+        {drawerOpen && <div style={{padding:"8px 12px",borderBottom:`1px solid ${BD}`,background:"#f9faf9"}}>
           {customerEnabled && customerPicker}
+          {(paxEnabled || tableEnabled) && <div style={{display:"grid",gridTemplateColumns:paxEnabled&&tableEnabled?"1fr 1fr":"1fr",gap:7,marginBottom:7}}>
+            {tableEnabled && <label style={{fontSize:10,color:MT,fontWeight:600}}>Table<input aria-label="Table" type="text" value={tableNumber} onChange={e=>setTableNumber(e.target.value)} placeholder="Nomor meja" style={{...inp,fontSize:12,marginTop:3}} /></label>}
+            {paxEnabled && <label style={{fontSize:10,color:MT,fontWeight:600}}>Pax<input aria-label="Pax" type="number" min="1" step="1" value={pax} onChange={e=>setPax(e.target.value)} placeholder="Jumlah orang" style={{...inp,fontSize:12,marginTop:3}} /></label>}
+          </div>}
           {receiptAdditionals && receiptAdditionals
             .filter(f => f.category === "receipt" && f.visible !== false)
             .map((field) => (
@@ -171,7 +176,7 @@ function ViewKasir({
                 )}
               </div>
             ))}
-        </div>
+        </div>}
 
         {/* Header kolom */}
         {items.length>0&&<div style={{display:"grid",gridTemplateColumns:"1fr 60px 46px 60px 20px",gap:3,padding:"5px 12px",borderBottom:`1px solid ${BD}`,background:LT}}>
@@ -272,7 +277,7 @@ function ViewKasir({
                 {activeBill?"Perbarui Open Bill":"Simpan Open Bill"}
               </button>
 
-              <button onClick={printPreview} disabled={!items.length || !checkRequiredAdditionals(receiptAdditionals) || printingPreview}
+              <button onClick={printPreview} disabled={!items.length || !checkRequiredAdditionals(receiptAdditionals) || printingPreview || (paxEnabled&&!(Number(pax)>0))}
                 style={{flex:1,
                 padding:10,
                 border:`1px solid ${G}`,
@@ -284,16 +289,16 @@ fontFamily:"inherit", fontSize:10, fontWeight:700}}>
 {printingPreview ? "Mencetak..." : "Cetak Invoice"}
 </button>
               <button onClick={
-                ()=>checkRequiredAdditionals(receiptAdditionals)&&stockErrors.length===0&&setPayModal(true)
+                ()=>checkRequiredAdditionals(receiptAdditionals)&&stockErrors.length===0&&(!paxEnabled||Number(pax)>0)&&setPayModal(true)
               }
-               disabled={!checkRequiredAdditionals(receiptAdditionals) || stockErrors.length>0}
+               disabled={!checkRequiredAdditionals(receiptAdditionals) || stockErrors.length>0 || (paxEnabled&&!(Number(pax)>0))}
                 style={{
                   padding:"8px 0",
                   border:"none",
                   borderRadius:7,
-                  background:checkRequiredAdditionals(receiptAdditionals)&&stockErrors.length===0?OR:"#f0c89a",
+                  background:checkRequiredAdditionals(receiptAdditionals)&&stockErrors.length===0&&(!paxEnabled||Number(pax)>0)?OR:"#f0c89a",
                   color:W,
-                  cursor:checkRequiredAdditionals(receiptAdditionals)&&stockErrors.length===0?"pointer":"not-allowed",
+                  cursor:checkRequiredAdditionals(receiptAdditionals)&&stockErrors.length===0&&(!paxEnabled||Number(pax)>0)?"pointer":"not-allowed",
                   fontFamily:"inherit",
                   fontSize:10,
                   fontWeight:700}}>

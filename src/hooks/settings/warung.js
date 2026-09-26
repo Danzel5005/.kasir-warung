@@ -40,6 +40,14 @@ export function createWarungHandlers({ settings, setSettings, toast_, onChange }
     toast_(next ? "Fitur pelanggan diaktifkan" : "Fitur pelanggan dimatikan", "ok");
   }, [settings, toast_, onChange]);
 
+  const setReceiptPartyField = useCallback(async (field, enabled) => {
+    if (field !== "receiptPaxEnabled" && field !== "receiptTableEnabled") return;
+    const s = { ...settings, [field]: !!enabled };
+    await api.saveSettings(s);
+    setSettings(s);
+    onChange?.(s);
+  }, [settings, onChange]);
+
   // Basis loyalty tier: "transaction" (total transaksi saat ini) atau
   // "lifetime" (total belanja kumulatif pelanggan). Hanya relevan saat fitur
   // loyalty menyala; perubahan langsung memengaruhi diskon di keranjang.
@@ -79,7 +87,7 @@ export function createWarungHandlers({ settings, setSettings, toast_, onChange }
   }, [settings, toast_, onChange]);
 
   return {
-    setWarungName, setWarungAddress, setWarungPhone, setCustomerEnabled, setLoyaltyTierBasis,
+    setWarungName, setWarungAddress, setWarungPhone, setCustomerEnabled, setReceiptPartyField, setLoyaltyTierBasis,
     setReceiptHeaderText, setReceiptFooterText,
   };
 }

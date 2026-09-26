@@ -1,0 +1,9 @@
+{
+  "name": "kasir-monitoring-quickstart",
+  "version": "1.0.0",
+  "description": "Quick start script for Kasir Warung Monitoring Backend",
+  "scripts": {
+    "test-db": "node scripts/test-database.js",
+    "install-all": "cd .. && mkdir -p monitoring-frontend && cd monitoring-frontend && npm init -y && npm install react react-dom react-router-dom axios chart.js recharts tailwindcss postcss autoprefixer && npx tailwindcss init -p"
+  }
+}
