@@ -78,7 +78,8 @@ export const formatRelativeTime = (date) => {
 };
 
 // Get payment method label
-export const getPaymentLabel = (method) => {
+export const getPaymentLabel = (method, transactionLabel = '') => {
+  if (transactionLabel) return transactionLabel;
   const labels = {
     cash: 'Tunai',
     qris: 'QRIS',
@@ -86,7 +87,14 @@ export const getPaymentLabel = (method) => {
     debit: 'Debit',
     ewallet: 'E-Wallet'
   };
-  return labels[method] || method || 'Unknown';
+  if (labels[method]) return labels[method];
+
+  // Custom methods are persisted by the POS as custom_<timestamp>, while
+  // the human-readable label is stored on the transaction/settings object.
+  // Never expose the internal custom key in the monitoring UI.
+  if (String(method || '').startsWith('custom_')) return 'Metode pembayaran';
+
+  return method || 'Unknown';
 };
 
 // Calculate percentage change

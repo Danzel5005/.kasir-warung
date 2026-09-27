@@ -4,6 +4,15 @@ import { authApi } from '../services/api';
 import LaporanView from './LaporanView';
 import RiwayatView from './RiwayatView';
 
+// DEN POS-style colors
+const G = "#1a5c38";       // Primary green
+const OR = "#e87c2a";      // Secondary orange
+const W = "#ffffff";       // White surface
+const BG = "#f5f5f0";      // Light gray background
+const BD = "#e0e0d8";      // Border
+const TX = "#1a1a1a";      // Text primary
+const MT = "#888888";      // Text muted
+
 export default function Dashboard({ user, onLogout }) {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const location = useLocation();
@@ -16,39 +25,41 @@ export default function Dashboard({ user, onLogout }) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen" style={{ backgroundColor: BG }}>
       {/* Navigation Bar */}
-      <nav className="bg-white shadow-lg border-b border-gray-200">
+      <nav style={{ backgroundColor: W, boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderBottom: `1px solid ${BD}` }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             {/* Logo & Title */}
             <div className="flex items-center">
               <div className="flex-shrink-0 flex items-center">
-                <svg className="h-8 w-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-8 w-8" style={{ color: G }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
-                <span className="ml-2 text-xl font-bold text-gray-800">Kasir Warung Monitor</span>
+                <span className="ml-2 text-xl font-bold" style={{ color: G }}>Kasir Warung Monitor</span>
               </div>
               
               {/* Navigation Tabs */}
               <div className="hidden md:ml-6 md:flex md:space-x-4">
                 <Link
                   to="/laporan"
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  className="px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                  style={
                     location.pathname.includes('/laporan')
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  }`}
+                      ? { backgroundColor: '#e8f5ee', color: G }
+                      : { color: '#666' }
+                  }
                 >
                   Laporan
                 </Link>
                 <Link
                   to="/riwayat"
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  className="px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                  style={
                     location.pathname.includes('/riwayat')
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  }`}
+                      ? { backgroundColor: '#e8f5ee', color: G }
+                      : { color: '#666' }
+                  }
                 >
                   Riwayat
                 </Link>
@@ -62,10 +73,10 @@ export default function Dashboard({ user, onLogout }) {
                   onClick={() => setShowUserMenu(!showUserMenu)}
                   className="flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
                 >
-                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold" style={{ backgroundColor: G }}>
                     {user?.name?.charAt(0) || user?.username?.charAt(0) || 'U'}
                   </div>
-                  <span className="text-sm font-medium text-gray-700 hidden md:inline">
+                  <span className="text-sm font-medium hidden md:inline" style={{ color: TX }}>
                     {user?.name || user?.username}
                   </span>
                   <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -77,11 +88,11 @@ export default function Dashboard({ user, onLogout }) {
                 {showUserMenu && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setShowUserMenu(false)}></div>
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-1 z-20 border border-gray-200">
-                      <div className="px-4 py-2 border-b border-gray-200">
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-1 z-20" style={{ border: `1px solid ${BD}` }}>
+                      <div className="px-4 py-2" style={{ borderBottom: `1px solid ${BD}` }}>
                         <p className="text-sm font-medium text-gray-900">{user?.name}</p>
                         <p className="text-xs text-gray-500">@{user?.username}</p>
-                        <span className="inline-block mt-1 px-2 py-1 text-xs font-semibold bg-blue-100 text-blue-700 rounded">
+                        <span className="inline-block mt-1 px-2 py-1 text-xs font-semibold rounded" style={{ backgroundColor: '#e8f5ee', color: G }}>
                           {user?.role?.toUpperCase()}
                         </span>
                       </div>
@@ -104,25 +115,27 @@ export default function Dashboard({ user, onLogout }) {
       </nav>
 
       {/* Mobile Navigation */}
-      <div className="md:hidden bg-white border-b border-gray-200 px-4 py-2">
+      <div className="md:hidden px-4 py-2" style={{ backgroundColor: W, borderBottom: `1px solid ${BD}` }}>
         <div className="flex space-x-2">
           <Link
             to="/laporan"
-            className={`flex-1 text-center px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            className="flex-1 text-center px-4 py-2 rounded-md text-sm font-medium transition-colors"
+            style={
               location.pathname.includes('/laporan')
-                ? 'bg-blue-100 text-blue-700'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
+                ? { backgroundColor: '#e8f5ee', color: G }
+                : { color: '#666' }
+            }
           >
             Laporan
           </Link>
           <Link
             to="/riwayat"
-            className={`flex-1 text-center px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            className="flex-1 text-center px-4 py-2 rounded-md text-sm font-medium transition-colors"
+            style={
               location.pathname.includes('/riwayat')
-                ? 'bg-blue-100 text-blue-700'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
+                ? { backgroundColor: '#e8f5ee', color: G }
+                : { color: '#666' }
+            }
           >
             Riwayat
           </Link>

@@ -3,10 +3,43 @@ import { dataApi } from '../services/api';
 import { formatCurrency, formatNumber, formatRelativeTime } from '../utils/formatters';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell
+  ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+// DEN POS-style color constants (matching src/constants/design.js)
+const G = "#1a5c38";       // Primary green
+const OR = "#e87c2a";      // Secondary orange  
+const W = "#ffffff";       // White surface
+const BD = "#e0e0d8";      // Border
+const TX = "#1a1a1a";      // Text primary
+const MT = "#888888";      // Text muted
+
+// Fallback colors for pie chart (when payment method color not defined)
+const COLORS = ["#1a5c38", "#e87c2a", "#0a7a7a", "#d32f2f", "#1a5fb4", "#c05a00"];
+
+// Payment method colors (matching METODE_COLORS from design.js)
+const PAYMENT_COLORS = {
+  cash: "#e87c2a",         // orange
+  qris: "#1a5c38",         // green
+  qris_bca: "#1a5c38",
+  qris_bni: "#0a7a7a",     // teal
+  debit_bca: "#1a5fb4",    // blue
+  debit_bni: "#0a7a7a",
+  transfer_bca: "#1a5c38"
+};
+
+function paymentLabel(key) {
+  const labels = {
+    cash: 'Tunai',
+    qris: 'QRIS',
+    'qris-bca': 'QRIS BCA',
+    'qris-bni': 'QRIS BNI',
+    'debit-bca': 'Debit BCA',
+    'debit-bni': 'Debit BNI',
+    'transfer-bca': 'Transfer BCA'
+  };
+  return labels[key] || (String(key).startsWith('custom_') ? 'Metode pembayaran' : String(key));
+}
 
 export default function LaporanView({ user }) {
   const [data, setData] = useState(null);
@@ -36,10 +69,10 @@ export default function LaporanView({ user }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading report data...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1a5c38] mx-auto mb-4"></div>
+          <p className="text-gray-600">Memuat laporan...</p>
         </div>
       </div>
     );
@@ -47,14 +80,14 @@ export default function LaporanView({ user }) {
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+      <div style={{ backgroundColor: '#ffebee', border: `1px solid ${BD}`, borderRadius: 8, padding: 24 }}>
         <h3 className="text-lg font-semibold text-red-800 mb-2">Error Loading Data</h3>
         <p className="text-red-600">{error}</p>
         <button
           onClick={() => load(true)}
-          className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+          className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
         >
-          Retry
+          Coba Lagi
         </button>
       </div>
     );
@@ -74,7 +107,9 @@ export default function LaporanView({ user }) {
   });
 
   const paymentData = Object.entries(paymentBreakdown).map(([name, value]) => ({
-    name: name.charAt(0).toUpperCase() + name.slice(1),
+    key: name,
+    name: transactions.find(t => t.metodeBayar === name)?.metodeBayarLabel
+      || paymentLabel(name),
     value: Math.round(value)
   }));
 
@@ -85,79 +120,98 @@ export default function LaporanView({ user }) {
   }));
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Laporan Keuangan</h1>
-          <p className="text-gray-500 text-sm mt-1">
+    <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
+      {/* Header - DEN POS style */}
+      <div style={{ marginBottom: '24px' }}>
+        <h1 style={{ fontSize: '24px', fontWeight: 700, color: TX, marginBottom: '8px' }}>Laporan Keuangan</h1>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <p style={{ fontSize: '12px', color: MT, marginBottom: 0 }}>
             Last updated: {lastUpdated ? formatRelativeTime(lastUpdated) : '-'}
           </p>
+          <button
+            onClick={() => load(false)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              padding: '8px 16px',
+              backgroundColor: G,
+              color: 'white',
+              border: 'none',
+              borderRadius: 8,
+              cursor: 'pointer',
+              transition: 'background-color 0.2s'
+            }}
+            onMouseEnter={e => e.target.style.backgroundColor = '#14492e'}
+            onMouseLeave={e => e.target.style.backgroundColor = G}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span style={{ marginLeft: '8px', fontSize: '14px', fontWeight: 500 }}>Refresh</span>
+          </button>
         </div>
-        <button
-          onClick={() => load(false)}
-          className="mt-3 sm:mt-0 inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          Refresh
-        </button>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
+      {/* Summary Cards - DEN POS card style */}
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', 
+        gap: '16px',
+        marginBottom: '24px'
+      }}>
+        <SummaryCard
           title="Total Pendapatan"
           value={formatCurrency(summary.totalRevenue)}
           icon="💰"
-          color="green"
         />
-        <StatCard
+        <SummaryCard
           title="Total Transaksi"
           value={formatNumber(summary.totalTransactions)}
           icon="🧾"
-          color="blue"
         />
-        <StatCard
+        <SummaryCard
           title="Rata-rata Transaksi"
           value={formatCurrency(summary.averageOrderValue)}
           icon="📊"
-          color="purple"
         />
-        <StatCard
+        <SummaryCard
           title="Transaksi Void"
           value={formatNumber(summary.voidedTransactions)}
           icon="⚠️"
-          color="red"
         />
       </div>
 
       {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         {/* Top Products Chart */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Produk Terlaris (7 hari)</h2>
+        <ChartCard title="Produk Terlaris (7 hari)">
           {topProductsData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={topProductsData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" height={70} />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="qty" fill="#3b82f6" name="Qty Terjual" radius={[4, 4, 0, 0]} />
+              <BarChart data={topProductsData} margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={BD} />
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} style={{ fontSize: '10px' }} />
+                <YAxis tick={{ fontSize: 10, color: MT }} />
+                <Tooltip 
+                  formatter={(value) => formatNumber(value)}
+                  contentStyle={{ 
+                    backgroundColor: W, 
+                    border: `1px solid ${BD}`,
+                    borderRadius: 8,
+                    fontSize: '12px'
+                  }}
+                />
+                <Bar dataKey="qty" fill={G} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[300px] flex items-center justify-center text-gray-400">
-              No sales data available
+            <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: MT }}>
+              Tidak ada data penjualan
             </div>
           )}
-        </div>
+        </ChartCard>
 
-        {/* Payment Method Breakdown */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Metode Pembayaran</h2>
+        {/* Payment Method Breakdown - PIED CHART SAIA YANG DIJAGA */}
+        <ChartCard title="Metode Pembayaran">
           {paymentData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
@@ -165,90 +219,130 @@ export default function LaporanView({ user }) {
                   data={paymentData}
                   cx="50%"
                   cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  labelLine={true}
+                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                   outerRadius={100}
                   fill="#8884d8"
                   dataKey="value"
                 >
                   {paymentData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    <Cell key={`cell-${index}`} fill={PAYMENT_COLORS[entry.key] || COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value) => formatCurrency(value)} />
+                <Tooltip 
+                  formatter={(value) => formatCurrency(value)}
+                  contentStyle={{ 
+                    backgroundColor: W, 
+                    border: `1px solid ${BD}`,
+                    borderRadius: 8,
+                    fontSize: '12px'
+                  }}
+                />
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[300px] flex items-center justify-center text-gray-400">
-              No payment data available
+            <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: MT }}>
+              Tidak ada data pembayaran
             </div>
           )}
-        </div>
+        </ChartCard>
       </div>
 
       {/* Top Products Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-800">Detail Produk Terlaris</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">#</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Produk</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Qty Terjual</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Pendapatan</th>
+      <TableCard title="Detail Produk Terlaris">
+        {topProducts.length > 0 ? (
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ backgroundColor: BG }}>
+                <th style={thStyle}>#</th>
+                <th style={thStyle}>Produk</th>
+                <th style={{ ...thStyle, textAlign: 'right' }}>Qty Terjual</th>
+                <th style={{ ...thStyle, textAlign: 'right' }}>Pendapatan</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {topProducts.length > 0 ? (
-                topProducts.map((product, idx) => (
-                  <tr key={product.id || idx} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{idx + 1}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {product.name || 'Unknown'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-700">
-                      {formatNumber(product.qty)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-semibold text-green-600">
-                      {formatCurrency(product.revenue)}
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-gray-400">
-                    No product data available
-                  </td>
+            <tbody>
+              {topProducts.map((product, idx) => (
+                <tr key={product.id || idx} style={{ borderBottom: `1px solid ${BD}` }}>
+                  <td style={tdStyle}>{idx + 1}</td>
+                  <td style={tdStyle}>{product.name || 'Unknown'}</td>
+                  <td style={{ ...tdStyle, textAlign: 'right' }}>{formatNumber(product.qty)}</td>
+                  <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(product.revenue)}</td>
                 </tr>
-              )}
+              ))}
             </tbody>
           </table>
-        </div>
-      </div>
+        ) : (
+          <div style={{ padding: '48px', textAlign: 'center', color: MT }}>
+            Tidak ada data produk
+          </div>
+        )}
+      </TableCard>
     </div>
   );
 }
 
-function StatCard({ title, value, icon, color }) {
-  const colorClasses = {
-    green: 'bg-green-50 text-green-700 border-green-200',
-    blue: 'bg-blue-50 text-blue-700 border-blue-200',
-    purple: 'bg-purple-50 text-purple-700 border-purple-200',
-    red: 'bg-red-50 text-red-700 border-red-200'
-  };
-
+function SummaryCard({ title, value, icon }) {
   return (
-    <div className={`bg-white rounded-xl shadow-sm border p-5 ${colorClasses[color] || 'border-gray-200'}`}>
-      <div className="flex items-center justify-between">
+    <div style={{
+      background: W,
+      border: `1px solid ${BD}`,
+      borderRadius: 8,
+      padding: '20px',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
         <div>
-          <p className="text-sm font-medium text-gray-500">{title}</p>
-          <p className="text-2xl font-bold text-gray-800 mt-2">{value}</p>
+          <p style={{ fontSize: '12px', color: MT, fontWeight: 500, marginBottom: '4px' }}>{title}</p>
+          <p style={{ fontSize: '24px', fontWeight: 600, color: TX, margin: 0 }}>{value}</p>
         </div>
-        <div className="text-3xl">{icon}</div>
+        <div style={{ fontSize: '32px' }}>{icon}</div>
       </div>
     </div>
   );
 }
+
+function ChartCard({ title, children }) {
+  return (
+    <div style={{
+      background: W,
+      border: `1px solid ${BD}`,
+      borderRadius: 8,
+      padding: '16px',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+    }}>
+      <h2 style={{ fontSize: '14px', fontWeight: 600, color: TX, marginBottom: '16px' }}>{title}</h2>
+      {children}
+    </div>
+  );
+}
+
+function TableCard({ title, children }) {
+  return (
+    <div style={{
+      background: W,
+      border: `1px solid ${BD}`,
+      borderRadius: 8,
+      padding: '16px',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+    }}>
+      <h2 style={{ fontSize: '14px', fontWeight: 600, color: TX, marginBottom: '16px' }}>{title}</h2>
+      {children}
+    </div>
+  );
+}
+
+const thStyle = {
+  padding: '12px 16px',
+  fontSize: '12px',
+  fontWeight: 600,
+  color: TX,
+  textAlign: 'left',
+  borderBottom: `2px solid ${BD}`
+};
+
+const tdStyle = {
+  padding: '12px 16px',
+  fontSize: '13px',
+  color: TX,
+  borderBottom: `1px solid ${BD}`
+};

@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { authApi } from '../services/api';
 
 export default function Login({ onLogin }) {
+  const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -23,6 +25,7 @@ export default function Login({ onLogin }) {
       
       if (response.success && response.token) {
         onLogin(response.user);
+        navigate('/laporan', { replace: true });
       } else {
         setError(response.message || 'Login failed');
       }

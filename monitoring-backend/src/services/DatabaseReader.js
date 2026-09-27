@@ -29,7 +29,7 @@ class DatabaseReader {
     params.push(limit);
 
     const rows = this.adapter.all(query, params);
-    return rows.map((row) => ({ id: row.id, ...JSON.parse(row.data), createdAt: row.created_at }));
+    return rows.map((row) => ({ ...JSON.parse(row.data), id: row.id, createdAt: row.created_at }));
   }
 
   async getTransactionById(id) {
@@ -38,20 +38,20 @@ class DatabaseReader {
       [id]
     );
     if (!row) return null;
-    return { id: row.id, ...JSON.parse(row.data), createdAt: row.created_at };
+    return { ...JSON.parse(row.data), id: row.id, createdAt: row.created_at };
   }
 
   async getShifts() {
     const rows = this.adapter.all(
       'SELECT id, data, created_at FROM shifts ORDER BY created_at DESC'
     );
-    return rows.map((row) => ({ id: row.id, ...JSON.parse(row.data), createdAt: row.created_at }));
+    return rows.map((row) => ({ ...JSON.parse(row.data), id: row.id, createdAt: row.created_at }));
   }
 
   async getShiftById(id) {
     const row = this.adapter.get('SELECT id, data, created_at FROM shifts WHERE id = ?', [id]);
     if (!row) return null;
-    return { id: row.id, ...JSON.parse(row.data), createdAt: row.created_at };
+    return { ...JSON.parse(row.data), id: row.id, createdAt: row.created_at };
   }
 
   async getDailyStats(date) {
@@ -102,7 +102,7 @@ class DatabaseReader {
     const rows = this.adapter.all(
       `SELECT json_extract(data, '$.items') as items
        FROM transactions
-       WHERE date(created_at) >= date('now', ?)
+       WHERE datetime(created_at) >= datetime('now', ?)
          AND json_extract(data, '$.status') != 'voided'`,
       [`-${periodDays} days`]
     );
@@ -120,7 +120,9 @@ class DatabaseReader {
           itemCounts[itemId] = { id: itemId, name: item.nama || item.name || 'Unknown', qty: 0, revenue: 0 };
         }
         itemCounts[itemId].qty += Number(item.qty) || 0;
-        itemCounts[itemId].revenue += (Number(item.modal) || 0) * (Number(item.qty) || 0);
+        // Use selling price for the monitoring report; modal is often zero
+        // when the POS does not track cost for that product.
+        itemCounts[itemId].revenue += (Number(item.harga ?? item.price ?? 0) || 0) * (Number(item.qty) || 0);
       });
     });
 
@@ -158,8 +160,8 @@ class DatabaseReader {
       const created = String(row.created_at || '');
       const [datePart, timePart] = created.split(' ');
       return {
-        id: row.id,
         ...JSON.parse(row.data),
+        id: row.id,
         createdAt: row.created_at,
         date: datePart || '',
         time: (timePart || '').substring(0, 5)
