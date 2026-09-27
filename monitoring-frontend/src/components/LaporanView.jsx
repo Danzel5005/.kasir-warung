@@ -123,7 +123,7 @@ export default function LaporanView({ user }) {
     <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
       {/* Header - DEN POS style */}
       <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '24px', fontWeight: 700, color: TX, marginBottom: '8px' }}>Laporan Keuangan</h1>
+        <h1 style={{ fontSize: '24px', fontWeight: 700, color: TX, marginBottom: '8px' }}>Laporan Transaksi</h1>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <p style={{ fontSize: '12px', color: MT, marginBottom: 0 }}>
             Last updated: {lastUpdated ? formatRelativeTime(lastUpdated) : '-'}

@@ -103,7 +103,7 @@ class DatabaseReader {
       `SELECT json_extract(data, '$.items') as items
        FROM transactions
        WHERE datetime(created_at) >= datetime('now', ?)
-         AND json_extract(data, '$.status') != 'voided'`,
+         AND COALESCE(json_extract(data, '$.status'), '') != 'voided'`,
       [`-${periodDays} days`]
     );
 
