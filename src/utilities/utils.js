@@ -369,6 +369,42 @@ async deleteTrx(id, opts) {
     }
     return { ok: true, stock };
   },
+  // ── Device identity & cloud sync (PLAN-WEBSYNC) ────────────────────────────
+  // Desktop-only. Di browser semua mengembalikan { ok:false } agar UI bisa
+  // menampilkan pesan "hanya tersedia di aplikasi desktop" tanpa crash.
+  deviceAvailable() { return !!window.kasirAPI?.deviceStatus; },
+  async deviceStatus() {
+    if (window.kasirAPI?.deviceStatus) return safeIpc("Status perangkat", () => window.kasirAPI.deviceStatus());
+    return { ok: false, error: "Hanya tersedia di aplikasi desktop", identity: null, baseUrl: "" };
+  },
+  async deviceSetBaseUrl(url) {
+    if (window.kasirAPI?.deviceSetBaseUrl) return safeIpc("Simpan URL backend", () => window.kasirAPI.deviceSetBaseUrl(url));
+    return { ok: false, error: "Hanya tersedia di aplikasi desktop" };
+  },
+  async deviceRegister(opts) {
+    if (window.kasirAPI?.deviceRegister) return safeIpc("Daftarkan perangkat", () => window.kasirAPI.deviceRegister(opts));
+    return { ok: false, error: "Hanya tersedia di aplikasi desktop" };
+  },
+  async deviceCheckPairing(opts) {
+    if (window.kasirAPI?.deviceCheckPairing) return safeIpc("Cek pairing", () => window.kasirAPI.deviceCheckPairing(opts));
+    return { ok: false, error: "Hanya tersedia di aplikasi desktop" };
+  },
+  async devicePushSync(batch) {
+    if (window.kasirAPI?.devicePushSync) return safeIpc("Kirim data sync", () => window.kasirAPI.devicePushSync(batch));
+    return { ok: false, error: "Hanya tersedia di aplikasi desktop" };
+  },
+  async deviceCredential() {
+    if (window.kasirAPI?.deviceCredential) return safeIpc("Kredensial perangkat", () => window.kasirAPI.deviceCredential());
+    return { ok: false, error: "Hanya tersedia di aplikasi desktop" };
+  },
+  async deviceRotateCredential() {
+    if (window.kasirAPI?.deviceRotateCredential) return safeIpc("Regenerasi kredensial", () => window.kasirAPI.deviceRotateCredential());
+    return { ok: false, error: "Hanya tersedia di aplikasi desktop" };
+  },
+  async deviceSetName(name) {
+    if (window.kasirAPI?.deviceSetName) return safeIpc("Ubah nama perangkat", () => window.kasirAPI.deviceSetName(name));
+    return { ok: false, error: "Hanya tersedia di aplikasi desktop" };
+  },
   // QRIS — simpan terpisah dari settings supaya tidak bloat settings.json
   async loadQris()        { return window.kasirAPI ? await window.kasirAPI.loadQris?.()       : (LS("ykk_qris")||{}); },
   async loadUsers()       { return window.kasirAPI?.loadUsers ? await window.kasirAPI.loadUsers() : (LS("ykk_users")||[]); },
