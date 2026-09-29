@@ -13,9 +13,11 @@ const { createDeviceSyncClient, MAX_SYNC_ROWS } = require("./device-sync-client.
 function makeIdentity(overrides = {}) {
   const secret = overrides.deviceSecret || "a".repeat(64);
   const deviceId = overrides.deviceId || "dev_0123456789abcdef";
+  const secretHash = crypto.createHash("sha256").update(secret, "utf8").digest("hex");
   return {
     getDeviceId: () => deviceId,
     getSecret: () => secret,
+    getSecretHash: () => secretHash,
     getDeviceName: () => "DEN POS — Test",
   };
 }
@@ -84,11 +86,15 @@ describe("device-sync-client: register", () => {
     expect(res.qrPayload).toBe("denpos://pair?code=AB12CD");
 
     const { init, url } = fetchImpl.calls[0];
-    expect(url).toBe("https://api.example.com/api/devices/register");
+    expect(url).toBe("https://api.example.com/devices-register");
     expect(init.method).toBe("POST");
     expect(init.headers["X-Device-ID"]).toBe(identity.getDeviceId());
-    expect(verifyHeaders(init, identity.getSecret())).toBe(true);
-    expect(JSON.parse(init.body).deviceName).toBe("DEN POS — Test");
+    // Ditandatangani dengan kunci turunan sha256(secret), bukan secret mentah.
+    expect(verifyHeaders(init, identity.getSecretHash())).toBe(true);
+    expect(verifyHeaders(init, identity.getSecret())).toBe(false);
+    const sent = JSON.parse(init.body);
+    expect(sent.deviceName).toBe("DEN POS — Test");
+    expect(sent.secretProof).toBe(identity.getSecretHash());
   });
 
   it("respons error backend diteruskan sebagai { ok:false }", async () => {
@@ -108,7 +114,7 @@ describe("device-sync-client: status pairing", () => {
     const res = await c.getStatus();
     expect(res).toMatchObject({ ok: true, paired: true, storeId: "store_9", storeName: "Warung Bu Tini" });
     const { url } = fetchImpl.calls[0];
-    expect(url).toContain(`/api/devices/${identity.getDeviceId()}/status`);
+    expect(url).toContain(`/devices-status/${identity.getDeviceId()}`);
   });
 
   it("belum paired -> paired=false", async () => {
@@ -130,7 +136,7 @@ describe("device-sync-client: push", () => {
     const body = JSON.parse(fetchImpl.calls[0].init.body);
     expect(body.deviceId).toBe(identity.getDeviceId());
     expect(body.rows).toHaveLength(2);
-    expect(verifyHeaders(fetchImpl.calls[0].init, identity.getSecret())).toBe(true);
+    expect(verifyHeaders(fetchImpl.calls[0].init, identity.getSecretHash())).toBe(true);
   });
 
   it("rows melebihi MAX_SYNC_ROWS dipotong", async () => {
@@ -139,6 +145,35 @@ describe("device-sync-client: push", () => {
     const rows = Array.from({ length: MAX_SYNC_ROWS + 50 }, (_, i) => ({ id: i }));
     await c.push({ rows });
     expect(JSON.parse(fetchImpl.calls[0].init.body).rows).toHaveLength(MAX_SYNC_ROWS);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regresi: GET TIDAK boleh mengirim body (fetch melempar
+// "Request with GET/HEAD method cannot have body"), TETAPI tanda tangan tetap
+// dihitung atas "{}" (dan server memverifikasi dengan rawBody "{}").
+// Bug ini dulu membuat POS selalu menganggap perangkat "belum dipasangkan".
+// ---------------------------------------------------------------------------
+describe("device-sync-client: GET status tanpa body (regresi)", () => {
+  it("getStatus mengirim body undefined, tetapi tanda tangan atas '{}'", async () => {
+    fetchImpl = makeFetch({ body: { paired: true, store_id: "store_1", store_name: "Toko A" } });
+    const c = createDeviceSyncClient({ identity, baseUrl: "https://api.example.com", fetchImpl });
+
+    const res = await c.getStatus();
+    const { init } = fetchImpl.calls[0];
+
+    expect(init.method).toBe("GET");
+    // Body TIDAK boleh dikirim untuk GET.
+    expect(init.body).toBeUndefined();
+
+    // Namun signature harus valid bila diverifikasi memakai "{}".
+    const ts = init.headers["X-Device-Timestamp"];
+    const nonce = init.headers["X-Device-Nonce"];
+    const expected = crypto.createHmac("sha256", identity.getSecretHash()).update(`${ts}.${nonce}.{}`).digest("hex");
+    expect(init.headers["X-Device-Signature"]).toBe(expected);
+
+    // Server mengembalikan paired -> client memetakan dengan benar.
+    expect(res).toMatchObject({ ok: true, paired: true, storeId: "store_1", storeName: "Toko A" });
   });
 });
 

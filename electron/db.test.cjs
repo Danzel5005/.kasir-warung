@@ -47,6 +47,7 @@ class FakeDatabase {
     if (e === "id") return row.id;
     if (e === "data") return row.data;
     if (e === "created_at") return row.created_at;
+    if (e === "synced_at") return row.synced_at;
     if (e === "menu_id") return row.menu_id;
     if (e === "kategori") return row.kategori;
     if (e === "stok") return row.stok;
@@ -99,6 +100,13 @@ class FakeDatabase {
       return v !== undefined && v !== null;
     }
 
+    // synced_at IS NULL / IS NOT NULL — untuk query pending cloud sync.
+    const syncedNull = /^synced_at\s+IS\s+(NOT\s+)?NULL$/i.exec(cond);
+    if (syncedNull) {
+      const isNullValue = row.synced_at === undefined || row.synced_at === null;
+      return syncedNull[1] ? !isNullValue : isNullValue;
+    }
+
     const cmp = /^(.+?)\s*(>=|<=|!=|=)\s*(\?|\d+|'[^']*')$/i.exec(cond);
     if (cmp) {
       const left = this._value(row, cmp[1]);
@@ -109,10 +117,26 @@ class FakeDatabase {
       if (op === ">=") return String(left) >= String(right);
       if (op === "<=") return String(left) <= String(right);
     }
+
+    // Kondisi gabungan "A = ? AND B IS NULL" (dipakai penanda synced_at).
+    const andParts = cond.split(/\s+AND\s+/i);
+    if (andParts.length > 1) {
+      return andParts.every((part) => this._where(row, `WHERE ${part}`));
+    }
     throw new Error(`FakeDatabase._where belum mendukung kondisi: ${cond}`);
   }
 
   _all(sql, params) {
+    // PRAGMA table_info(<table>) — dipakai db.cjs ensureColumn untuk migrasi.
+    const pragma = /^PRAGMA\s+table_info\((\w+)\)$/i.exec(sql);
+    if (pragma) {
+      const table = pragma[1];
+      // FakeDatabase hanya memodelkan kolom yang benar-benar dipakai db.cjs.
+      const base = table === "transactions"
+        ? ["id", "data", "created_at", "synced_at"]
+        : ["id", "data", "created_at"];
+      return base.map((name, cid) => ({ cid, name }));
+    }
     const table = /FROM\s+(\w+)/i.exec(sql)?.[1];
     if (!table) throw new Error(`FakeDatabase: tidak menemukan tabel di: ${sql}`);
     this._lastParams = params;
@@ -233,6 +257,16 @@ class FakeDatabase {
       const target = rows.find((r) => r.id === params[1]);
       if (!target) return { changes: 0 };
       target.data = params[0];
+      return { changes: 1 };
+    }
+
+    // UPDATE transactions SET synced_at = ? WHERE id = ? AND synced_at IS NULL
+    const updSynced = /^UPDATE\s+(\w+)\s+SET\s+synced_at\s*=\s*\?\s+WHERE\s+id\s*=\s*\?\s+AND\s+synced_at\s+IS\s+NULL$/i.exec(sql);
+    if (updSynced) {
+      const rows = this.tables[updSynced[1]] || [];
+      const target = rows.find((r) => String(r.id) === String(params[1]) && (r.synced_at === undefined || r.synced_at === null));
+      if (!target) return { changes: 0 };
+      target.synced_at = params[0];
       return { changes: 1 };
     }
 
@@ -379,8 +413,9 @@ describe("db.cjs: initDB & registerHandlers", () => {
       "menu-bulk-upsert", "menu-delete", "menu-load", "menu-replace", "menu-upsert",
       "process-payment", "shifts-load", "shifts-save",
       "stock-in", "stock-movements", "stock-opname", "stock-set",
-      "trx-clear", "trx-delete", "trx-get-daily-stats", "trx-get-shift-ids",
-      "trx-load", "trx-load-filtered", "trx-restore", "trx-restore-cleared",
+      "trx-clear", "trx-count-unsynced", "trx-delete", "trx-get-daily-stats", "trx-get-shift-ids",
+      "trx-list-unsynced",
+      "trx-load", "trx-load-filtered", "trx-mark-synced", "trx-restore", "trx-restore-cleared",
       "trx-restore-preview",
       "trx-save", "trx-settle", "trx-void",
     ]);
@@ -859,5 +894,67 @@ describe("db.cjs: Langkah 6 — stok masuk, opname, mutasi", () => {
     const sum = movements({ productId: "m1" }).reduce((acc, m) => acc + Number(m.delta), 0);
     expect(sum).toBe(3); // 5 - 3 + 3 - 2
     expect(awal + sum).toBe(stokOf("m1")); // 10 + 3 === 13
+  });
+});
+
+describe("db.cjs: cloud sync bookkeeping (synced_at)", () => {
+  beforeEach(() => {
+    services.svc.initDB();
+    services.svc.registerHandlers();
+  });
+
+  const call = (name, ...args) => services.registry[name](null, ...args);
+
+  it("initDB menambah kolom synced_at (migrasi ringan)", () => {
+    // Kolom harus ada sejak awal: semua transaksi baru synced_at NULL.
+    call("trx-save", { id: "t1", total: 100 });
+    expect(call("trx-count-unsynced")).toBe(1);
+  });
+
+  it("transaksi baru dihitung sebagai belum terkirim", () => {
+    call("trx-save", { id: "a", total: 1 });
+    call("trx-save", { id: "b", total: 2 });
+    expect(call("trx-count-unsynced")).toBe(2);
+  });
+
+  it("trx-list-unsynced mengembalikan payload & occurredAt", () => {
+    call("trx-save", { id: "a", total: 5, createdAt: "2026-01-01T10:00:00.000Z" });
+    const rows = call("trx-list-unsynced", {});
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe("a");
+    expect(rows[0].occurredAt).toBe("2026-01-01T10:00:00.000Z");
+    expect(rows[0].payload).toMatchObject({ id: "a", total: 5 });
+  });
+
+  it("trx-mark-synced menandai & mengurangi jumlah tertunda", () => {
+    call("trx-save", { id: "a", total: 1 });
+    call("trx-save", { id: "b", total: 2 });
+    const res = call("trx-mark-synced", { ids: ["a"], syncedAt: "2026-01-01T11:00:00.000Z" });
+    expect(res).toEqual({ ok: true, updated: 1 });
+    expect(call("trx-count-unsynced")).toBe(1);
+    // Hanya "b" yang tersisa sebagai pending.
+    expect(call("trx-list-unsynced", {}).map((r) => r.id)).toEqual(["b"]);
+  });
+
+  it("trx-mark-synced idempoten (tidak menimpa waktu sync lama)", () => {
+    call("trx-save", { id: "a", total: 1 });
+    call("trx-mark-synced", { ids: ["a"], syncedAt: "2026-01-01T11:00:00.000Z" });
+    const again = call("trx-mark-synced", { ids: ["a"], syncedAt: "2026-01-02T00:00:00.000Z" });
+    expect(again.updated).toBe(0); // sudah tersinkron -> tidak disentuh
+    expect(call("trx-count-unsynced")).toBe(0);
+  });
+
+  it("helper langsung (count/list/mark) konsisten dengan IPC", () => {
+    call("trx-save", { id: "x", total: 9 });
+    expect(services.svc.countUnsyncedTransactions()).toBe(1);
+    const list = services.svc.listUnsyncedTransactions();
+    expect(list.map((r) => r.id)).toEqual(["x"]);
+    services.svc.markTransactionsSynced(["x"], "2026-02-02T00:00:00.000Z");
+    expect(services.svc.countUnsyncedTransactions()).toBe(0);
+  });
+
+  it("trx-list-unsynced menghormati limit", () => {
+    for (let i = 0; i < 5; i += 1) call("trx-save", { id: `t${i}`, total: i });
+    expect(call("trx-list-unsynced", { limit: 2 })).toHaveLength(2);
   });
 });

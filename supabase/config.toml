@@ -1,0 +1,39 @@
+# Supabase project config untuk DEN POS cloud sync (PLAN-WEBSYNC).
+# Jalankan: supabase link --project-ref <ref>  (mengisi project_id di bawah)
+# atau isi manual. Jangan commit service_role key ke file ini.
+
+project_id = "REPLACE_WITH_YOUR_PROJECT_REF"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[edge_runtime]
+enabled = true
+policy = "oneshot"
+
+# Verifikasi JWT dimatikan untuk fungsi mesin (devices-*, sync-upload) karena
+# autentikasinya pakai HMAC device, bukan JWT Supabase. Setiap function
+# memanggil serviceClient() sendiri.
+[functions.devices-register]
+verify_jwt = false
+
+[functions.devices-status]
+verify_jwt = false
+
+[functions.devices-heartbeat]
+verify_jwt = false
+
+[functions.sync-upload]
+verify_jwt = false

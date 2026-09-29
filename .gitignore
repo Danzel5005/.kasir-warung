@@ -25,6 +25,15 @@ generator*
 API-Keys.md
 menuandcat.json
 
+# Supabase — jangan commit state lokal & secret.
+# (migrations/ dan functions/ TETAP di-commit.)
+supabase/.temp/
+supabase/.branches/
+supabase/functions/**/.env
+supabase/functions/deno.lock
+*monitoring*/
+
+
 # Logs
 logs
 *.log

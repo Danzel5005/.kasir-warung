@@ -18,7 +18,7 @@ function createDatabaseService({ ipcMain, files, ensureDir, rJSON, atomicWrite, 
       db.pragma("journal_mode = WAL");
       console.log("[Main] WAL mode set");
       db.exec(`
-        CREATE TABLE IF NOT EXISTS transactions (id TEXT PRIMARY KEY, data TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
+        CREATE TABLE IF NOT EXISTS transactions (id TEXT PRIMARY KEY, data TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, synced_at DATETIME);
         CREATE TABLE IF NOT EXISTS shifts (id TEXT PRIMARY KEY, data TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
         CREATE TABLE IF NOT EXISTS products (
           id TEXT PRIMARY KEY,
@@ -48,10 +48,33 @@ function createDatabaseService({ ipcMain, files, ensureDir, rJSON, atomicWrite, 
         CREATE INDEX IF NOT EXISTS idx_stock_movements_product ON stock_movements(product_id, created_at);
       `);
       console.log("[Main] Tables created");
+      // Migrasi ringan untuk DB lama (file sudah ada sebelum kolom ditambahkan).
+      // CREATE TABLE IF NOT EXISTS tidak mengubah tabel yang sudah ada.
+      ensureColumn("transactions", "synced_at", "DATETIME");
+      // Buat indeks setelah migrasi kolom agar DB lama (yang belum memiliki
+      // synced_at) tetap bisa dibuka. Sebelumnya CREATE INDEX di blok awal
+      // membuat initDB gagal sebelum ensureColumn sempat berjalan.
+      db.exec("CREATE INDEX IF NOT EXISTS idx_trx_synced ON transactions(synced_at)");
       console.log("[DB] SQLite initialized successfully");
       return true;
     } catch (err) {
       console.error("[DB] Failed to initialize SQLite:", err.message, err.stack);
+      return false;
+    }
+  }
+
+  // ensureColumn — tambah kolom hanya jika belum ada (idempoten, aman dijalankan
+  // tiap start). Dipakai untuk migrasi ringan tanpa tool migration eksternal.
+  function ensureColumn(table, column, type) {
+    if (!db) return false;
+    try {
+      const cols = db.prepare(`PRAGMA table_info(${table})`).all();
+      if (cols.some((c) => c.name === column)) return false;
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+      console.log(`[DB] Migrated: added ${table}.${column}`);
+      return true;
+    } catch (err) {
+      console.error(`[DB] ensureColumn ${table}.${column} failed:`, err.message);
       return false;
     }
   }
@@ -458,6 +481,44 @@ function createDatabaseService({ ipcMain, files, ensureDir, rJSON, atomicWrite, 
       try { db.prepare("INSERT INTO transactions (id, data) VALUES (?, ?)").run(trx.id || null, JSON.stringify(trx)); return { ok: true }; }
       catch (err) { console.error("[trx-save] Error:", err.message); return { ok: false, error: err.message }; }
     });
+
+    // ── Cloud sync bookkeeping (PLAN-WEBSYNC) ────────────────────────────────
+    // Transaksi dianggap "belum terkirim" selama synced_at IS NULL.
+    ipcMain.handle("trx-count-unsynced", () => {
+      if (!db) return 0;
+      try { return db.prepare("SELECT COUNT(*) as total FROM transactions WHERE synced_at IS NULL").get().total || 0; }
+      catch (err) { console.error("[trx-count-unsynced] Error:", err.message); return 0; }
+    });
+
+    // Ambil batch transaksi yang belum disinkronkan sebagai payload ringan:
+    // { id, occurredAt, payload }. Non-void DAN void tetap dikirim (web-app
+    // perlu tahu koreksi/void), jadi tidak ada filter status di sini.
+    ipcMain.handle("trx-list-unsynced", (_e, { limit = 2000 } = {}) => {
+      if (!db) return [];
+      try {
+        const rows = db.prepare("SELECT id, data, created_at FROM transactions WHERE synced_at IS NULL ORDER BY created_at ASC LIMIT ?").all(limit);
+        return rows.map((row) => {
+          let parsed = {};
+          try { parsed = JSON.parse(row.data); } catch { parsed = { id: row.id }; }
+          return { id: row.id, occurredAt: parsed?.createdAt || row.created_at, payload: parsed };
+        });
+      } catch (err) { console.error("[trx-list-unsynced] Error:", err.message); return []; }
+    });
+
+    // Tandai transaksi sudah terkirim. `syncedAt` = ISO timestamp dari renderer
+    // (atau sekarang). Hanya baris dengan synced_at NULL yang disentuh supaya
+    // retry tidak menimpa waktu sync sebelumnya.
+    ipcMain.handle("trx-mark-synced", (_e, { ids = [], syncedAt } = {}) => {
+      if (!db) return { ok: true, updated: 0 };
+      try {
+        if (!Array.isArray(ids) || ids.length === 0) return { ok: true, updated: 0 };
+        const stamp = syncedAt || new Date().toISOString();
+        const stmt = db.prepare("UPDATE transactions SET synced_at = ? WHERE id = ? AND synced_at IS NULL");
+        let updated = 0;
+        db.transaction((list) => { for (const id of list) updated += stmt.run(stamp, String(id)).changes; })(ids);
+        return { ok: true, updated };
+      } catch (err) { console.error("[trx-mark-synced] Error:", err.message); return { ok: false, error: err.message, updated: 0 }; }
+    });
     ipcMain.handle("trx-delete", (_e, id, { restoreStock = false } = {}) => {
       // Langkah 2b: opsi mengembalikan stok saat transaksi dihapus. Transaksi
       // void SELALU dilewati (stoknya sudah kembali saat void, Langkah 1).
@@ -734,7 +795,36 @@ ipcMain.handle("trx-restore", (_e, list) => {
     catch (err) { console.error("[loadShifts] Error:", err.message); return null; }
   }
 
-  return { initDB, migrateJSONToSQLite, migrateMenuToProducts, closeDB, registerHandlers, applyStockDelta, loadMenuList, replaceMenuList, restoreStockFromTrx, loadTrx, loadShifts };
+  // ── Sync helpers (dipakai auto-sync di main process) ──────────────────────
+  function countUnsyncedTransactions() {
+    if (!db) return 0;
+    try { return db.prepare("SELECT COUNT(*) as total FROM transactions WHERE synced_at IS NULL").get().total || 0; }
+    catch (err) { console.error("[countUnsyncedTransactions] Error:", err.message); return 0; }
+  }
+  function listUnsyncedTransactions(limit = 2000) {
+    if (!db) return [];
+    try {
+      const rows = db.prepare("SELECT id, data, created_at FROM transactions WHERE synced_at IS NULL ORDER BY created_at ASC LIMIT ?").all(limit);
+      return rows.map((row) => {
+        let parsed = {};
+        try { parsed = JSON.parse(row.data); } catch { parsed = { id: row.id }; }
+        return { id: row.id, occurredAt: parsed?.createdAt || row.created_at, payload: parsed };
+      });
+    } catch (err) { console.error("[listUnsyncedTransactions] Error:", err.message); return []; }
+  }
+  function markTransactionsSynced(ids = [], syncedAt) {
+    if (!db) return { ok: true, updated: 0 };
+    try {
+      if (!Array.isArray(ids) || ids.length === 0) return { ok: true, updated: 0 };
+      const stamp = syncedAt || new Date().toISOString();
+      const stmt = db.prepare("UPDATE transactions SET synced_at = ? WHERE id = ? AND synced_at IS NULL");
+      let updated = 0;
+      db.transaction((list) => { for (const id of list) updated += stmt.run(stamp, String(id)).changes; })(ids);
+      return { ok: true, updated };
+    } catch (err) { console.error("[markTransactionsSynced] Error:", err.message); return { ok: false, error: err.message, updated: 0 }; }
+  }
+
+  return { initDB, migrateJSONToSQLite, migrateMenuToProducts, closeDB, registerHandlers, applyStockDelta, loadMenuList, replaceMenuList, restoreStockFromTrx, loadTrx, loadShifts, countUnsyncedTransactions, listUnsyncedTransactions, markTransactionsSynced };
 }
 
 module.exports = { createDatabaseService };

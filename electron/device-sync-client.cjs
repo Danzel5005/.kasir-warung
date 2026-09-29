@@ -51,8 +51,13 @@ function createDeviceSyncClient({ identity, baseUrl = "", fetchImpl, timeoutMs =
       headers["X-Device-ID"] = identity.getDeviceId();
       headers["X-Device-Timestamp"] = timestamp;
       headers["X-Device-Nonce"] = nonce;
+      // Kunci = sha256(device_secret), BUKAN secret mentah. Server hanya
+      // menyimpan turunan ini (credential_hash) sehingga tidak perlu secret.
+      const signingKey = typeof identity.getSecretHash === "function"
+        ? identity.getSecretHash()
+        : identity.getSecret();
       headers["X-Device-Signature"] = crypto
-        .createHmac("sha256", identity.getSecret())
+        .createHmac("sha256", signingKey)
         .update(`${timestamp}.${nonce}.${payload}`)
         .digest("hex");
       headers["Content-Type"] = "application/json";
@@ -64,10 +69,15 @@ function createDeviceSyncClient({ identity, baseUrl = "", fetchImpl, timeoutMs =
     const controller = typeof AbortController === "function" ? new AbortController() : null;
     const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
     try {
+      // GET/HEAD TIDAK boleh punya body (fetch/DOM melempar TypeError).
+      // Tanda tangan tetap dihitung atas `payload` ("{}" untuk GET), dan server
+      // memverifikasi dengan rawBody "{}" — jadi keduanya tetap cocok.
+      const method_ = String(method).toUpperCase();
+      const sendBody = method_ !== "GET" && method_ !== "HEAD";
       const res = await doFetch(url, {
         method,
         headers,
-        body: payload,
+        body: sendBody ? payload : undefined,
         signal: controller ? controller.signal : undefined,
       });
       const text = await res.text().catch(() => "");
@@ -109,8 +119,11 @@ function createDeviceSyncClient({ identity, baseUrl = "", fetchImpl, timeoutMs =
       deviceName: deviceName || identity.getDeviceName(),
       platform: process.platform,
       appVersion: process.env.npm_package_version || null,
+      // Proof kredensial untuk device BARU (server belum punya hash-nya).
+      // Ini sha256(device_secret) — sama dengan kunci yang dipakai menandatangani.
+      secretProof: typeof identity.getSecretHash === "function" ? identity.getSecretHash() : null,
     };
-    const res = await request("POST", "/api/devices/register", { body, signed: true, baseUrlOverride });
+    const res = await request("POST", "/devices-register", { body, signed: true, baseUrlOverride });
     if (!res.ok) return res;
     const data = res.data || {};
     return {
@@ -126,7 +139,7 @@ function createDeviceSyncClient({ identity, baseUrl = "", fetchImpl, timeoutMs =
 
   /** Cek status pairing device (sudah dipasangkan ke store atau belum). */
   async function getStatus({ baseUrlOverride } = {}) {
-    const res = await request("GET", `/api/devices/${encodeURIComponent(identity.getDeviceId())}/status`, {
+    const res = await request("GET", `/devices-status/${encodeURIComponent(identity.getDeviceId())}`, {
       signed: true,
       baseUrlOverride,
     });
@@ -144,7 +157,7 @@ function createDeviceSyncClient({ identity, baseUrl = "", fetchImpl, timeoutMs =
 
   /** Heartbeat ringan (opsional): menandai device online di web-app. */
   async function heartbeat({ baseUrlOverride } = {}) {
-    return request("POST", "/api/devices/heartbeat", {
+    return request("POST", "/devices-heartbeat", {
       body: { deviceId: identity.getDeviceId(), at: new Date().toISOString() },
       signed: true,
       baseUrlOverride,
@@ -164,7 +177,7 @@ function createDeviceSyncClient({ identity, baseUrl = "", fetchImpl, timeoutMs =
       sentAt: new Date().toISOString(),
       rows,
     };
-    const res = await request("POST", "/api/sync/upload", { body, signed: true, baseUrlOverride });
+    const res = await request("POST", "/sync-upload", { body, signed: true, baseUrlOverride });
     if (!res.ok) return res;
     return { ok: true, status: res.status, accepted: res.data?.accepted ?? rows.length, batchId: body.batchId, raw: res.data };
   }

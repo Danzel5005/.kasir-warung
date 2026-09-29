@@ -129,6 +129,17 @@ function createDeviceIdentity({ app, secretPath } = {}) {
     return ensure().deviceSecret;
   }
 
+  /**
+   * Kunci turunan untuk menandatangani request ke cloud:
+   *   signingKey = sha256(device_secret)  (hex lowercase)
+   *
+   * Server HANYA menyimpan nilai ini (= credential_hash), sehingga tidak perlu
+   * menyimpan secret mentah. device_secret tetap rahasia milik POS.
+   */
+  function getSecretHash() {
+    return crypto.createHash("sha256").update(getSecret(), "utf8").digest("hex");
+  }
+
   function getDeviceName() {
     return ensure().deviceName;
   }
@@ -196,6 +207,7 @@ function createDeviceIdentity({ app, secretPath } = {}) {
     getCredential,
     getDeviceId,
     getSecret,
+    getSecretHash,
     getDeviceName,
     setName,
     isRegistered,

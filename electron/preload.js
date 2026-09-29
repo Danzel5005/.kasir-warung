@@ -95,9 +95,16 @@ settleTrx: (id, actor) => ipcRenderer.invoke("trx-settle", id, actor),
   deviceRegister:        (opts) => ipcRenderer.invoke("device-register", opts),
   deviceCheckPairing:    (opts) => ipcRenderer.invoke("device-check-pairing", opts),
   devicePushSync:        (batch)=> ipcRenderer.invoke("device-push-sync", batch),
+  devicePushTransactions:()     => ipcRenderer.invoke("device-push-transactions"),
+  devicePendingCount:    ()     => ipcRenderer.invoke("device-pending-count"),
   deviceCredential:      ()     => ipcRenderer.invoke("device-credential"),
   deviceRotateCredential:()     => ipcRenderer.invoke("device-rotate-credential"),
   deviceSetName:         (name) => ipcRenderer.invoke("device-set-name", name),
+  onDeviceSyncEvent: (callback) => {
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on("device-sync-event", listener);
+    return () => ipcRenderer.removeListener("device-sync-event", listener);
+  },
   // Info
   getDataPath:  ()      => ipcRenderer.invoke("get-data-path"),
   processPayment: (data) => ipcRenderer.invoke("process-payment", data),

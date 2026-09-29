@@ -70,7 +70,20 @@ const backupRestore = createBackupRestoreService({ app, ipcMain, dialog, files: 
 // userData (.pos_device) — satu level di atas folder data/, jadi tidak ikut
 // ter-backup/ter-restore bersama data bisnis.
 const deviceIdentity = createDeviceIdentity({ app });
-const deviceSync = createDeviceSyncService({ app, identity: deviceIdentity });
+const deviceSync = createDeviceSyncService({
+  app,
+  identity: deviceIdentity,
+  // Sumber data "belum terkirim" + penanda hasil sync (SQLite via db.cjs).
+  pendingCountProvider: () => database.countUnsyncedTransactions(),
+  pendingListProvider: () => database.listUnsyncedTransactions(),
+  markSynced: (ids, at) => database.markTransactionsSynced(ids, at),
+  // Peringatan/sukses sync diteruskan ke renderer (toast "gagal kirim" dsb.).
+  notify: (payload) => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w.isDestroyed()) w.webContents.send("device-sync-event", payload);
+    }
+  },
+});
 
 function registerFileHandlers() {
   ipcMain.handle("bills-load", () => backup.rJSON(FILES.bills) || []);
@@ -172,6 +185,8 @@ app.whenReady().then(() => {
     database.migrateMenuToProducts();
     backup.walRecover();
     backup.dailyBackup();
+    // Mulai auto-sync 5 menit HANYA jika perangkat sudah dipasangkan & URL diatur.
+    deviceSync.syncAutoSyncState();
     createWindow();
   } catch (err) { console.error("[Main] Error during startup:", err); }
   const updateCheck = checkForUpdate().catch(() => null);
@@ -180,6 +195,7 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => {
+  deviceSync.stopAutoSync();
   database.closeDB();
   if (process.platform !== "darwin") app.quit();
 });

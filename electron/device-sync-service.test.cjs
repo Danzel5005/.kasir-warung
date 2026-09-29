@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { createRequire } from "module";
 import fs from "fs";
 import os from "os";
@@ -30,11 +30,11 @@ let identity;
 let fetchImpl;
 let svc;
 
-function build(responder) {
+function build(responder, extra = {}) {
   fetchImpl = makeFetch(responder);
   identity = createDeviceIdentity({ secretPath: path.join(dir, ".pos_device") });
   const client = createDeviceSyncClient({ identity, fetchImpl });
-  svc = createDeviceSyncService({ identity, client, configPath: path.join(dir, "device-sync.json") });
+  svc = createDeviceSyncService({ identity, client, configPath: path.join(dir, "device-sync.json"), ...extra });
 }
 
 beforeEach(() => {
@@ -172,6 +172,8 @@ describe("device-sync-service: IPC handlers", () => {
       "device-register",
       "device-check-pairing",
       "device-push-sync",
+      "device-push-transactions",
+      "device-pending-count",
       "device-credential",
       "device-rotate-credential",
       "device-set-name",
@@ -192,5 +194,215 @@ describe("device-sync-service: IPC handlers", () => {
     const out = registered.get("device-status")();
     expect(out.identity.deviceId).toMatch(/^dev_/);
     expect(out.identity).not.toHaveProperty("deviceSecret");
+  });
+});
+
+describe("device-sync-service: kirim transaksi (pending)", () => {
+  function withPending(rows, extra = {}) {
+    const marked = [];
+    build({ body: { accepted: rows.length } }, {
+      pendingCountProvider: () => rows.length,
+      pendingListProvider: () => rows,
+      markSynced: (ids, at) => { marked.push({ ids, at }); return { ok: true, updated: ids.length }; },
+      ...extra,
+    });
+    return marked;
+  }
+
+  it("getStatus menyertakan pendingCount", () => {
+    withPending([{ id: "a" }, { id: "b" }]);
+    expect(svc.getStatus().pendingCount).toBe(2);
+  });
+
+  it("pushTransactions tanpa pairing -> ditolak", async () => {
+    withPending([{ id: "a" }]);
+    svc.setBaseUrl("https://cloud.denpos.id");
+    const res = await svc.pushTransactions();
+    expect(res.ok).toBe(false);
+    expect(res.error).toMatch(/belum dipasangkan/i);
+  });
+
+  it("pushTransactions tanpa data -> sukses tanpa fetch", async () => {
+    withPending([]);
+    svc.setBaseUrl("https://cloud.denpos.id");
+    identity.markRegistered("store_1");
+    const res = await svc.pushTransactions();
+    expect(res).toMatchObject({ ok: true, sent: 0 });
+    expect(fetchImpl.calls.length).toBe(0);
+  });
+
+  it("pushTransactions mengirim & menandai terkirim", async () => {
+    const marked = withPending([{ id: "t1" }, { id: "t2" }]);
+    svc.setBaseUrl("https://cloud.denpos.id");
+    identity.markRegistered("store_1");
+    const res = await svc.pushTransactions();
+    expect(res).toMatchObject({ ok: true, sent: 2 });
+    expect(marked.length).toBe(1);
+    expect(marked[0].ids).toEqual(["t1", "t2"]);
+    expect(marked[0].at).toBeTruthy();
+  });
+
+  it("gagal kirim -> TIDAK menandai terkirim", async () => {
+    const marked = withPending([{ id: "t1" }]);
+    // ganti fetch jadi gagal
+    fetchImpl = null;
+    svc.setBaseUrl("https://cloud.denpos.id");
+    identity.markRegistered("store_1");
+    // client sudah dibuat dengan fetchImpl lama; buat ulang service dengan fetch gagal
+    build(() => ({ status: 500, body: { error: "SERVER_ERROR" } }), {
+      pendingCountProvider: () => 1,
+      pendingListProvider: () => [{ id: "t1" }],
+      markSynced: (ids) => { marked.push({ ids }); return { ok: true, updated: ids.length }; },
+    });
+    svc.setBaseUrl("https://cloud.denpos.id");
+    identity.markRegistered("store_1");
+    const res = await svc.pushTransactions();
+    expect(res.ok).toBe(false);
+    expect(marked.length).toBe(0);
+  });
+});
+
+describe("device-sync-service: auto-sync 5 menit", () => {
+  it("tidak jalan saat belum paired", () => {
+    build({}, { autoSyncIntervalMs: 60_000 });
+    expect(svc.isAutoSyncRunning()).toBe(false);
+    svc.syncAutoSyncState();
+    expect(svc.isAutoSyncRunning()).toBe(false);
+    svc.stopAutoSync();
+  });
+
+  it("mulai saat paired + URL diatur", () => {
+    build({}, { autoSyncIntervalMs: 60_000, pendingCountProvider: () => 0 });
+    svc.setBaseUrl("https://cloud.denpos.id");
+    identity.markRegistered("store_1");
+    svc.syncAutoSyncState();
+    expect(svc.isAutoSyncRunning()).toBe(true);
+    svc.stopAutoSync();
+    expect(svc.isAutoSyncRunning()).toBe(false);
+  });
+
+  it("berhenti saat pairing dicabut", () => {
+    build({}, { autoSyncIntervalMs: 60_000 });
+    svc.setBaseUrl("https://cloud.denpos.id");
+    identity.markRegistered("store_1");
+    svc.syncAutoSyncState();
+    expect(svc.isAutoSyncRunning()).toBe(true);
+    identity.clearRegistration();
+    svc.syncAutoSyncState();
+    expect(svc.isAutoSyncRunning()).toBe(false);
+  });
+
+  it("autoSyncIntervalMs=0 menonaktifkan timer (untuk tes)", () => {
+    build({}, { autoSyncIntervalMs: 0 });
+    svc.setBaseUrl("https://cloud.denpos.id");
+    identity.markRegistered("store_1");
+    svc.syncAutoSyncState();
+    expect(svc.isAutoSyncRunning()).toBe(false);
+  });
+});
+
+describe("device-sync-service: auto-sync tick (fake timers)", () => {
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("tiap 5 menit mengirim transaksi tertunda & menandainya", async () => {
+    const marked = [];
+    const notify = [];
+    const rows = [{ id: "t1" }, { id: "t2" }];
+    build({ body: { accepted: 2 } }, {
+      autoSyncIntervalMs: 5 * 60 * 1000,
+      pendingCountProvider: () => rows.length,
+      pendingListProvider: () => rows,
+      markSynced: (ids, at) => { marked.push({ ids, at }); return { ok: true, updated: ids.length }; },
+      notify: (p) => notify.push(p),
+    });
+    svc.setBaseUrl("https://cloud.denpos.id");
+    identity.markRegistered("store_1");
+
+    vi.useFakeTimers();
+    svc.syncAutoSyncState();
+    expect(svc.isAutoSyncRunning()).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+
+    expect(fetchImpl.calls.length).toBe(1);
+    expect(marked[0].ids).toEqual(["t1", "t2"]);
+    expect(notify.some((p) => p.kind === "sync-ok")).toBe(true);
+    svc.stopAutoSync();
+  });
+
+  it("gagal kirim -> emit peringatan 'sync-failed' tiap tick", async () => {
+    const notify = [];
+    build(() => ({ status: 500, body: { error: "SERVER_ERROR" } }), {
+      autoSyncIntervalMs: 5 * 60 * 1000,
+      pendingCountProvider: () => 1,
+      pendingListProvider: () => [{ id: "t1" }],
+      markSynced: () => ({ ok: true, updated: 0 }),
+      notify: (p) => notify.push(p),
+    });
+    svc.setBaseUrl("https://cloud.denpos.id");
+    identity.markRegistered("store_1");
+
+    vi.useFakeTimers();
+    svc.syncAutoSyncState();
+
+    await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+    await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+
+    const failures = notify.filter((p) => p.kind === "sync-failed");
+    expect(failures.length).toBe(2); // sekali per tick yang gagal
+    expect(failures[0].title).toMatch(/gagal/i);
+    expect(failures[0].message).toMatch(/SERVER_ERROR/);
+    svc.stopAutoSync();
+  });
+
+  it("offline (fetch throw) -> peringatan dengan penanda koneksi", async () => {
+    const notify = [];
+    const failing = async () => { throw new Error("ECONNREFUSED"); };
+    build({}, {
+      autoSyncIntervalMs: 5 * 60 * 1000,
+      pendingCountProvider: () => 1,
+      pendingListProvider: () => [{ id: "t1" }],
+      markSynced: () => ({ ok: true, updated: 0 }),
+      notify: (p) => notify.push(p),
+    });
+    // ganti client ke fetch yang throw
+    svc = createDeviceSyncService({
+      identity,
+      client: createDeviceSyncClient({ identity, fetchImpl: failing }),
+      configPath: path.join(dir, "device-sync.json"),
+      autoSyncIntervalMs: 5 * 60 * 1000,
+      pendingCountProvider: () => 1,
+      pendingListProvider: () => [{ id: "t1" }],
+      markSynced: () => ({ ok: true, updated: 0 }),
+      notify: (p) => notify.push(p),
+    });
+    svc.setBaseUrl("https://cloud.denpos.id");
+    identity.markRegistered("store_1");
+
+    vi.useFakeTimers();
+    svc.syncAutoSyncState();
+    await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+
+    const failures = notify.filter((p) => p.kind === "sync-failed");
+    expect(failures.length).toBe(1);
+    expect(failures[0].detail).toMatch(/koneksi/i);
+    svc.stopAutoSync();
+  });
+
+  it("tidak memanggil jaringan saat tidak ada data tertunda", async () => {
+    build({}, {
+      autoSyncIntervalMs: 5 * 60 * 1000,
+      pendingCountProvider: () => 0,
+      pendingListProvider: () => [],
+      notify: () => {},
+    });
+    svc.setBaseUrl("https://cloud.denpos.id");
+    identity.markRegistered("store_1");
+
+    vi.useFakeTimers();
+    svc.syncAutoSyncState();
+    await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
+    expect(fetchImpl.calls.length).toBe(0);
+    svc.stopAutoSync();
   });
 });

@@ -393,6 +393,20 @@ async deleteTrx(id, opts) {
     if (window.kasirAPI?.devicePushSync) return safeIpc("Kirim data sync", () => window.kasirAPI.devicePushSync(batch));
     return { ok: false, error: "Hanya tersedia di aplikasi desktop" };
   },
+  async devicePendingCount() {
+    if (window.kasirAPI?.devicePendingCount) return safeIpc("Jumlah data tertunda", () => window.kasirAPI.devicePendingCount());
+    return 0;
+  },
+  async devicePushTransactions() {
+    if (window.kasirAPI?.devicePushTransactions) return safeIpc("Kirim transaksi", () => window.kasirAPI.devicePushTransactions());
+    return { ok: false, error: "Hanya tersedia di aplikasi desktop" };
+  },
+  // onDeviceSyncEvent — langganan peringatan hasil auto-sync dari main process.
+  // Return fungsi unsubscribe (no-op di browser).
+  onDeviceSyncEvent(callback) {
+    if (window.kasirAPI?.onDeviceSyncEvent) return window.kasirAPI.onDeviceSyncEvent(callback);
+    return () => {};
+  },
   async deviceCredential() {
     if (window.kasirAPI?.deviceCredential) return safeIpc("Kredensial perangkat", () => window.kasirAPI.deviceCredential());
     return { ok: false, error: "Hanya tersedia di aplikasi desktop" };

@@ -9,3 +9,4 @@ export * from "./PricingSettingsTab.jsx";
 export * from "./BackupSettingsTab.jsx";
 export * from "./UsersSettingsTab.jsx";
 export * from "./AdvancedSettingsTab.jsx";
+export * from "./CloudSyncSettingsTab.jsx";

@@ -3,6 +3,7 @@ import { createRequire } from "module";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import crypto from "crypto";
 
 const require = createRequire(import.meta.url);
 const {
@@ -84,6 +85,19 @@ describe("device-identity: signing", () => {
     expect(sig).toMatch(/^[0-9a-f]{64}$/);
     expect(identity.sign(payload)).toBe(sig);
     expect(identity.verify(payload, sig)).toBe(true);
+  });
+
+  it("getSecretHash() = sha256(secret) dan berbeda dari secret mentah", () => {
+    const expected = crypto.createHash("sha256").update(identity.getSecret(), "utf8").digest("hex");
+    expect(identity.getSecretHash()).toBe(expected);
+    expect(identity.getSecretHash()).toMatch(/^[0-9a-f]{64}$/);
+    expect(identity.getSecretHash()).not.toBe(identity.getSecret());
+  });
+
+  it("getSecretHash() berubah saat rotate()", () => {
+    const before = identity.getSecretHash();
+    identity.rotate();
+    expect(identity.getSecretHash()).not.toBe(before);
   });
 
   it("urutan key tidak mengubah signature (canonical JSON)", () => {

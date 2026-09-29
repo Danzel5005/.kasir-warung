@@ -10,7 +10,9 @@ import {
   BackupSettingsTab,
   UsersSettingsTab,
   AdvancedSettingsTab,
+  CloudSyncSettingsTab,
 } from "./settings-tabs/index.js";
+import { useDeviceSync } from "../../hooks/useDeviceSync.js";
 
 const SETTINGS_TABS = [
   ["printer", "Printer"],
@@ -22,13 +24,14 @@ const SETTINGS_TABS = [
   ["backup", "Backup"],
   ["users", "Kelola Pengguna"],
   ["advanced", "Fitur Lanjutan"],
+  ["cloud", "Sync Cloud"],
 ];
 
 function SettingsTabButton({ tab, activeTab, onSelect, children }) {
   return <button onClick={() => onSelect(tab)} style={{ display: "flex", alignItems: "center", flexShrink: 0, width: "100%", boxSizing: "border-box", minHeight: 38, padding: "10px 13px", border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 11, fontWeight: 600, textAlign: "left", background: activeTab === tab ? "rgba(255,255,255,0.18)" : "transparent", color: W, borderLeft: activeTab === tab ? "3px solid #fff" : "3px solid transparent", transition: "all 0.15s" }}>{children}</button>;
 }
 
-function SettingsPanel({ tab, settingsH, authH, menu, cats }) {
+function SettingsPanel({ tab, settingsH, authH, menu, cats, deviceH }) {
   const panelProps = { settingsH, menu, cats };
   switch (tab) {
     case "printer": return <PrinterSettingsTab {...panelProps} />;
@@ -40,12 +43,16 @@ function SettingsPanel({ tab, settingsH, authH, menu, cats }) {
     case "backup": return <BackupSettingsTab {...panelProps} />;
     case "users": return <UsersSettingsTab authH={authH} />;
     case "advanced": return <AdvancedSettingsTab {...panelProps} />;
+    case "cloud": return <CloudSyncSettingsTab authH={authH} deviceH={deviceH} />;
     default: return null;
   }
 }
 
 export default function SettingsModal({ settingsH, authH, menu = [], cats = [] }) {
   const [tab, setTab] = useState("printer");
+  // Hook harus dipanggil di level komponen (bukan di dalam switch), dan hidup
+  // selama modal terbuka. Auto-send 5 menit sendiri berjalan di main process.
+  const deviceH = useDeviceSync({ toast_: settingsH?.toast_, isAdmin: true });
   const close = () => settingsH.setSettingsModal(false);
 
   return <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300 }} onClick={(event) => event.target === event.currentTarget && close()}>
@@ -59,7 +66,7 @@ export default function SettingsModal({ settingsH, authH, menu = [], cats = [] }
           {SETTINGS_TABS.map(([key, label]) => <SettingsTabButton key={key} tab={key} activeTab={tab} onSelect={setTab}>{label}</SettingsTabButton>)}
         </aside>
         <div style={{ flex: 1, overflowY: "auto", padding: 16, minWidth: 0 }}>
-          <SettingsPanel tab={tab} settingsH={settingsH} authH={authH} menu={menu} cats={cats} />
+          <SettingsPanel tab={tab} settingsH={settingsH} authH={authH} menu={menu} cats={cats} deviceH={deviceH} />
         </div>
       </div>
       <div style={{ ...row }}><button onClick={close} style={{ marginLeft: "auto", padding: "8px 16px", background: COLOR_PALETTE.primaryLight, color: G, border: "none", borderRadius: RADIUS.md, cursor: "pointer", fontFamily: "inherit", fontSize: TYPOGRAPHY.small.fontSize, fontWeight: 700 }}>Tutup</button></div>
