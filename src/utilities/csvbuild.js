@@ -74,30 +74,36 @@ function lapRow(t) { return [t]; } // placeholder, grouped below
 
 function csvLaporan(trxs, at, meta = {}) {
   const byDay={};
-  const openingCash = Number(meta.openingCash || 0);
-  const totalExpenses = Number(meta.totalExpenses || 0);
+  const shiftTotals = new Map((meta.shifts || []).map((shift) => [shift.id, shift]));
 
   trxs.forEach(t=>{
     const k=`${t.hari}||${t.tgl} ${t.bln} ${t.thn}`;
-    if(!byDay[k]) byDay[k]={hari:t.hari,tgl:`${t.tgl} ${t.bln} ${t.thn}`,trx:0,pendapatan:0,modal:0};
+    if(!byDay[k]) byDay[k]={hari:t.hari,tgl:`${t.tgl} ${t.bln} ${t.thn}`,trx:0,pendapatan:0,modal:0,shifts:new Set()};
     byDay[k].trx++;
-    byDay[k].pendapatan+=t.total;
+    byDay[k].pendapatan+=Number(t.total)||0;
+    if (t.shiftId != null) byDay[k].shifts.add(t.shiftId);
     t.items.forEach(i=>{byDay[k].modal+=(i.modal||0)*i.qty;});
   });
 
   const rows=Object.values(byDay).map(d=>{
     const totalRevenue = d.pendapatan;
     const grossProfit = totalRevenue - d.modal;
-    const cashFinal = openingCash + grossProfit - totalExpenses;
+    const shifts = [...d.shifts].map((id) => shiftTotals.get(id)).filter(Boolean);
+    const openingCash = shifts.reduce((sum, shift) => sum + (Number(shift.openingCash) || 0), 0);
+    const totalExpenses = shifts.reduce((sum, shift) => sum + (shift.expenses || []).reduce((inner, item) => inner + (Number(item.jumlah) || 0), 0), 0);
+    const cashFinal = openingCash + totalRevenue - totalExpenses;
     const ket = d.modal === 0 ? "Modal belum diinput" : cashFinal >= 0 ? "LABA" : "RUGI";
     return [d.hari,d.tgl,d.trx,d.pendapatan,totalRevenue,d.modal,grossProfit,openingCash,totalExpenses,cashFinal,grossProfit-totalExpenses,ket,at].join(",");
   });
 
   const tot={trx:0,pend:0,mod:0};
-  trxs.forEach(t=>{tot.trx++;tot.pend+=t.total;t.items.forEach(i=>{tot.mod+=(i.modal||0)*i.qty;});});
+  trxs.forEach(t=>{tot.trx++;tot.pend+=Number(t.total)||0;t.items.forEach(i=>{tot.mod+=(Number(i.modal)||0)*(Number(i.qty)||0);});});
+  const allShifts = [...new Set(trxs.map((t) => t.shiftId).filter((id) => id != null))].map((id) => shiftTotals.get(id)).filter(Boolean);
+  const openingCash = allShifts.length ? allShifts.reduce((sum, shift) => sum + (Number(shift.openingCash) || 0), 0) : Number(meta.openingCash) || 0;
+  const totalExpenses = allShifts.length ? allShifts.reduce((sum, shift) => sum + (shift.expenses || []).reduce((inner, item) => inner + (Number(item.jumlah) || 0), 0), 0) : Number(meta.totalExpenses) || 0;
   const totGross = tot.pend;
   const totGrossProfit = totGross - tot.mod;
-  const totCashFinal = openingCash + totGrossProfit - totalExpenses;
+  const totCashFinal = openingCash + totGross - totalExpenses;
   const totNetProfit = totGrossProfit - totalExpenses;
   rows.push(["TOTAL","",tot.trx,tot.pend,totGross,tot.mod,totGrossProfit,openingCash,totalExpenses,totCashFinal,totNetProfit,tot.mod===0?"Modal belum diinput":totCashFinal>=0?"LABA":"RUGI",at].join(","));
   return [LAP_HEADER,...rows].join("\n");
