@@ -1,13 +1,5 @@
-# 📖 DEN POS — Buku Panduan Pengguna
-
-**Versi dokumen:** 1.2.2
-**Aplikasi:** DEN POS (aplikasi kasir untuk warung, toko, dan usaha kecil)
-**Bahasa:** Indonesia
-**Untuk:** Pemilik warung, kasir, dan staf — **bukan** untuk programmer.
-
----
-
-## Selamat Datang 👋
+#  DEN POS — Buku Panduan Pengguna
+## Selamat Datang 
 
 Buku ini adalah **panduan lengkap** cara memakai DEN POS, mulai dari pertama kali menyalakan aplikasi sampai memakai fitur-fitur canggih seperti Cloud Sync dan Loyalty Tier.
 
@@ -17,7 +9,7 @@ Buku ini ditulis dengan bahasa yang **mudah dipahami**. Setiap fitur dijelaskan 
 2. **Kapan** kamu memakainya.
 3. **Bagaimana** cara memakainya, langkah demi langkah.
 
-> 💡 **Tips:** Kamu tidak perlu membaca dari awal sampai akhir. Kalau bingung dengan satu fitur, langsung lompat ke bagiannya pakai daftar isi di bawah.
+> **Tips:** Kamu tidak perlu membaca dari awal sampai akhir. Kalau bingung dengan satu fitur, langsung lompat ke bagiannya pakai daftar isi di bawah.
 
 ---
 
@@ -104,7 +96,7 @@ Saat aplikasi pertama kali dibuka, kamu akan melihat halaman **"Aktivasi Softwar
 6. **Klik "Aktifkan Software".**
    Kalau kode benar, aplikasi akan terbuka dan kamu dibawa ke halaman login.
 
-> ⚠️ **Penting:** Lisensi **terikat pada perangkat ini**. Kalau kamu pindah ke komputer/PC lain, lisensi tidak akan berfungsi. Hubungi penjual untuk **reset aktivasi** bila ingin pindah perangkat.
+> ️ **Penting:** Lisensi **terikat pada perangkat ini**. Kalau kamu pindah ke komputer/PC lain, lisensi tidak akan berfungsi. Hubungi penjual untuk **reset aktivasi** bila ingin pindah perangkat.
 
 ---
 
@@ -138,7 +130,7 @@ Saat pertama kali memakai aplikasi, gunakan akun default ini:
 | --- | --- | --- |
 | `admin` | `admin123` | Administrator (bisa semua hal) |
 
-> 🔒 **Wajib dilakukan:** Segera ganti password default lewat **Pengaturan → Kelola Pengguna → Ganti Password Saya**. Password `admin123` tidak aman untuk dipakai jangka panjang.
+>  **Wajib dilakukan:** Segera ganti password default lewat **Pengaturan → Kelola Pengguna → Ganti Password Saya**. Password `admin123` tidak aman untuk dipakai jangka panjang.
 
 ### Peran Pengguna (Role)
 
@@ -266,7 +258,7 @@ Kalau ada transaksi yang perlu dibatalkan (misalnya pelanggan minta batal), guna
 
 4. Konfirmasi. Transaksi akan ditandai sebagai **void** dan tercatat di laporan.
 
-> 📝 Transaksi void **tetap tercatat** untuk audit, tetapi tidak dihitung sebagai penjualan.
+> Transaksi void **tetap tercatat** untuk audit, tetapi tidak dihitung sebagai penjualan.
 
 ---
 
@@ -290,7 +282,7 @@ Halaman **Laporan** adalah tempat kamu melihat "kesehatan" usaha: berapa penjual
 
 ### Ekspor CSV
 
-Kamu bisa mengunduh beberapa jenis laporan sebagai CSV (bisa dibuka di Excel):
+Kamu bisa mengunduh beberapa jenis laporan sebagai CSV (Comma Separated Values):
 
 - CSV per hari.
 - CSV laporan lengkap.
@@ -307,7 +299,7 @@ Kalau **Fitur Lanjutan** aktif, akan muncul laporan tambahan:
 - **Cash Flow (Arus Kas)** — grafik pemasukan dan pengeluaran per jam/shift.
 - **Laporan PDF** — ekspor laporan ke PDF.
 
-> 🔒 **Info:** Untuk akun **kasir (non-admin)**, laporan laba dan modal **disembunyikan**. Hanya **admin** yang bisa melihat angka laba/modal.
+>  **Info:** Untuk akun **kasir (non-admin)**, laporan laba dan modal **disembunyikan**. Hanya **admin** yang bisa melihat angka laba/modal.
 
 ---
 
@@ -345,7 +337,6 @@ Kalau kamu punya banyak menu, kamu tidak perlu memasukkannya satu per satu. Guna
 4. Aplikasi akan memberi tahu baris mana yang berhasil dan mana yang ditolak.
 5. Setelah selesai, **daftar menu akan otomatis diperbarui** (tidak perlu restart).
 
-Template dan penjelasan format Excel bisa dilihat pada `updates/EXCEL_TEMPLATE.md` dan `updates/TUTORIAL-MENAMBAH-MENU.md`.
 
 ---
 
@@ -353,7 +344,7 @@ Template dan penjelasan format Excel bisa dilihat pada `updates/EXCEL_TEMPLATE.m
 
 Bagian ini **sangat penting**. Banyak fitur keren di DEN POS **dimatikan secara default** agar tampilan tetap sederhana. Untuk memakainya, kamu harus **menyalakan** dulu.
 
-### ➡️ Cara Mengaktifkan Fitur Lanjutan
+### ️ Cara Mengaktifkan Fitur Lanjutan
 
 1. Login sebagai **admin**.
 2. Klik tombol **"⚙️ Pengaturan"** di kanan atas.
@@ -368,7 +359,7 @@ Bagian ini **sangat penting**. Banyak fitur keren di DEN POS **dimatikan secara 
 
 Fitur lanjutan dibagi menjadi beberapa kelompok:
 
-#### 🍳 Bahan Baku, Supplier, dan Resep (HPP)
+####  Bahan Baku, Supplier, dan Resep (HPP)
 
 - **Bahan Baku** — catat bahan mentah (misalnya gula, kopi, susu) beserta satuan, harga beli, dan stoknya.
   - Saat kamu menjual menu, stok bahan baku **otomatis berkurang** sesuai resep.
@@ -381,7 +372,7 @@ Fitur lanjutan dibagi menjadi beberapa kelompok:
   - Ada indikator **"bisa dibuat berapa porsi"** berdasarkan stok bahan yang ada.
 - **canViewCost** — pengaturan untuk membatasi siapa yang boleh melihat modal/harga pokok (biasanya hanya admin).
 
-#### 🎁 Fitur Pelanggan Tambahan (Loyalty)
+####  Fitur Pelanggan Tambahan (Loyalty)
 
 - **Loyalty Tier** — program pelanggan setia.
   - Buat tingkatan (misalnya Bronze, Silver, Gold).
@@ -391,13 +382,13 @@ Fitur lanjutan dibagi menjadi beberapa kelompok:
     - **Lifetime** — berdasarkan total belanja seumur hidup pelanggan.
   - Diskon tier otomatis diterapkan saat checkout.
 
-#### 📊 Laporan Tambahan
+####  Laporan Tambahan
 
 - **Insights** — wawasan/analisis penjualan otomatis.
 - **PDF Report** — ekspor laporan ke PDF.
 - **Cash Flow** — arus kas per shift + modal **"Tampilkan Semua Shift"** dengan pencarian dan paginasi. Menampilkan Pemasukan per Sumber, Pengeluaran per Kategori, dan Piutang (outstanding).
 
-#### 📥 Impor Excel
+#### Impor Excel
 
 - Impor menu, bahan baku, dan resep sekaligus dari file Excel.
 
@@ -412,15 +403,15 @@ Fitur lanjutan dibagi menjadi beberapa kelompok:
 
 **Cloud Sync** menghubungkan aplikasi kasir desktop ini dengan **server online (cloud)**. Tujuannya agar kamu bisa **memantau penjualan dari web** (HP atau komputer lain), walaupun kamu tidak sedang di depan komputer kasir.
 
-> 💡 Fitur ini **opsional**. Tanpa Cloud Sync, aplikasi tetap berjalan normal secara lokal. Aktifkan hanya kalau kamu memang ingin memantau dari jarak jauh.
+>  Fitur ini **opsional**. Tanpa Cloud Sync, aplikasi tetap berjalan normal secara lokal. Aktifkan hanya kalau kamu memang ingin memantau dari jarak jauh.
 
 ### Cara Kerjanya (Singkat)
 
 - Aplikasi kasir menyimpan data secara lokal (di komputer).
 - Kalau perangkat sudah **dipasangkan (paired)** dan URL backend sudah diisi, aplikasi akan **mengirim transaksi baru ke cloud otomatis setiap 5 menit**.
-- Data yang terkirim bisa dilihat di **web-app** (folder `monitoring-frontend`).
+- Data yang terkirim bisa dilihat di **web-app** pada `https://denpos-monitoring.vercel.app/`.
 
-### ➡️ Cara Mengaktifkan Cloud Sync
+### Cara Mengaktifkan Cloud Sync
 
 1. Login sebagai **admin**.
 2. Buka **Pengaturan → Sync Cloud**.
@@ -463,7 +454,7 @@ Web pemantau (dibuka di browser) punya halaman:
 
 ### Catatan Penting untuk Cloud Sync
 
-> ⚠️ **Jangan ubah password akun admin kasir sembarangan** kalau belum yakin — akun web dan kasir saling terkait. Ikuti panduan dari pihak teknis.
+> ️ **Jangan ubah password akun admin kasir sembarangan** kalau belum yakin — akun web dan kasir saling terkait. Ikuti panduan dari pihak teknis.
 
 - Data yang sudah tersinkron ditandai dengan `synced_at` (waktu sinkron) di sistem.
 - Kalau internet mati, transaksi tetap tersimpan lokal dan akan dikirim saat internet kembali.
@@ -487,7 +478,7 @@ Halaman **Pengaturan** **hanya bisa dibuka oleh admin**. Ada 10 tab, dari kiri k
 
 Berikut penjelasan satu per satu.
 
-### 11.1 Tab Printer 🖨️
+### 11.1 Tab Printer ️
 
 Mengatur printer thermal untuk mencetak struk.
 
@@ -495,7 +486,7 @@ Mengatur printer thermal untuk mencetak struk.
 - **Lebar Kertas (mm)** — atur lebar kertas printer, dari **30 sampai 210 mm** (nilai default: **80 mm**).
 - Test cetak untuk memastikan printer bekerja.
 
-### 11.2 Tab Nama Warung 🏪
+### 11.2 Tab Nama Warung 
 
 Identitas usaha kamu.
 
@@ -503,23 +494,23 @@ Identitas usaha kamu.
 - **Alamat** — alamat warung.
 - **Telepon** — nomor telepon/WA.
 
-> 💡 Logo warung bisa diganti dengan **mengklik logo** di bagian atas aplikasi.
+>  Logo warung bisa diganti dengan **mengklik logo** di bagian atas aplikasi.
 
-### 11.3 Tab Metode Bayar 💳
+### 11.3 Tab Metode Bayar 
 
 Mengatur cara pelanggan membayar.
 
 - Tambah/edit/hapus **metode pembayaran** (misalnya Cash, QRIS, Transfer, E-Wallet).
 - Urutkan metode bayar sesuai keinginan.
 
-### 11.4 Tab QRIS 📱
+### 11.4 Tab QRIS 
 
 Mengatur gambar QRIS.
 
 - Upload **gambar QRIS** untuk setiap metode pembayaran yang menggunakan QRIS.
 - Gambar ini akan tampil saat pelanggan memilih bayar QRIS.
 
-### 11.5 Tab Resi 🧾
+### 11.5 Tab Resi 
 
 Mengatur tampilan struk.
 
@@ -529,7 +520,7 @@ Mengatur tampilan struk.
 - **Pax & Meja** — aktifkan supaya muncul kolom **Table** (meja) dan **Pax** (jumlah orang) di halaman Kasir.
 - **Field Resi** — tambah/hapus **field khusus** yang ingin ditampilkan di struk. Setiap field bisa ditandai **Wajib** (harus diisi).
 
-### 11.6 Tab Harga 💰
+### 11.6 Tab Harga 
 
 Mengatur harga dan pajak.
 
@@ -537,7 +528,7 @@ Mengatur harga dan pajak.
 - **Pajak / Service** — atur pajak dan biaya layanan.
 - **Diskon Bertingkat** — atur diskon berdasarkan tingkatan (berlapis).
 
-### 11.7 Tab Backup 💾
+### 11.7 Tab Backup 
 
 Melindungi datamu dari kehilangan.
 
@@ -547,9 +538,9 @@ Melindungi datamu dari kehilangan.
 - **Backup Internal** — melihat daftar backup internal.
 - **Backup Harian Otomatis** — aplikasi membuat backup harian, dengan **retensi maksimal 30 file** (yang paling lama otomatis dihapus).
 
-> 📌 **Kebiasaan baik:** Buat backup sebelum melakukan perubahan besar (misalnya impor Excel atau restore).
+>  **Kebiasaan baik:** Buat backup sebelum melakukan perubahan besar (misalnya impor Excel atau restore).
 
-### 11.8 Tab Kelola Pengguna 👥
+### 11.8 Tab Kelola Pengguna 
 
 Mengatur akun yang bisa memakai aplikasi.
 
@@ -558,14 +549,14 @@ Mengatur akun yang bisa memakai aplikasi.
 - **Hapus Pengguna** — hapus akun yang tidak diperlukan.
 - **Manajemen Pengguna bersifat admin-only** — hanya admin yang bisa mengelola.
 
-### 11.9 Tab Fitur Lanjutan ⭐
+### 11.9 Tab Fitur Lanjutan 
 
 Ini sakelar utama untuk fitur-fitur bonus (lihat [Bab 9](#9-fitur-lanjutan-dan-cara-mengaktifkannya)).
 
 - **Master Switch "Nyalakan Fitur Tingkat Lanjut"** — menyalakan/mematikan semua fitur lanjutan.
 - **Sakelar per fitur** — untuk menyalakan fitur tertentu saja, seperti bahan baku, supplier, loyalty, insights, dll.
 
-### 11.10 Tab Sync Cloud ☁️
+### 11.10 Tab Sync Cloud ️
 
 Mengatur koneksi ke cloud (lihat [Bab 10](#10-cloud-sync-sync-ke-awan--web-sync)).
 
@@ -579,50 +570,50 @@ Mengatur koneksi ke cloud (lihat [Bab 10](#10-cloud-sync-sync-ke-awan--web-sync)
 
 ## 12. Tanya Jawab (FAQ) & Pemecahan Masalah
 
-### ❓ Lisensi tidak cocok setelah pindah perangkat
+###  Lisensi tidak cocok setelah pindah perangkat
 
 Lisensi terikat pada satu perangkat. **Hubungi penjual** untuk reset aktivasi, lalu masukkan License Key baru di perangkat baru.
 
-### ❓ Printer thermal gagal mencetak
+###  Printer thermal gagal mencetak
 
 1. Pastikan printer sudah **terhubung** dan menyala.
 2. Cek **Pengaturan → Printer** — pilih printer yang benar.
 3. Sesuaikan **lebar kertas** dengan kertas printer (default 80 mm).
 4. Coba test cetak.
 
-### ❓ Scanner barcode tidak mendeteksi
+###  Scanner barcode tidak mendeteksi
 
 1. Pastikan scanner terhubung dan menyala.
 2. Pastikan menu sudah punya **barcode** yang tersimpan.
 3. Klik kolom pencarian dulu, baru scan.
 
-### ❓ Data tidak tampil / transaksi hilang
+###  Data tidak tampil / transaksi hilang
 
 1. Cek file data dan backup.
 2. Buka **Pengaturan → Backup**, lakukan **restore** dari backup terakhir kalau perlu.
 
-### ❓ Fitur lanjutan tidak muncul
+###  Fitur lanjutan tidak muncul
 
 Pastikan kamu sudah login sebagai **admin** dan sudah menyalakan **master switch** di **Pengaturan → Fitur Lanjutan**. Coba keluar dan masuk lagi kalau masih belum muncul.
 
-### ❓ Impor Excel gagal sebagian
+###  Impor Excel gagal sebagian
 
 - Pastikan nama sheet benar: **Menu**, **BahanBaku**, **Resep**.
-- Pastikan format kolom sesuai template (`updates/EXCEL_TEMPLATE.md`).
+- Pastikan format kolom sesuai template .
 - Aplikasi akan memberi tahu baris mana yang ditolak — perbaiki dan ulangi.
 
-### ❓ Transaksi void tidak muncul/hilang dari laporan
+###  Transaksi void tidak muncul/hilang dari laporan
 
 Transaksi void **tetap tercatat** tapi tidak dihitung sebagai penjualan. Cek filter tanggal/shift di halaman Riwayat.
 
-### ❓ Cloud Sync tidak terhubung
+###  Cloud Sync tidak terhubung
 
 1. Pastikan **URL Backend** sudah diisi dan disimpan.
 2. Lakukan **Pairing Perangkat** ulang bila statusnya "Belum terhubung".
 3. Cek koneksi internet.
 4. Kalau perangkat pernah di-**revoke**, pairing ulang dengan kode baru.
 
-### ❓ Lupa password admin
+###  Lupa password admin
 
 Hubungi penjual/pihak teknis untuk bantuan pemulihan akun.
 
@@ -642,7 +633,7 @@ Supaya lebih cepat, gunakan tombol pintas berikut saat aplikasi aktif:
 | **F** | Buka halaman **Fitur Lanjutan** (hanya kalau sudah diaktifkan) |
 | **P** | Buka **Keranjang** di halaman Kasir |
 
-> 💡 Tombol pintas ini membuatmu kerja lebih cepat, apalagi saat jam sibuk.
+>  Tombol pintas ini membuatmu kerja lebih cepat, apalagi saat jam sibuk.
 
 ---
 
@@ -650,16 +641,16 @@ Supaya lebih cepat, gunakan tombol pintas berikut saat aplikasi aktif:
 
 Selamat! Kamu sekarang sudah mengenal seluruh fitur DEN POS versi **1.2.2**, mulai dari:
 
-- ✅ Aktivasi lisensi
-- ✅ Login & shift
-- ✅ Kasir & pembayaran
-- ✅ Open Bill
-- ✅ Riwayat & Void
-- ✅ Laporan & ekspor
-- ✅ Kelola Menu & Kategori
-- ✅ Fitur Lanjutan (dan cara menyalakannya)
-- ✅ Cloud Sync ke web
-- ✅ Semua tab Pengaturan
+-  Aktivasi lisensi
+-  Login & shift
+-  Kasir & pembayaran
+-  Open Bill
+-  Riwayat & Void
+-  Laporan & ekspor
+-  Kelola Menu & Kategori
+-  Fitur Lanjutan (dan cara menyalakannya)
+-  Cloud Sync ke web
+-  Semua tab Pengaturan
 
 ### Saran Penggunaan Sehari-hari
 
@@ -669,8 +660,6 @@ Selamat! Kamu sekarang sudah mengenal seluruh fitur DEN POS versi **1.2.2**, mul
 4. **Ganti password default** sesegera mungkin.
 5. Kalau stok menipis, **tambah stok** lewat halaman Menu atau impor Excel.
 
-Semoga DEN POS membantu usahamu makin lancar! 🚀
+Semoga DEN POS membantu usahamu makin lancar! 
 
----
 
-*Dokumen ini dibuat untuk DEN POS versi 1.2.2. Fitur bisa berubah pada versi berikutnya — periksa changelog untuk pembaruan.*

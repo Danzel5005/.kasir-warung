@@ -302,7 +302,7 @@ Pesan fatal (menghentikan proses):
 Lewat Excel **belum** bisa mengisi/mengubah:
 
 - Multi-satuan (`units`) dan harga bertingkat (`priceTiers`).
-- Deskripsi menu (`desc`) dan foto menu.
+- Deskripsi menu (`desc`).
 - Supplier bahan (`supplierId`) — dipertahankan dari data existing saat Timpa.
 - Loyalty tier.
 - Pengaturan hutang/piutang.

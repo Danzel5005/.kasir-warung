@@ -1,4 +1,4 @@
-# Changelog
+# CHANGELOG
 
 Semua perubahan penting pada proyek ini didokumentasikan di file ini.
 
@@ -6,36 +6,9 @@ Semua perubahan penting pada proyek ini didokumentasikan di file ini.
 
 Rilis ini adalah lompatan besar. Fokus utamanya adalah **Sync Cloud (Web Sync)** — menghubungkan aplikasi kasir desktop ke backend cloud berbasis Supabase sehingga penjualan dapat dipantau dari web-app terpisah. Selain itu ada fitur **Meja & Pax**, peringatan **Stok Bahan Baku**, optimasi **Arus Kas**, perombakan **laporan**, serta perbaikan **CSV** dan **resubahan tampilan resi**.
 
-### Ringkasan
-
-- **Baseline:** `v1.2.1-D` (commit `a086f05d`)
-- **HEAD saat dokumen ini ditulis:** `8fabc725` (commit "last bit of change for v1.2.2 Resto")
-- **Rentang:** 15 commit
-- **Total perubahan:** 69 file berubah (di luar `node_modules` dan artifact rilis) dengan sekitar **+6.111 / -281** baris
-
-Daftar commit inti:
-
-```
-8fabc725 last bit of change for v1.2.2 Resto
-96859707 final?
-7be2e334 FIXED THE WARNING FOR REVOKED DEVICES
-d4bc4015 some csv fixes
-fe2e821c agents revision
-1121fa8e i'm trying to fix the bug, it just wouldn't work
-90af6844 minor edit
-c92ec964 HOLY PUSH, about supabase and others
-31ab87af software side sync to web-app trial
-5d533f48 benerin koneksi web-app ke DEN POS tipis tipis, sama login page biar gak keliatan vibecoded lah
-15b61243 Improvement on web-app, but still not public hehe
-9bb853b0 Meja and Pax added and monitoring device demo. Not deployed to public yet so everything is okay
-c96611a6 Stok Bahan Baku warning implementation
-dd5498eb Arus Kas Graph optimization
-a8f03762 Removal and renaming of reports
-```
-
 ---
 
-### 🌟 Fitur Utama Baru
+###  Fitur Utama Baru
 
 #### 1. Sync Cloud / Web Sync (Fitur Terbesar)
 
@@ -126,7 +99,7 @@ Menghubungkan aplikasi kasir desktop (POS) dengan backend cloud berbasis **Supab
 
 ---
 
-### 🔧 Perbaikan (Bug Fixes)
+### Perbaikan (Bug Fixes)
 
 - **Perbaikan CSV** (commit `d4bc4015`):
   - `csvLaporan` kini menghitung **opening cash** dan **total expenses** per hari berdasarkan shift yang benar-benar terjadi pada hari tersebut (bukan dari `meta` global).
@@ -140,7 +113,7 @@ Menghubungkan aplikasi kasir desktop (POS) dengan backend cloud berbasis **Supab
 - **Perbaikan open bill** — penyesuaian alur dan tampilan (`apply-openbill-fix.ps1`, `fix-openbill.ps1`, `ViewOpenBill.jsx`).
 - **Perbaikan warung settings** — `useSettings.js` dan `src/hooks/settings/warung.js` diperluas untuk field Meja/Pax.
 
-### ⚙️ Perubahan Teknis & Internal
+### ️ Perubahan Teknis & Internal
 
 - `electron/main.cjs` dan `electron/preload.js` — wiring untuk modul device/ sync.
 - `src/App.jsx` dan `src/screens/Workspace/ModalStack.jsx` — integrasi hook `useDeviceSync` dan modal baru.
@@ -153,14 +126,14 @@ Menghubungkan aplikasi kasir desktop (POS) dengan backend cloud berbasis **Supab
 
 ---
 
-### 📦 Dependensi
+###  Dependensi
 
 - Tidak ada dependensi runtime baru pada paket utama; perubahan `package.json` hanya berkaitan dengan metadata/versi (`1.2.2`).
 - Backend cloud memakai **Supabase** (Auth, RLS, Edge Functions, migrations) dan **pgcrypto** (schema `extensions`).
 
 ---
 
-### ⬆️ Upgrade dari v1.2.1
+### ️ Upgrade dari v1.2.1
 
 - **Database** — saat pertama membuka v1.2.2, kolom `transactions.synced_at` akan ditambahkan otomatis lewat `ensureColumn()` (aman dan idempoten). Tidak perlu langkah manual.
 - **Cloud Sync** — fitur baru bersifat opsional. Untuk mengaktifkannya: buka **Pengaturan → Sync Cloud**, isi URL Backend, lalu lakukan pairing perangkat.
@@ -169,4 +142,4 @@ Menghubungkan aplikasi kasir desktop (POS) dengan backend cloud berbasis **Supab
 
 ---
 
-*Dokumen ini mencakup perubahan dari `v1.2.1-D` (a086f05d) hingga `8fabc725`.*
+
