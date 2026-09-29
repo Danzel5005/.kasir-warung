@@ -2,11 +2,11 @@
 
 Aplikasi Point of Sale (POS) desktop untuk warung dan usaha makanan/minuman. Aplikasi berjalan sebagai aplikasi Windows berbasis Electron dengan antarmuka React, menyimpan data transaksi secara lokal, dan mendukung pencetakan struk thermal maupun PDF.
 
-Dokumen ini mengikuti struktur dan perilaku kode yang ada di repository. Versi aplikasi saat ini adalah `1.2.2` untuk Windows 10 ke atas.
+Dokumen ini mengikuti struktur dan perilaku kode yang ada di repository. Versi aplikasi saat ini adalah `1.3.0` untuk Windows 10 ke atas.
 
 Selain fungsi kasir inti, aplikasi menyediakan sekumpulan fitur lanjutan yang dikelompokkan menjadi tiga grup — laporan tambahan, fitur pelanggan tambahan, serta bahan baku, supplier, dan harga — dan dapat dinyalakan secara terpisah dari Settings pada tab Fitur Lanjutan.
 
-Sejak versi `1.2.2`, aplikasi juga memiliki **Sync Cloud (Web Sync)**: transaksi yang tersimpan secara lokal dikirim otomatis ke backend cloud (Supabase) setiap 5 menit selama perangkat sudah dipasangkan (*paired*). Data yang tersinkron dapat dipantau dari web-app terpisah di folder `monitoring-frontend/`.
+Sejak versi `1.3.0`, aplikasi juga memiliki **Sync Cloud (Web Sync)**: transaksi yang tersimpan secara lokal dikirim otomatis ke backend cloud (Supabase) setiap 5 menit selama perangkat sudah dipasangkan (*paired*). Data yang tersinkron dapat dipantau dari web-app terpisah di folder `monitoring-frontend/`.
 
 ## Ruang Lingkup Fitur
 
