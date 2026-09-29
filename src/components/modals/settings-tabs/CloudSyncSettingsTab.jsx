@@ -61,11 +61,27 @@ function formatTime(iso) {
 }
 
 async function copyText(text, toast_) {
+  if (!text) {
+    toast_?.("Tidak ada kode untuk disalin", "err");
+    return;
+  }
   try {
     await navigator.clipboard.writeText(text);
     toast_?.("Disalin ke clipboard", "ok");
   } catch {
-    toast_?.("Gagal menyalin. Salin manual dari kotak.", "err");
+    try {
+      const input = document.createElement("textarea");
+      input.value = text;
+      input.style.position = "fixed";
+      input.style.opacity = "0";
+      document.body.appendChild(input);
+      input.select();
+      const copied = document.execCommand("copy");
+      input.remove();
+      toast_?.(copied ? "Disalin ke clipboard" : "Gagal menyalin. Salin manual dari kotak.", copied ? "ok" : "err");
+    } catch {
+      toast_?.("Gagal menyalin. Salin manual dari kotak.", "err");
+    }
   }
 }
 
@@ -96,14 +112,14 @@ export function CloudSyncSettingsTab({ authH, deviceH }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
       <div style={{ fontSize: TYPOGRAPHY.label.fontSize, color: MT, fontWeight: 600 }}>
-        Sinkronkan data kasir ke cloud (Supabase). Pengiriman otomatis tiap 5 menit
+        Sinkronkan data kasir ke cloud. Pengiriman otomatis tiap 5 menit
         berjalan selama perangkat sudah dipasangkan.
       </div>
 
       {/* Status ringkas */}
       <div style={{ ...row, marginTop: 10 }}>
           {lastSync && !lastSync.ok ? (
-          <StatusPill tone="critical">⚠ Gagal kirim: {lastSync.error || "tidak diketahui"} ({formatTime(lastSync.at)})</StatusPill>
+          <StatusPill tone="err">⚠ Gagal kirim: {lastSync.error || "tidak diketahui"} ({formatTime(lastSync.at)})</StatusPill>
           ): 
         paired
           ? <StatusPill tone="ok">Terhubung{identity.storeId ? ` • ${identity.storeId}` : ""}</StatusPill>
@@ -157,7 +173,7 @@ export function CloudSyncSettingsTab({ authH, deviceH }) {
 
       {/* Pairing */}
       <Section title="Pairing Perangkat">
-        {paired ? (
+        {paired && !(lastSync && !lastSync.ok) ? (
           <div style={{ fontSize: TYPOGRAPHY.caption.fontSize, color: G, fontWeight: 600 }}>
             ✓ Perangkat sudah dipasangkan. Data akan dikirim otomatis tiap 5 menit.
           </div>
@@ -166,7 +182,7 @@ export function CloudSyncSettingsTab({ authH, deviceH }) {
             <SaveButton onClick={() => d.register()}>
               {d.registering ? "Meminta kode…" : "Daftarkan & Minta Kode"}
             </SaveButton>
-            {d.pairing && (
+            {d.pairing && lastSync && !lastSync.ok && (
               <div style={{ marginTop: 10, padding: 12, background: LT, borderRadius: RADIUS.md, textAlign: "center" }}>
                 <div style={{ fontSize: TYPOGRAPHY.caption.fontSize, color: MT, marginBottom: 4 }}>
                   Masukkan kode ini di Web-App → &quot;Hubungkan Perangkat&quot;
