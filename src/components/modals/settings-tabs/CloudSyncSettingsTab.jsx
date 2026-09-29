@@ -102,20 +102,17 @@ export function CloudSyncSettingsTab({ authH, deviceH }) {
 
       {/* Status ringkas */}
       <div style={{ ...row, marginTop: 10 }}>
-        {paired
+          {lastSync && !lastSync.ok ? (
+          <StatusPill tone="critical">⚠ Gagal kirim: {lastSync.error || "tidak diketahui"} ({formatTime(lastSync.at)})</StatusPill>
+          ): 
+        paired
           ? <StatusPill tone="ok">Terhubung{identity.storeId ? ` • ${identity.storeId}` : ""}</StatusPill>
-          : <StatusPill tone="muted">Belum terhubung</StatusPill>}
+          : <StatusPill tone="muted">Belum terhubung</StatusPill>
+        }
         <span style={{ fontSize: TYPOGRAPHY.caption.fontSize, color: MT }}>
           {d.autoSync ? "Auto-sync: aktif (5 menit)" : "Auto-sync: nonaktif"}
         </span>
-      </div>
-
-      {lastSync && !lastSync.ok && (
-        <div style={{ marginTop: 8, padding: "7px 10px", background: COLOR_PALETTE.dangerLight, color: COLOR_PALETTE.danger, borderRadius: RADIUS.md, fontSize: TYPOGRAPHY.caption.fontSize, fontWeight: 600 }}>
-          ⚠ Gagal kirim terakhir: {lastSync.error || "tidak diketahui"} ({formatTime(lastSync.at)})
         </div>
-      )}
-
       {/* URL backend */}
       <Section title="URL Backend">
         <div style={{ display: "flex", gap: 8 }}>
