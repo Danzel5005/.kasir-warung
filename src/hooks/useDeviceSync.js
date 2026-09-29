@@ -125,6 +125,9 @@ function useDeviceSync({ toast_, isAdmin = true } = {}) {
   // remains open. The backend is the source of truth for pairing status.
   useEffect(() => {
     if (!available) return undefined;
+    // Do not wait for the first interval: on app restart the local identity
+    // may still say registered even though the Web-App already revoked it.
+    checkPairing();
     const interval = setInterval(() => { checkPairing(); }, 10000);
     return () => clearInterval(interval);
   }, [available, checkPairing]);
