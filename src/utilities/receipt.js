@@ -175,26 +175,19 @@ function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName,
     : "";
   const addressLine = warungAddress || trx.warungAddress || "";
   const phoneLine = warungPhone || trx.warungPhone || "";
-  const { taggedCategories, untaggedCategories } = buildCategoryTotals(trx.items, cats);
 
   const rows = trx.items.map(i=>{
     const addStr = formatAdditionals(i.additionals);
-    const catLabel = i.kategori ? getCategoryName(i.kategori, cats) : "";
     const itemTotal = fmt(i.harga * i.qty);
     const unitPrice = fmt(i.harga);
     // Langkah 3: unitLabel menandai satuan baris (mis. "2x Dus Teh").
     const unitLabel = i.unitLabel ? ` ${i.unitLabel}` : "";
-    const qtyCatName = catLabel ? `${i.qty} ${catLabel} ${i.nama}${unitLabel}` : `${i.qty}x ${i.nama}${unitLabel}`;
     return `<div class="item">
-      <div class="item-row1"><span>${qtyCatName}</span><span>${itemTotal}</span></div>
+      <div class="item-row1"><span>${i.qty}x ${i.nama}${unitLabel}</span><span>${itemTotal}</span></div>
       <div class="item-row2"><span style="color: white;">_______</span><span>${unitPrice}</span></div>
       ${addStr?`<div class="item-row2"><span>${addStr}</span></div>`:""}
     </div>`
   }).join("");
-
-  const renderCatTotals = (catMap) => Object.entries(catMap)
-    .map(([catKey, qty]) => `<div class="cat-line"><span>TOTAL (${getCategoryName(catKey, cats)}) :</span><span>${qty}</span></div>`)
-    .join("");
 
   // Calculate total quantity of all items for subtotal
   const totalQty = trx.items.reduce((sum, item) => sum + (item.qty || 0), 0);
@@ -274,8 +267,6 @@ ${buildPrintCSS(paperWidthMm)}
       <!-- FOOTER -->
       <div class="section footer">
         <div class="cat-line"><span>SUBTOTAL ITEMS :</span><span>${totalQty}</span></div>
-        ${Object.keys(untaggedCategories).length ? `<div class="footer-list">${renderCatTotals(untaggedCategories)}</div>` : ""}
-        ${Object.keys(taggedCategories).length ? `<div class="footer-list"><div class="bold">TAGGED</div>${renderCatTotals(taggedCategories)}</div>` : ""}
         ${footerLine || `<div class="footer-note">Barang yang sudah dibeli tidak bisa<br/>dikembalikan<br/>Terimakasih</div>`}
       </div>
     </div>
@@ -294,25 +285,18 @@ function buildPreviewHTML(receiptAdditionalValues, items, logo, receiptAdditiona
   const footerLine = renderTextBlock(footerText, "footer");
   const addressLine = warungAddress || "";
   const phoneLine = warungPhone || "";
-  const { taggedCategories, untaggedCategories } = buildCategoryTotals(items, cats);
 
   const rows = items.map(i => {
     const addStr = formatAdditionals(i.additionals);
-    const catLabel = i.kategori ? getCategoryName(i.kategori, cats) : "";
     const itemTotal = fmt(i.harga * i.qty);
     const unitPrice = fmt(i.harga);
     const unitLabel = i.unitLabel ? ` ${i.unitLabel}` : "";
-    const qtyCatName = catLabel ? `${i.qty} ${catLabel} ${i.nama}${unitLabel}` : `${i.qty}x ${i.nama}${unitLabel}`;
     return `<div class="item">
-      <div class="item-row1"><span>${qtyCatName}</span><span>${itemTotal}</span></div>
+      <div class="item-row1"><span>${i.qty}x ${i.nama}${unitLabel}</span><span>${itemTotal}</span></div>
       <div class="item-row2"><span>${unitPrice}</span></div>
       ${addStr?`<div class="item-row2"><span>${addStr}</span></div>`:""}
     </div>`
   }).join("");
-
-  const renderCatTotals = (catMap) => Object.entries(catMap)
-    .map(([catKey, qty]) => `<div class="cat-line"><span>TOTAL (${getCategoryName(catKey, cats)}) :</span><span>${qty}</span></div>`)
-    .join("");
 
   // Calculate total quantity of all items for subtotal
   const totalQty = items.reduce((sum, item) => sum + (item.qty || 0), 0);
@@ -372,8 +356,6 @@ ${buildPrintCSS(paperWidthMm)}
       </div>
       <div class="section footer">
         <div class="cat-line"><span>SUBTOTAL ITEMS :</span><span>${totalQty}</span></div>
-        ${Object.keys(untaggedCategories).length ? `<div class="footer-list">${renderCatTotals(untaggedCategories)}</div>` : ""}
-        ${Object.keys(taggedCategories).length ? `<div class="footer-list"><div class="bold">TAGGED</div>${renderCatTotals(taggedCategories)}</div>` : ""}
         ${footerLine || `<div class="footer-note">Belum Lunas</div>`}
       </div>
     </div>
