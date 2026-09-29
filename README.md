@@ -2,9 +2,11 @@
 
 Aplikasi Point of Sale (POS) desktop untuk warung dan usaha makanan/minuman. Aplikasi berjalan sebagai aplikasi Windows berbasis Electron dengan antarmuka React, menyimpan data transaksi secara lokal, dan mendukung pencetakan struk thermal maupun PDF.
 
-Dokumen ini mengikuti struktur dan perilaku kode yang ada di repository. Versi aplikasi saat ini adalah `1.2.1` untuk Windows 10 ke atas.
+Dokumen ini mengikuti struktur dan perilaku kode yang ada di repository. Versi aplikasi saat ini adalah `1.2.2` untuk Windows 10 ke atas.
 
 Selain fungsi kasir inti, aplikasi menyediakan sekumpulan fitur lanjutan yang dikelompokkan menjadi tiga grup — laporan tambahan, fitur pelanggan tambahan, serta bahan baku, supplier, dan harga — dan dapat dinyalakan secara terpisah dari Settings pada tab Fitur Lanjutan.
+
+Sejak versi `1.2.2`, aplikasi juga memiliki **Sync Cloud (Web Sync)**: transaksi yang tersimpan secara lokal dikirim otomatis ke backend cloud (Supabase) setiap 5 menit selama perangkat sudah dipasangkan (*paired*). Data yang tersinkron dapat dipantau dari web-app terpisah di folder `monitoring-frontend/`.
 
 ## Ruang Lingkup Fitur
 
@@ -193,6 +195,47 @@ Aplikasi memeriksa lisensi sebelum memuat workspace utama. Lisensi terikat ke ha
 - Lisensi yang aktif disimpan sebagai payload JSON yang di-encode Base64 di file `.ykk_lic` pada direktori user-data Electron.
 - Kunci lisensi dan `electron/license-secret.cjs` adalah artefak sensitif. Seharusnya jangan menaruh secret produksi di repository publik, tapi gapapalah.
 
+### Sync Cloud (Web Sync)
+
+Sync Cloud menghubungkan aplikasi kasir desktop (POS) dengan sebuah backend cloud berbasis Supabase, sehingga transaksi yang terjadi di warung dapat dipantau dari web-app terpisah. Fitur ini bersifat opsional: tanpa URL backend dan tanpa pairing, aplikasi tetap berjalan normal secara lokal.
+
+Cara kerja singkat:
+
+- Setiap perangkat memiliki **identitas perangkat** sendiri (`deviceId` + `deviceSecret`) yang dibuat otomatis dan disimpan secara lokal.
+- Perangkat **dipasangkan (pairing)** ke sebuah store pada web-app menggunakan **kode pairing** sekali pakai. Kode ditampilkan oleh POS pada tab Sync Cloud dan dimasukkan pada halaman "Hubungkan Perangkat" di web-app.
+- Setelah terpasang, POS **mengirim transaksi yang belum tersinkron secara otomatis setiap 5 menit** (auto-sync). Pengiriman manual juga tersedia.
+- Transaksi yang sudah berhasil dikirim ditandai `synced_at` pada database lokal, sehingga tidak dikirim ulang. Transaksi yang gagal **tidak** ditandai, dan akan dicoba lagi pada siklus berikutnya.
+- Setiap request ditandatangani dengan **HMAC-SHA256** (`timestamp.nonce.rawBody`) memakai kunci turunan dari device secret; server memverifikasi tanda tangan, batas waktu (300 detik), dan mencegah pengiriman ulang (replay) melalui tabel nonce.
+
+Komponen sisi POS:
+
+| Lokasi | Isi dan fungsi |
+| --- | --- |
+| `electron/device-identity.cjs` | Membuat, membaca, dan menandatangani identitas perangkat. Credential disimpan base64-JSON di `userData/.pos_device` (di luar `data/`, sehingga tidak ikut backup bisnis). |
+| `electron/device-sync-client.cjs` | Klien HTTP (fetch) bertanda tangan untuk register, status, heartbeat, dan upload transaksi. |
+| `electron/device-sync-service.cjs` | Menggabungkan identitas + klien, menyimpan `baseUrl` di `userData/device-sync.json`, menjalankan timer auto-sync 5 menit, dan mendaftarkan IPC. |
+| `electron/main.cjs` | Membuat `deviceIdentity` + `deviceSync`, menyuntikkan helper database dan `notify`, serta menghentikan auto-sync saat keluar. |
+| `src/hooks/useDeviceSync.js` | State + aksi UI (register, cek pairing, push manual, ubah URL) dan langganan notifikasi sync. |
+| `src/components/modals/settings-tabs/CloudSyncSettingsTab.jsx` | Tab admin "Sync Cloud" pada modal Settings. |
+
+Komponen sisi cloud (folder `supabase/`):
+
+- `supabase/migrations/0001_init.sql` — tabel `stores`, `devices`, `pairing_codes`, `store_users`, `synced_transactions`, `device_nonces`, beserta RLS dan RPC `pair_device(code)`.
+- `supabase/migrations/0002_device_management.sql` — RPC `revoke_device(text)` dan `activate_device(text)`.
+- `supabase/migrations/0003_fix_search_path.sql` — perbaikan `search_path` (`public, extensions`) untuk fungsi security definer (pgcrypto).
+- `supabase/functions/` — Edge Function `devices-register`, `devices-status`, `devices-heartbeat`, dan `sync-upload`.
+- `supabase/config.toml` — konfigurasi `verify_jwt=false` untuk keempat fungsi mesin.
+
+Web-app pemantau ada di folder `monitoring-frontend/` (React + Vite) dan memakai Supabase Auth + RLS pada project yang sama. Halaman utamanya mencakup Laporan, Riwayat, Data Tersinkron, Perangkat (pairing/revoke), dan Akun.
+
+Panduan operasional: `supabase/PANDUAN-PHASE-B.md` (setup backend), `monitoring-frontend/PANDUAN-WEBAPP-SYNC.md` (integrasi web-app), serta `updates/PLAN-WEBSYNC.md` dan `updates/PLAN-WEBSYNC-UI-CLOUD.md` (dokumen desain).
+
+Catatan:
+
+- Endpoint Edge Function **tidak** diperbarui otomatis. Setelah mengubah `supabase/functions/**`, jalankan `supabase functions deploy <nama>`.
+- Perubahan pada `electron/*.cjs` memerlukan restart aplikasi POS.
+- Rotasi credential perangkat mengubah `deviceId` + secret dan melepas pairing, sehingga perangkat harus dipasangkan ulang.
+
 ## Teknologi dan Dependensi
 
 Versi di bawah ini adalah versi yang tercatat di `package.json` saat dokumentasi ini dibuat.
@@ -281,6 +324,9 @@ Persyaratan RAM dan ruang di atas adalah batas operasional yang disarankan untuk
 | `auth-ipc.cjs` | Registrasi handler IPC untuk autentikasi dan pengelolaan sesi login. |
 | `category-label.cjs` | Resolusi label kategori untuk output printer. |
 | `update-check.cjs` | Pemeriksaan versi terbaru dari feed update dan perbandingan versi semantik. |
+| `device-identity.cjs` | Identitas perangkat (device ID + secret), pembuatan, penandatanganan HMAC, dan penyimpanan credential. |
+| `device-sync-client.cjs` | Klien HTTP bertanda tangan untuk register, status, heartbeat, dan upload transaksi ke cloud. |
+| `device-sync-service.cjs` | Layanan Sync Cloud: menggabungkan identitas + klien, menyimpan `baseUrl`, timer auto-sync 5 menit, dan handler IPC `device-*`. |
 | `dev-runner.cjs` | Runner development yang memantau perubahan pada `electron/` dan me-restart main process secara otomatis. Tidak digunakan pada build produksi. |
 | `free-port.cjs` | Utilitas development untuk membebaskan port yang tertahan sebelum menjalankan Vite/Electron. |
 | `kill-electron.cjs` | Utilitas development untuk menghentikan proses Electron yang masih berjalan. |
@@ -294,11 +340,29 @@ Persyaratan RAM dan ruang di atas adalah batas operasional yang disarankan untuk
 | `assets/` | Ikon dan aset statis, termasuk ikon aplikasi. |
 | `components/` | Komponen UI bersama seperti detail bill, jam, loader, badge stok, panel peringatan stok, pemilih pelanggan, panel backup/restore, panel data lanjutan, grafik cash flow, error boundary, dan tag. |
 | `components/modals/` | Modal item, kategori, additionals minuman, pembayaran, struk, printer, settings, pengguna, konfirmasi, dan tutup shift. |
-| `components/modals/settings-tabs/` | Implementasi panel tiap tab Settings: printer, warung, pembayaran, QRIS, receipt, pricing, backup, pengguna, dan fitur lanjutan, dengan `index.js` sebagai barrel. |
+| `components/modals/settings-tabs/` | Implementasi panel tiap tab Settings: printer, warung, pembayaran, QRIS, receipt, pricing, backup, pengguna, fitur lanjutan, dan Sync Cloud, dengan `index.js` sebagai barrel. |
 | `constants/` | Konfigurasi kategori, menu, pembayaran, additionals, receipt fields, fitur lanjutan (`advancedFeatures.js`), dan design tokens. `design.js` adalah sumber token visual utama saat ini. |
-| `hooks/` | Domain state dan operasi untuk auth/shift, barcode, bills, cart, customers, history, license, menu, settings, users, data lanjutan, impor Excel, dan toast/undo. |
+| `hooks/` | Domain state dan operasi untuk auth/shift, barcode, bills, cart, customers, history, license, menu, settings, users, data lanjutan, impor Excel, Sync Cloud (`useDeviceSync.js`), dan toast/undo. |
 | `utilities/` | Logika murni dan adapter untuk barcode, kalkulasi harga, kategori, CSV, i18n, printer, receipt, shift, stock, user, backup, ipc guard, IPC API, loyalty, pencarian pelanggan, bahan baku, supplier, resep dan HPP, cash flow, insight, report HTML, dan impor Excel. Banyak utilitas memiliki file test berdekatan. |
 | `views/` | Layar Kasir, Open Bill, Riwayat, Laporan, Kelola Menu/Kategori, dan Fitur Lanjutan. |
+
+### `supabase/`
+
+Backend cloud (Supabase) untuk Sync Cloud. Berisi migration, Edge Function, konfigurasi, dan panduan:
+
+- `migrations/` — skema tabel (`stores`, `devices`, `pairing_codes`, `store_users`, `synced_transactions`, `device_nonces`), RLS, dan RPC (`pair_device`, `revoke_device`, `activate_device`).
+- `functions/` — Edge Function `devices-register`, `devices-status`, `devices-heartbeat`, dan `sync-upload`.
+- `config.toml` — konfigurasi project Supabase.
+- `PANDUAN-PHASE-B.md` — panduan setup backend.
+- `sync-parity.test.mjs` — tes keccocokan skema/parity sinkronisasi.
+
+### `monitoring-frontend/` dan `monitoring-backend/`
+
+Web-app pemantau (React + Vite) di `monitoring-frontend/` memakai Supabase Auth + RLS pada project yang sama dengan POS. Halaman utamanya: Laporan, Riwayat, Data Tersinkron, Perangkat (pairing/revoke), dan Akun. Panduan integrasi ada di `monitoring-frontend/PANDUAN-WEBAPP-SYNC.md`. Folder `monitoring-backend/` berisi layanan backend tambahan untuk pemantauan.
+
+### `scripts/`
+
+Skrip bantu untuk pengujian integrasi Sync Cloud: `sign-request.mjs` (menandatangani request), `test-register.mjs` (registrasi perangkat), dan `test-status.mjs` (cek status perangkat).
 
 ### `updates/`
 
@@ -345,6 +409,8 @@ Lokasi aktual dapat dilihat dari aplikasi melalui API `getDataPath`.
 | `backups/` | Backup harian transaksi dengan retensi maksimal 30 file. |
 | `json-backups/` | Salinan `transactions.json` dan `shifts.json` saat migrasi ke SQLite. |
 | `receipt-print.html` | HTML sementara yang digunakan alur print HTML/PDF. |
+| `.pos_device` | Identitas perangkat (`deviceId` + secret) untuk Sync Cloud, disimpan dengan permission ketat. |
+| `device-sync.json` | State Sync Cloud: URL backend, status pairing, kode pairing, dan waktu sync terakhir. |
 
 Penulisan JSON menggunakan file temporary, `fsync`, lalu rename. Saat startup, urutannya adalah inisialisasi SQLite, migrasi JSON lama, recovery WAL, backup harian, lalu pembuatan window.
 
@@ -400,7 +466,7 @@ npm run test:watch
 npm run build
 ```
 
-Test unit renderer berada di `src/utilities/` dan `src/hooks/`, mencakup barcode, kalkulasi, category management, CSP, CSV, printer, receipt, stock, backup, ipc guard, pemulihan sesi login, utilitas IPC, data fitur lanjutan, cash flow, insight penjualan, report HTML, dan impor Excel.
+Test unit renderer berada di `src/utilities/` dan `src/hooks/`, mencakup barcode, kalkulasi, category management, CSP, CSV, printer, receipt, stock, backup, ipc guard, pemulihan sesi login, utilitas IPC, data fitur lanjutan, cash flow, insight penjualan, report HTML, impor Excel, resep/HPP, dan Sync Cloud.
 
 Test unit main process berada di `electron/` dan ikut dijalankan oleh `npm test`:
 
@@ -412,6 +478,9 @@ Test unit main process berada di `electron/` dan ikut dijalankan oleh `npm test`
 | `electron/backup-restore.test.cjs` | `stats`, `createBackup`, `previewBackup`, `restoreBackup` (termasuk safety snapshot), `listInternalBackups`, registrasi handler. |
 | `electron/license.test.cjs` | `generateKey`, aktivasi, penolakan key perangkat lain, lisensi rusak, hardware ID tidak terbaca. |
 | `electron/update-check.test.cjs` | `compareVersions`, deteksi versi baru, dan jaminan tidak melempar saat offline. |
+| `electron/device-identity.test.cjs` | Pembuatan/pembacaan identity perangkat, penyimpanan secret dengan permission ketat, dan `rotate()` yang mengganti `deviceId` + secret. |
+| `electron/device-sync-client.test.cjs` | Penandatanganan request HMAC (header `ts`/`nonce`/`sign`), pemanggilan Edge Function, dan penanganan respons gagal. |
+| `electron/device-sync-service.test.cjs` | Orkestrasi pairing, heartbeat, dan push transaksi bertanda `synced_at`, termasuk retry saat offline. |
 
 Catatan penting saat menambah test baru di `electron/`:
 
