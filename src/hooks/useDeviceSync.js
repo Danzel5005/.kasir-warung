@@ -111,11 +111,23 @@ function useDeviceSync({ toast_, isAdmin = true } = {}) {
         stopPollingRef();
         setPairing(null);
         toast_?.("Perangkat berhasil dipasangkan", "ok");
-        refresh();
+        await refresh();
+      } else {
+        // Backend may revoke pairing independently of this app.
+        stopPollingRef();
+        setPairing(null);
       }
     }
     return res;
   }, [available, refresh, stopPollingRef, toast_]);
+
+  // Re-check status so a revoke from the Web-App is reflected while Settings
+  // remains open. The backend is the source of truth for pairing status.
+  useEffect(() => {
+    if (!available) return undefined;
+    const interval = setInterval(() => { checkPairing(); }, 10000);
+    return () => clearInterval(interval);
+  }, [available, checkPairing]);
 
   const startPolling = useCallback(() => {
     stopPolling();
