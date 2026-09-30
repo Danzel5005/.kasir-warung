@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../utilities/utils.js";
 
 function normalizeCustomer(input = {}) {
@@ -13,9 +13,17 @@ function normalizeCustomer(input = {}) {
   };
 }
 
-function useCustomers({ toast_ }) {
+// useCustomers — domain pelanggan: daftar pelanggan (CRUD) + total belanja
+// kumulatif per pelanggan (untuk basis tier loyalty "lifetime").
+//
+// customerTotals dimuat lewat IPC agregat (`loadCustomerTotals`), bukan dengan
+// memuat seluruh riwayat transaksi. Peta di-refresh setiap kali `refreshKey`
+// berubah — App.jsx mengoper jumlah riwayat transaksi agar tier pelanggan
+// langsung mengikuti total terbaru setelah pembayaran.
+function useCustomers({ toast_, refreshKey = 0 }) {
   const [customers, setCustomers] = useState([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
+  const [customerTotals, setCustomerTotals] = useState({});
 
   const loadInitial = useCallback((saved) => {
     setCustomers(Array.isArray(saved) ? saved : []);
@@ -49,7 +57,30 @@ function useCustomers({ toast_ }) {
     toast_("Pelanggan dihapus", "ok");
   }, [customers, save, selectedCustomerId, toast_]);
 
-  return { customers, selectedCustomer, selectedCustomerId, setSelectedCustomerId, loadInitial, upsertCustomer, deleteCustomer };
+  // loadCustomerTotalsMap — muat total belanja kumulatif per pelanggan
+  // (basis tier "lifetime"). Gagal memuat dibiarkan kosong: tier basis
+  // lifetime jatuh ke 0 / Bronze, bukan crash.
+  const loadCustomerTotalsMap = useCallback(async () => {
+    try {
+      const rows = (await api.loadCustomerTotals()) || [];
+      const map = {};
+      for (const r of rows) {
+        if (!r?.customerId) continue;
+        map[r.customerId] = Number(r.total) || 0;
+      }
+      setCustomerTotals(map);
+    } catch {
+      /* biarkan kosong — tier basis lifetime jatuh ke 0 / Bronze */
+    }
+  }, []);
+
+  useEffect(() => { loadCustomerTotalsMap(); }, [loadCustomerTotalsMap, refreshKey]);
+
+  return {
+    customers, selectedCustomer, selectedCustomerId, setSelectedCustomerId,
+    loadInitial, upsertCustomer, deleteCustomer,
+    customerTotals, loadCustomerTotalsMap,
+  };
 }
 
 export { useCustomers };

@@ -1,8 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import { METODE_LABELS} from "./constants/payments.js";
 import { OR, W, LT, BD, TX, MT } from "./constants/design.js";
-import { buildReceiptHTML, buildPreviewHTML, fmt } from "./utilities/receipt.js";
-import { getPrinterSelectionStatus } from "./utilities/printer.js";
 import { api } from "./utilities/utils.js";
 import { AppSkeleton } from "./components/AppSkeleton.jsx";
 import LicenseScreen from "./screens/LicenseScreen.jsx";
@@ -20,6 +18,7 @@ import { useCart } from "./hooks/useCart.js";
 import { useHistory } from "./hooks/useHistory.js";
 import { useBarcodeScanner } from "./hooks/useBarcodeScanner.js";
 import { useCustomers } from "./hooks/useCustomers.js";
+import { useReceiptPrinting } from "./hooks/useReceiptPrinting.js";
 import { useAdvancedData } from "./hooks/useAdvancedData.js";
 import { loyalDiscountRules } from "./utilities/loyalty.js";
 import { LOYALTY_TIER_BASIS, normalizeLoyaltyTierBasis } from "./constants/advancedFeatures.js";
@@ -27,12 +26,15 @@ import { useShiftCashFlow } from "./hooks/useShiftCashFlow.js";
 import { row } from "./constants/design.js";
 import { canAccessView, isAdmin } from "./utilities/permissions.js";
 
-import ViewOpenBill from "./views/ViewOpenBill.jsx";
-import ViewKasir from "./views/ViewKasir.jsx";
-import ViewRiwayat from "./views/ViewRiwayat.jsx";
-import ViewLaporan from "./views/ViewLaporan.jsx";
-import ViewKelola from "./views/ViewKelola.jsx";
-import ViewFiturLanjutan from "./views/ViewFiturLanjutan.jsx";
+// Views di-lazy-load: hanya satu view yang tampil pada satu waktu, jadi view
+// yang tidak aktif tidak perlu ikut di chunk awal. Ini memangkas bundle
+// startup (khususnya rangkaian laporan/chart di ViewLaporan).
+const ViewOpenBill = lazy(() => import("./views/ViewOpenBill.jsx"));
+const ViewKasir = lazy(() => import("./views/ViewKasir.jsx"));
+const ViewRiwayat = lazy(() => import("./views/ViewRiwayat.jsx"));
+const ViewLaporan = lazy(() => import("./views/ViewLaporan.jsx"));
+const ViewKelola = lazy(() => import("./views/ViewKelola.jsx"));
+const ViewFiturLanjutan = lazy(() => import("./views/ViewFiturLanjutan.jsx"));
 import CustomerPicker from "./components/CustomerPicker.jsx";
 
   import { useHistoryVoid } from "./hooks/useHistoryVoid.js";
@@ -88,7 +90,9 @@ function KasirWorkspace() {
   });
   const historyH  = useHistory({ toast_: toastH.toast_, addUndo: toastH.addUndo, getNow, authH, applyBahanUsage });
   historyRefreshRef.current = historyH.refresh;
-  const customersH = useCustomers({ toast_: toastH.toast_ });
+  // refreshKey = jumlah riwayat transaksi — total belanja kumulatif pelanggan
+  // (basis tier "lifetime") dimuat ulang setiap transaksi bertambah.
+  const customersH = useCustomers({ toast_: toastH.toast_, refreshKey: historyH.history.length });
   const advDataH = useAdvancedData({ toast_: toastH.toast_ });
   bahanUsageRef.current = advDataH.applyBahanUsage;
   // settingsH needs cartH to be defined first for onChange callback
@@ -104,6 +108,11 @@ function KasirWorkspace() {
         service: newSettings.service || { enabled: false, value: 0 },
       });
     }
+  });
+
+  // ── Cetak struk & preview tagihan (thermal ESC/POS + PDF/HTML fallback).
+  const { printReceipt, printPreview, printingPreview } = useReceiptPrinting({
+    settingsH, menuH, cartH, toast_: toastH.toast_,
   });
 
   // ── Navigasi (UI-level, tidak dimiliki domain manapun)
@@ -124,11 +133,6 @@ function KasirWorkspace() {
     if (view === "fitur-lanjutan" && !settingsH.settings.advancedFeatures?.enabled) setView("menu");
   }, [authH.currentUser, view]);
 
-  // ── Total belanja kumulatif per pelanggan (untuk basis tier "lifetime").
-  // Dimuat lewat IPC agregat agar tidak perlu memuat seluruh riwayat transaksi.
-  // Dideklarasi SEBELUM efek loyalty di bawah yang memakainya (hindari TDZ).
-  const [customerTotals, setCustomerTotals] = useState({});
-
   // ── Loyalty Tier → Diskon otomatis (Fase 1).
   // Basis tier bisa dipilih di Settings:
   //   - "transaction" (default): TOTAL TRANSAKSI SAAT INI (subtotal keranjang)
@@ -143,7 +147,7 @@ function KasirWorkspace() {
     const customer = customersH.selectedCustomer;
     const basis = normalizeLoyaltyTierBasis(settingsH.settings.loyaltyTierBasis);
     const basisTotal = (basis === LOYALTY_TIER_BASIS.LIFETIME)
-      ? (customerTotals[customer?.id] || 0)
+      ? (customersH.customerTotals[customer?.id] || 0)
       : cartH.subtotal;
     const baseDiscounts = settingsH.settings.discounts || [];
     const loyaltyRules = (loyaltyOn && customer)
@@ -162,7 +166,7 @@ function KasirWorkspace() {
     settingsH.settings.service,
     settingsH.settings.loyaltyTierBasis,
     customersH.selectedCustomer,
-    customerTotals,
+    customersH.customerTotals,
     advDataH.loyaltyTiers,
     cartH.subtotal,
   ]);
@@ -216,7 +220,6 @@ function KasirWorkspace() {
   // ── Receipt & Pay modal — UI state yang menjembatani cart+history, tetap di App.jsx
   const [payModal, setPayModal] = useState(false);
   const [receipt, setReceipt]   = useState(null);
-  const [printingPreview, setPrintingPreview] = useState(false);
 
   const [dataPath, setDataPath] = useState("");
 
@@ -260,25 +263,6 @@ function KasirWorkspace() {
       setDataPath(dp);
     })();
   }, []);
-
-  // ── Muat total belanja kumulatif pelanggan (basis tier "lifetime").
-  // Di-refresh setiap jumlah riwayat transaksi bertambah (mis. setelah bayar)
-  // supaya tier pelanggan langsung mengikuti total terbaru.
-  const loadCustomerTotalsMap = useCallback(async () => {
-    try {
-      const rows = (await api.loadCustomerTotals()) || [];
-      const map = {};
-      for (const r of rows) {
-        if (!r?.customerId) continue;
-        map[r.customerId] = Number(r.total) || 0;
-      }
-      setCustomerTotals(map);
-    } catch {
-      /* biarkan kosong — tier basis lifetime jatuh ke 0 / Bronze */
-    }
-  }, []);
-
-  useEffect(() => { loadCustomerTotalsMap(); }, [loadCustomerTotalsMap, historyH.history.length]);
 
   // ── Hotkeys
   useEffect(() => {
@@ -347,53 +331,6 @@ function KasirWorkspace() {
   const confirmCloseShift = useCallback(() => authH.confirmCloseShift({
     clearCart: cartH.clearCart,
   }), [authH.confirmCloseShift, cartH.clearCart]);
-
- // printReceipt(trx) — thermal fisik pakai ESC/POS langsung (bypass driver Windows),
-// printer PDF virtual (mis. "Microsoft Print to PDF") tetap lewat buildReceiptHTML + printToPDF.
-const printReceipt = useCallback(async (trx) => {
-  const printerName = settingsH.settings.printerName || "";
-  const selection = getPrinterSelectionStatus(printerName);
-
-  if (selection.isThermal) {
-    const res = await window.api.printReceiptEscPos({
-      trx,
-      printerName,
-      paperWidthMm: settingsH.settings.receiptPaperWidthMm,
-      warungName: settingsH.settings.warungName,
-      warungAddress: settingsH.settings.warungAddress,
-      warungPhone: settingsH.settings.warungPhone,
-      operatorName: trx.operator,
-      cats: menuH.cats,
-      customerEnabled: settingsH.settings.customerEnabled !== false,
-    });
-    if (res?.ok) toastH.toast_("Selesai Mencetak Resi", "ok");
-    else toastH.toast_(res?.error || "Gagal cetak thermal", "err");
-    return res;
-  }
-
-  if (selection.isPdf) {
-    const html = buildReceiptHTML(trx, settingsH.logo, settingsH.settings.receiptAdditionals, settingsH.settings.qrisImages, settingsH.settings.warungName, menuH.cats, settingsH.settings.warungAddress, settingsH.settings.warungPhone, settingsH.settings.paymentMethods, settingsH.settings.receiptPaperWidthMm, settingsH.settings.customerEnabled !== false, settingsH.settings.receiptHeaderText, settingsH.settings.receiptFooterText);
-    const res = await settingsH.printHTML(html, "Selesai Mencetak Resi");
-    return res;
-  }
-
-  const html = buildReceiptHTML(trx, settingsH.logo, settingsH.settings.receiptAdditionals, settingsH.settings.qrisImages, settingsH.settings.warungName, menuH.cats, settingsH.settings.warungAddress, settingsH.settings.warungPhone, settingsH.settings.paymentMethods, settingsH.settings.receiptPaperWidthMm, settingsH.settings.customerEnabled !== false, settingsH.settings.receiptHeaderText, settingsH.settings.receiptFooterText);
-  const res = await settingsH.printHTML(html, "Selesai Mencetak Resi");
-  return res;
-}, [settingsH.logo, settingsH.printHTML, settingsH.settings.printerName, settingsH.settings.receiptAdditionals, settingsH.settings.qrisImages, settingsH.settings.warungName, settingsH.settings.warungAddress, settingsH.settings.warungPhone, menuH.cats, settingsH.settings.paymentMethods, settingsH.settings.receiptPaperWidthMm, settingsH.settings.customerEnabled, settingsH.settings.receiptHeaderText, settingsH.settings.receiptFooterText, toastH.toast_]);
-
-  // printPreview — depend ke cart (items/receiptAdditionalValues), pakai printHTML generic dari settings
-  // PENTING: membaca cartH.items/receiptAdditionalValues dan settingsH.logo langsung. Semua wajib di deps.
-  const printPreview = useCallback(async () => {
-    if (!cartH.items.length) { toastH.toast_("Isi pesanan dulu", "err"); return; }
-    setPrintingPreview(true);
-    try {
-      const html = buildPreviewHTML(cartH.receiptAdditionalValues, cartH.items, settingsH.logo, settingsH.settings.receiptAdditionals, settingsH.settings.warungName, menuH.cats, settingsH.settings.warungAddress, settingsH.settings.warungPhone, settingsH.settings.receiptPaperWidthMm, cartH.pricingConfig, cartH.paidNum, cartH.metode, settingsH.settings.receiptHeaderText, settingsH.settings.receiptFooterText);
-      await settingsH.printHTML(html, "Mencetak preview tagihan...");
-    } finally {
-      setPrintingPreview(false);
-    }
-  }, [cartH.items, cartH.receiptAdditionalValues, cartH.pricingConfig, cartH.paidNum, cartH.metode, toastH.toast_, settingsH.logo, settingsH.printHTML, settingsH.settings.receiptAdditionals, settingsH.settings.warungName, settingsH.settings.warungAddress, settingsH.settings.warungPhone, menuH.cats, settingsH.settings.receiptPaperWidthMm, settingsH.settings.receiptHeaderText, settingsH.settings.receiptFooterText]);
 
   // loadBillToCart (wrapped) — selain mengisi cart, juga memulihkan pelanggan
   // yang tersimpan di bill. useCart.loadBillToCart sengaja tetap "murni"
@@ -498,6 +435,7 @@ const executeConfirmDel = useCallback((restoreStock = false) => {
       {/* ══ BODY ══════════════════════════════════════════════════════════════ */}
       <div style={{flex:1,display:"flex",overflow:"hidden",position:"relative"}}>
 
+        <Suspense fallback={<AppSkeleton />}>
 
         {/* ══════ MENU VIEW ════════════════════════════════════════════════ */}
         {view==="menu" && (
@@ -514,7 +452,7 @@ const executeConfirmDel = useCallback((restoreStock = false) => {
               (settingsH.settings.advancedFeatures?.loyalty && customersH.selectedCustomer)
                 ? advDataH.tierForTotal(
                     normalizeLoyaltyTierBasis(settingsH.settings.loyaltyTierBasis) === LOYALTY_TIER_BASIS.LIFETIME
-                      ? (customerTotals[customersH.selectedCustomer?.id] || 0)
+                      ? (customersH.customerTotals[customersH.selectedCustomer?.id] || 0)
                       : cartH.subtotal,
                     advDataH.loyaltyTiers,
                   )
@@ -618,6 +556,7 @@ const executeConfirmDel = useCallback((restoreStock = false) => {
             onImported={menuH.refreshFromStore}
           />
         )}
+        </Suspense>
       </div>
 
       {/* FOOTER */}
