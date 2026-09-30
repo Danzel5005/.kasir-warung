@@ -33,6 +33,7 @@ supabase/.branches/
 supabase/functions/**/.env
 supabase/functions/deno.lock
 monitoring-backend.rar
+monitoring-frontend
 
 
 # Logs
