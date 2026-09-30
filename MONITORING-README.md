@@ -1,4 +1,4 @@
-# Kasir Warung Monitoring Web-App
+# DEN POS Monitoring Web-App
 
 A web-based monitoring system that watches **only the Laporan (reports)** and **Riwayat (transaction history)** pages of your Kasir Warung POS software, refreshing automatically **every 5 minutes**.
 

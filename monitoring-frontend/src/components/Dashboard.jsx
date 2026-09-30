@@ -47,7 +47,7 @@ export default function Dashboard({ user, onLogout }) {
                 <svg className="h-8 w-8" style={{ color: G }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
-                <span className="ml-2 text-xl font-bold" style={{ color: G }}>Kasir Warung Monitor</span>
+                <span className="ml-2 text-xl font-bold" style={{ color: G }}>DEN POS Monitor</span>
               </div>
               
               {/* Navigation Tabs */}
@@ -154,7 +154,7 @@ export default function Dashboard({ user, onLogout }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <p className="text-sm text-gray-500">
-              © 2024 Kasir Warung Monitoring System
+              © 2024 DEN POS Monitoring System
             </p>
             <div className="flex items-center space-x-4 mt-2 md:mt-0">
               <div className="flex items-center space-x-2">

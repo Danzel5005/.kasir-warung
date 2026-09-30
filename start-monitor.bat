@@ -1,12 +1,12 @@
 @echo off
 REM ============================================================
-REM  Kasir Warung Monitoring - Start Script
+REM  DEN POS Monitoring - Start Script
 REM  Starts both backend (API + 5-min sync) and frontend (web UI)
 REM ============================================================
-title Kasir Warung Monitor
+title DEN POS Monitor
 
 echo ============================================================
-echo   Kasir Warung Monitoring System
+echo   DEN POS Monitoring System
 echo ============================================================
 echo.
 echo Starting backend (port 3001)...
