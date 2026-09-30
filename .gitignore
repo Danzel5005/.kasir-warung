@@ -20,6 +20,7 @@ license-key-generator-android/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.example
 *.pem
 generator*
 API-Keys.md
@@ -31,7 +32,7 @@ supabase/.temp/
 supabase/.branches/
 supabase/functions/**/.env
 supabase/functions/deno.lock
-*monitoring*/
+monitoring-backend.rar
 
 
 # Logs
