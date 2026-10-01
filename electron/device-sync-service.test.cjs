@@ -141,6 +141,64 @@ describe("device-sync-service: push", () => {
   });
 });
 
+describe("device-sync-service: stock exchange", () => {
+  it("mengirim full pertama, hanya delta berikutnya, dan membersihkan ack setelah sukses", async () => {
+    let rows = [{ id: "m1", type: "menu", name: "Kopi", stock: 4 }];
+    build({ body: { needFull: false, pending: [] } }, {
+      autoSyncIntervalMs: 0,
+      stockSyncIntervalMs: 0,
+      stockSnapshotProvider: () => ({ rows, features: { ingredientsEnabled: false } }),
+    });
+    svc.setBaseUrl("https://cloud.denpos.id");
+    identity.markRegistered("store_1");
+
+    expect((await svc.exchangeStock()).ok).toBe(true);
+    expect(JSON.parse(fetchImpl.calls[0].init.body)).toMatchObject({ mode: "full", rows });
+
+    rows = [{ ...rows[0], stock: 5 }];
+    expect((await svc.exchangeStock()).ok).toBe(true);
+    expect(JSON.parse(fetchImpl.calls[1].init.body)).toMatchObject({ mode: "delta", rows });
+
+    expect((await svc.queueRestockAck({ eventId: "evt-1", status: "applied", stockAfter: 6 })).ok).toBe(true);
+    const config = JSON.parse(fs.readFileSync(path.join(dir, "device-sync.json"), "utf8"));
+    expect(JSON.parse(fetchImpl.calls[2].init.body).ack).toEqual([{ eventId: "evt-1", status: "applied", stockAfter: 6 }]);
+    expect(config.stockAcks).toEqual([]);
+  });
+
+  it("mengembalikan hasil cloud claim untuk satu event sebelum POS menerapkan restock", async () => {
+    build((_url, init) => ({ body: { pending: [], claimedEventIds: JSON.parse(init.body).claim } }), {
+      autoSyncIntervalMs: 0,
+      stockSyncIntervalMs: 0,
+      stockSnapshotProvider: () => ({ rows: [], features: {} }),
+    });
+    svc.setBaseUrl("https://cloud.denpos.id");
+    identity.markRegistered("store_1");
+
+    await expect(svc.claimRestock("evt-claim")).resolves.toEqual({ ok: true, claimed: true });
+    expect(JSON.parse(fetchImpl.calls[0].init.body).claim).toEqual(["evt-claim"]);
+  });
+
+  it("mengirim item menu dan bahan baku dalam snapshot yang sama saat fitur bahan aktif", async () => {
+    const rows = [
+      { id: "m1", type: "menu", name: "Kopi", stock: 4, unit: "pcs" },
+      { id: "b1", type: "ingredient", name: "Beras", stock: 1200, unit: "gram" },
+    ];
+    build({ body: { needFull: false, pending: [] } }, {
+      autoSyncIntervalMs: 0,
+      stockSyncIntervalMs: 0,
+      stockSnapshotProvider: () => ({ rows, features: { ingredientsEnabled: true } }),
+    });
+    svc.setBaseUrl("https://cloud.denpos.id");
+    identity.markRegistered("store_1");
+
+    expect((await svc.exchangeStock()).ok).toBe(true);
+    const sent = JSON.parse(fetchImpl.calls[0].init.body);
+    expect(sent.features.ingredientsEnabled).toBe(true);
+    expect(sent.rows.map((row) => row.type)).toEqual(["menu", "ingredient"]);
+    expect(sent.rows[1]).toMatchObject({ id: "b1", name: "Beras", stock: 1200, unit: "gram" });
+  });
+});
+
 describe("device-sync-service: rotate & nama", () => {
   it("rotateCredential mengubah deviceId dan menghapus pairing", () => {
     build({});

@@ -40,6 +40,15 @@ function createDatabaseService({ ipcMain, files, ensureDir, rJSON, atomicWrite, 
           note TEXT,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE TABLE IF NOT EXISTS remote_restock_events (
+          event_id TEXT PRIMARY KEY,
+          item_type TEXT NOT NULL,
+          item_id TEXT NOT NULL,
+          item_name TEXT NOT NULL,
+          qty REAL NOT NULL,
+          status TEXT NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
         CREATE INDEX IF NOT EXISTS idx_trx_created ON transactions(created_at);
         CREATE INDEX IF NOT EXISTS idx_shifts_created ON shifts(created_at);
         CREATE INDEX IF NOT EXISTS idx_trx_created_date ON transactions(date(created_at));
@@ -243,6 +252,62 @@ function createDatabaseService({ ipcMain, files, ensureDir, rJSON, atomicWrite, 
     });
     run();
     return stock;
+  }
+
+  function applyRemoteMenuRestock(event = {}) {
+    if (!db) return { ok: false, error: "database belum siap" };
+    const eventId = String(event.id || event.eventId || "");
+    const itemId = String(event.item_id || event.itemId || "");
+    const qty = Number(event.qty);
+    if (!eventId || !itemId || !Number.isFinite(qty) || qty <= 0 || qty > 1000000) {
+      return { ok: false, error: "Data restock tidak valid", rejected: true };
+    }
+    const existing = db.prepare("SELECT status FROM remote_restock_events WHERE event_id = ?").get(eventId);
+    if (existing) {
+      const row = db.prepare("SELECT stok FROM products WHERE menu_id = ?").get(itemId);
+      return { ok: existing.status === "applied", duplicate: true, stockAfter: row?.stok, rejected: existing.status === "rejected" };
+    }
+
+    const row = db.prepare("SELECT stok FROM products WHERE menu_id = ?").get(itemId);
+    if (!row || row.stok === null || row.stok === undefined) {
+      db.prepare("INSERT INTO remote_restock_events (event_id, item_type, item_id, item_name, qty, status) VALUES (?, 'menu', ?, ?, ?, 'rejected')")
+        .run(eventId, itemId, String(event.item_name || event.itemName || itemId), qty);
+      return { ok: false, error: !row ? "Item menu tidak ditemukan" : "Item tidak memakai stok terukur", rejected: true };
+    }
+
+    try {
+      const run = db.transaction(() => {
+        db.prepare("INSERT INTO remote_restock_events (event_id, item_type, item_id, item_name, qty, status) VALUES (?, 'menu', ?, ?, ?, 'applied')")
+          .run(eventId, itemId, String(event.item_name || event.itemName || itemId), qty);
+        const stock = applyStockDelta({ [itemId]: qty }, { type: "web-restock", ref: eventId, actor: "web", note: event.note || null });
+        return stock[itemId];
+      });
+      return { ok: true, stockAfter: run() };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  }
+
+  function claimIngredientRestock(event = {}) {
+    if (!db) return { ok: false, error: "database belum siap" };
+    const eventId = String(event.id || event.eventId || "");
+    const itemId = String(event.item_id || event.itemId || "");
+    const qty = Number(event.qty);
+    if (!eventId || !itemId || !Number.isFinite(qty) || qty <= 0 || qty > 1000000) {
+      return { ok: false, error: "Data restock tidak valid", rejected: true };
+    }
+    const result = db.prepare(
+      "INSERT OR IGNORE INTO remote_restock_events (event_id, item_type, item_id, item_name, qty, status) VALUES (?, 'ingredient', ?, ?, ?, 'claimed')"
+    ).run(eventId, itemId, String(event.item_name || event.itemName || itemId), qty);
+    const existing = result.changes ? "claimed" : db.prepare("SELECT status FROM remote_restock_events WHERE event_id = ?").get(eventId)?.status;
+    return { ok: true, duplicate: result.changes === 0, status: existing };
+  }
+
+  function completeIngredientRestock(eventId) {
+    if (!db || !eventId) return { ok: false, error: "Event tidak valid" };
+    const result = db.prepare("UPDATE remote_restock_events SET status = 'applied' WHERE event_id = ? AND item_type = 'ingredient' AND status = 'claimed'")
+      .run(String(eventId));
+    return { ok: result.changes > 0 };
   }
 
   // ── Stok: helper bersama.
@@ -824,7 +889,7 @@ ipcMain.handle("trx-restore", (_e, list) => {
     } catch (err) { console.error("[markTransactionsSynced] Error:", err.message); return { ok: false, error: err.message, updated: 0 }; }
   }
 
-  return { initDB, migrateJSONToSQLite, migrateMenuToProducts, closeDB, registerHandlers, applyStockDelta, loadMenuList, replaceMenuList, restoreStockFromTrx, loadTrx, loadShifts, countUnsyncedTransactions, listUnsyncedTransactions, markTransactionsSynced };
+  return { initDB, migrateJSONToSQLite, migrateMenuToProducts, closeDB, registerHandlers, applyStockDelta, applyRemoteMenuRestock, claimIngredientRestock, completeIngredientRestock, loadMenuList, replaceMenuList, restoreStockFromTrx, loadTrx, loadShifts, countUnsyncedTransactions, listUnsyncedTransactions, markTransactionsSynced };
 }
 
 module.exports = { createDatabaseService };

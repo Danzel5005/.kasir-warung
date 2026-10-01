@@ -182,6 +182,13 @@ function createDeviceSyncClient({ identity, baseUrl = "", fetchImpl, timeoutMs =
     return { ok: true, status: res.status, accepted: res.data?.accepted ?? rows.length, batchId: body.batchId, raw: res.data };
   }
 
+  async function stockExchange(payload = {}, { baseUrlOverride } = {}) {
+    const body = { ...payload, deviceId: identity.getDeviceId() };
+    const res = await request("POST", "/stock-exchange", { body, signed: true, baseUrlOverride });
+    if (!res.ok) return res;
+    return { ok: true, status: res.status, ...(res.data || {}) };
+  }
+
   return {
     setBaseUrl,
     getBaseUrl: () => cachedBaseUrl,
@@ -189,6 +196,7 @@ function createDeviceSyncClient({ identity, baseUrl = "", fetchImpl, timeoutMs =
     getStatus,
     heartbeat,
     push,
+    stockExchange,
   };
 }
 

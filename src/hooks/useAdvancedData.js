@@ -161,6 +161,26 @@ export function useAdvancedData({ toast_ }) {
     return { changed, applied: deltas };
   }, [resep]);
 
+  const applyIncomingRestock = useCallback((itemId, qty) => new Promise((resolve) => {
+    const addQty = Number(qty);
+    if (!itemId || !Number.isFinite(addQty) || addQty <= 0) {
+      resolve({ ok: false, error: "Jumlah restock tidak valid" });
+      return;
+    }
+    setBahanBaku((prev) => {
+      const id = String(itemId);
+      if (!prev.some((item) => String(item.id) === id)) {
+        resolve({ ok: false, error: "Bahan baku tidak ditemukan" });
+        return prev;
+      }
+      const { list } = applyBahanDelta(prev, { [id]: addQty }, new Date().toISOString());
+      api.saveBahanBaku(list).then((result) => {
+        resolve(result?.ok ? { ok: true, stockAfter: list.find((item) => String(item.id) === id)?.stok } : { ok: false, error: "Gagal menyimpan bahan baku" });
+      }).catch(() => resolve({ ok: false, error: "Gagal menyimpan bahan baku" }));
+      return list;
+    });
+  }), []);
+
   // ── Supplier helpers ───────────────────────────────────────────
   const upsertSupplier = useCallback((input) => {
     const item = normalizeSupplier(input);
@@ -214,6 +234,7 @@ export function useAdvancedData({ toast_ }) {
     upsertBahan,
     deleteBahan,
     applyBahanUsage,
+    applyIncomingRestock,
     upsertSupplier,
     deleteSupplier,
     hppByMenu,

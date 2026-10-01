@@ -45,6 +45,8 @@ class FakeDatabase {
   _value(row, expr) {
     const e = expr.trim();
     if (e === "id") return row.id;
+    if (e === "event_id") return row.event_id;
+    if (e === "status") return row.status;
     if (e === "data") return row.data;
     if (e === "created_at") return row.created_at;
     if (e === "synced_at") return row.synced_at;
@@ -179,6 +181,8 @@ class FakeDatabase {
       const wants = (expr) => new RegExp(`(^|,\\s*)${expr}(\\s*(as\\s+\\w+)?)?\\s*(,|$)`).test(select);
       const projection = {};
       if (wants("id")) projection.id = (row) => row.id;
+      if (wants("event_id")) projection.event_id = (row) => row.event_id;
+      if (wants("status")) projection.status = (row) => row.status;
       if (wants("menu_id")) projection.menu_id = (row) => row.menu_id;
       if (wants("kategori")) projection.kategori = (row) => row.kategori;
       if (wants("stok")) projection.stok = (row) => row.stok;
@@ -234,6 +238,17 @@ class FakeDatabase {
   }
 
   _run(sql, params) {
+    const remoteInsert = /^INSERT (OR IGNORE )?INTO\s+remote_restock_events\s*\(/i.exec(sql);
+    if (remoteInsert) {
+      const tableRows = this.tables.remote_restock_events || (this.tables.remote_restock_events = []);
+      const existing = tableRows.some((row) => row.event_id === params[0]);
+      if (existing && remoteInsert[1]) return { changes: 0 };
+      if (existing) throw new Error("UNIQUE constraint failed");
+      const itemType = /'ingredient'/i.test(sql) ? "ingredient" : "menu";
+      const status = /'claimed'/i.test(sql) ? "claimed" : /'rejected'/i.test(sql) ? "rejected" : "applied";
+      tableRows.push({ event_id: params[0], item_type: itemType, item_id: params[1], item_name: params[2], qty: params[3], status, created_at: new Date().toISOString() });
+      return { changes: 1 };
+    }
     const insert = /^INSERT (OR IGNORE )?INTO\s+(\w+)\s*\((.*?)\)\s*VALUES\s*\((.*?)\)$/i.exec(sql);
     if (insert) {
       const [, ignore, table, colsRaw, valsRaw] = insert;
@@ -241,8 +256,9 @@ class FakeDatabase {
       const rows = this.tables[table] || (this.tables[table] = []);
       const row = { rowid: this.nextRowid++, created_at: new Date().toISOString() };
       cols.forEach((col, i) => { row[col] = params[i]; });
-      if (ignore && cols.includes("id") && rows.some((r) => r.id === row.id)) return { changes: 0 };
-      if (cols.includes("id") && rows.some((r) => r.id === row.id)) {
+      const uniqueColumn = cols.includes("id") ? "id" : cols.includes("event_id") ? "event_id" : null;
+      if (ignore && uniqueColumn && rows.some((r) => r[uniqueColumn] === row[uniqueColumn])) return { changes: 0 };
+      if (uniqueColumn && rows.some((r) => r[uniqueColumn] === row[uniqueColumn])) {
         const err = new Error("UNIQUE constraint failed");
         err.code = "SQLITE_CONSTRAINT_PRIMARYKEY";
         throw err;
@@ -257,6 +273,14 @@ class FakeDatabase {
       const target = rows.find((r) => r.id === params[1]);
       if (!target) return { changes: 0 };
       target.data = params[0];
+      return { changes: 1 };
+    }
+
+    const completeRestock = /^UPDATE\s+remote_restock_events\s+SET\s+status\s*=\s*'applied'\s+WHERE\s+event_id\s*=\s*\?\s+AND\s+item_type\s*=\s*'ingredient'\s+AND\s+status\s*=\s*'claimed'$/i.exec(sql);
+    if (completeRestock) {
+      const target = (this.tables.remote_restock_events || []).find((row) => row.event_id === params[0] && row.item_type === "ingredient" && row.status === "claimed");
+      if (!target) return { changes: 0 };
+      target.status = "applied";
       return { changes: 1 };
     }
 
@@ -881,6 +905,23 @@ describe("db.cjs: Langkah 6 — stok masuk, opname, mutasi", () => {
     const mv = movements({ productId: "m1" });
     expect(mv).toHaveLength(1);
     expect(mv[0]).toMatchObject({ type: "sale", delta: -3, stok_after: 7, ref: "trx-1", actor: "kasir" });
+  });
+
+  it("remote menu restock idempotent: event yang sama menambah stok dan mutasi sekali", () => {
+    call("menu-replace", [{ id: "m1", nama: "Kopi", stok: 5 }]);
+    const event = { id: "evt-1", item_id: "m1", item_name: "Kopi", qty: 4 };
+    expect(services.svc.applyRemoteMenuRestock(event)).toMatchObject({ ok: true, stockAfter: 9 });
+    expect(services.svc.applyRemoteMenuRestock(event)).toMatchObject({ ok: true, duplicate: true, stockAfter: 9 });
+    expect(stokOf("m1")).toBe(9);
+    expect(movements({ productId: "m1" })).toHaveLength(1);
+  });
+
+  it("ingredient restock claim tidak bisa diproses dua kali dan baru complete sekali", () => {
+    const event = { id: "evt-bahan-1", item_id: "b1", item_name: "Beras", qty: 10 };
+    expect(services.svc.claimIngredientRestock(event)).toMatchObject({ ok: true, duplicate: false, status: "claimed" });
+    expect(services.svc.claimIngredientRestock(event)).toMatchObject({ ok: true, duplicate: true, status: "claimed" });
+    expect(services.svc.completeIngredientRestock(event.id)).toEqual({ ok: true });
+    expect(services.svc.completeIngredientRestock(event.id)).toEqual({ ok: false });
   });
 
   it("INVARIANT: stok awal + Σdelta = stok akhir", () => {

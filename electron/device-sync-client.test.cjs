@@ -148,6 +148,21 @@ describe("device-sync-client: push", () => {
   });
 });
 
+describe("device-sync-client: stock exchange", () => {
+  it("mengirim snapshot, ack, dan tanda tangan ke endpoint stock-exchange", async () => {
+    fetchImpl = makeFetch({ body: { ok: true, needFull: false, pending: [] } });
+    const c = createDeviceSyncClient({ identity, baseUrl: "https://api.example.com", fetchImpl });
+    const payload = { mode: "full", features: { ingredientsEnabled: true }, rows: [{ id: "b1", type: "ingredient", name: "Beras", stock: 4 }], ack: [] };
+
+    const result = await c.stockExchange(payload);
+    const { url, init } = fetchImpl.calls[0];
+    expect(result).toMatchObject({ ok: true, needFull: false, pending: [] });
+    expect(url).toBe("https://api.example.com/stock-exchange");
+    expect(JSON.parse(init.body)).toMatchObject({ ...payload, deviceId: identity.getDeviceId() });
+    expect(verifyHeaders(init, identity.getSecretHash())).toBe(true);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Regresi: GET TIDAK boleh mengirim body (fetch melempar
 // "Request with GET/HEAD method cannot have body"), TETAPI tanda tangan tetap

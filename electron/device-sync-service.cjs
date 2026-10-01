@@ -26,6 +26,11 @@ function createDeviceSyncService({
   // Notifikasi ke renderer (disuntik dari main.cjs; default no-op).
   notify = () => {},
   autoSyncIntervalMs = DEFAULT_AUTO_SYNC_INTERVAL_MS,
+  stockSnapshotProvider = null,
+  applyMenuRestockProvider = () => ({ ok: false, error: "Database belum siap" }),
+  claimIngredientRestockProvider = () => ({ ok: false, error: "Database belum siap" }),
+  completeIngredientRestockProvider = () => ({ ok: false, error: "Database belum siap" }),
+  stockSyncIntervalMs = 60 * 1000,
 } = {}) {
   if (!identity) throw new Error("createDeviceSyncService: identity wajib diisi");
 
@@ -51,6 +56,18 @@ function createDeviceSyncService({
     fs.writeFileSync(tmp, JSON.stringify(next, null, 2), "utf8");
     fs.renameSync(tmp, file);
     return next;
+  }
+
+  const stockStatePath = () => `${resolveConfigPath()}.stock-state.json`;
+  function readStockState() {
+    try { return JSON.parse(fs.readFileSync(stockStatePath(), "utf8")) || {}; }
+    catch { return {}; }
+  }
+  function writeStockState(value) {
+    const file = stockStatePath();
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(`${file}.tmp`, JSON.stringify(value), "utf8");
+    fs.renameSync(`${file}.tmp`, file);
   }
 
   // Client bisa disuntik (tes) atau dibangun lazy dari config tersimpan.
@@ -178,6 +195,73 @@ function createDeviceSyncService({
     };
   }
 
+  let stockTimer = null;
+  let stockExchangeInFlight = null;
+
+  async function exchangeStock(options = {}) {
+    if (!getBaseUrl()) return { ok: false, error: "URL backend belum diatur" };
+    if (!identity.isRegistered()) return { ok: false, error: "Perangkat belum dipasangkan" };
+    if (stockExchangeInFlight) {
+      if (options.claim?.length || readConfig().stockAcks?.length) {
+        await stockExchangeInFlight;
+        return exchangeStock(options);
+      }
+      return { ok: true, skipped: true };
+    }
+    stockExchangeInFlight = performStockExchange(options);
+    try { return await stockExchangeInFlight; }
+    finally { stockExchangeInFlight = null; }
+  }
+
+  async function performStockExchange({ claim = [] } = {}) {
+    try {
+      const snapshot = typeof stockSnapshotProvider === "function" ? stockSnapshotProvider() || {} : {};
+      const allRows = Array.isArray(snapshot.rows) ? snapshot.rows : [];
+      const previous = readStockState();
+      const current = Object.fromEntries(allRows.map((row) => [`${row.type}:${row.id}`, row]));
+      const full = previous.forceFull || !previous.rows;
+      const rows = full ? allRows : allRows.filter((row) => JSON.stringify(previous.rows[`${row.type}:${row.id}`]) !== JSON.stringify(row));
+      const deletedIds = !previous.rows ? [] : Object.keys(previous.rows).filter((key) => !current[key]).map((key) => {
+        const split = key.indexOf(":");
+        return { type: key.slice(0, split), id: key.slice(split + 1) };
+      });
+      const pendingAcks = readConfig().stockAcks || [];
+      const result = await ensureClient().stockExchange({
+        mode: full ? "full" : "delta",
+        features: snapshot.features || {},
+        rows,
+        deletedIds,
+        ack: pendingAcks,
+        claim,
+      });
+      if (!result.ok) return result;
+
+      const acked = new Set(pendingAcks.map((ack) => ack.eventId));
+      writeConfig({ stockAcks: (readConfig().stockAcks || []).filter((ack) => !acked.has(ack.eventId)) });
+      writeStockState({ rows: current, forceFull: result.needFull === true });
+      const events = Array.isArray(result.pending) ? result.pending : [];
+      if (events.length) notify({ kind: "restock-incoming", events });
+      return { ok: true, needFull: result.needFull === true, pending: events, claimedEventIds: result.claimedEventIds || [] };
+    } catch (err) {
+      return { ok: false, error: err?.message || "Sinkronisasi stok gagal", offline: true };
+    }
+  }
+
+  function queueRestockAck(ack) {
+    if (!ack?.eventId || !["applied", "rejected"].includes(ack.status)) return { ok: false, error: "Ack tidak valid" };
+    const existing = readConfig().stockAcks || [];
+    writeConfig({ stockAcks: [...existing.filter((item) => item.eventId !== ack.eventId), ack] });
+    return exchangeStock();
+  }
+
+  async function claimRestock(eventId) {
+    if (!eventId) return { ok: false, error: "Event tidak valid" };
+    const result = await exchangeStock({ claim: [String(eventId)] });
+    if (!result.ok) return result;
+    const claimed = (result.claimedEventIds || []).includes(String(eventId));
+    return { ok: true, claimed };
+  }
+
   // ── Auto-sync tiap 5 menit (hanya jika sudah dipasangkan) ─────────────────
   // Tidak ada timer yang jalan saat belum paired → hemat & tidak spam notifikasi.
   let autoTimer = null;
@@ -212,10 +296,34 @@ function createDeviceSyncService({
     if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
   }
 
+  function maybeStartStockSync() {
+    if (typeof stockSnapshotProvider !== "function") return false;
+    if (stockTimer || !stockSyncIntervalMs || stockSyncIntervalMs <= 0) return false;
+    if (!identity.isRegistered() || !getBaseUrl()) return false;
+    stockTimer = setInterval(async () => {
+      if (!identity.isRegistered() || !getBaseUrl()) { stopStockSync(); return; }
+      try {
+        const result = await exchangeStock();
+        if (!result.ok) notify({ kind: "stock-sync-failed", message: result.error || "Sinkronisasi stok gagal" });
+      } catch (err) {
+        notify({ kind: "stock-sync-failed", message: err?.message || "Sinkronisasi stok gagal" });
+      }
+    }, stockSyncIntervalMs);
+    stockTimer.unref?.();
+    exchangeStock().then((result) => {
+      if (!result.ok) notify({ kind: "stock-sync-failed", message: result.error || "Sinkronisasi stok gagal" });
+    }).catch((err) => notify({ kind: "stock-sync-failed", message: err?.message || "Sinkronisasi stok gagal" }));
+    return true;
+  }
+
+  function stopStockSync() {
+    if (stockTimer) { clearInterval(stockTimer); stockTimer = null; }
+  }
+
   /** Dipanggil service saat status pairing berubah (paired → start, else stop). */
   function syncAutoSyncState() {
-    if (identity.isRegistered() && getBaseUrl()) maybeStartAutoSync();
-    else stopAutoSync();
+    if (identity.isRegistered() && getBaseUrl()) { maybeStartAutoSync(); maybeStartStockSync(); }
+    else { stopAutoSync(); stopStockSync(); }
     return isAutoSyncRunning();
   }
 
@@ -238,12 +346,18 @@ function createDeviceSyncService({
     ipcMain.handle("device-check-pairing", (_e, opts) => checkPairing(opts || {}));
     ipcMain.handle("device-push-sync", (_e, batch) => push(batch || {}));
     ipcMain.handle("device-push-transactions", () => pushTransactions());
+    ipcMain.handle("device-stock-exchange", () => exchangeStock());
+    ipcMain.handle("device-restock-ack", (_e, ack) => queueRestockAck(ack));
+    ipcMain.handle("device-claim-restock", (_e, eventId) => claimRestock(eventId));
+    ipcMain.handle("device-apply-menu-restock", (_e, event) => applyMenuRestockProvider(event));
+    ipcMain.handle("device-claim-ingredient-restock", (_e, event) => claimIngredientRestockProvider(event));
+    ipcMain.handle("device-complete-ingredient-restock", (_e, eventId) => completeIngredientRestockProvider(eventId));
     ipcMain.handle("device-pending-count", () => getPendingCount());
     ipcMain.handle("device-credential", () => getCredentialForPairing());
     ipcMain.handle("device-rotate-credential", () => rotateCredential());
     ipcMain.handle("device-set-name", (_e, name) => setDeviceName(name));
     syncAutoSyncState();
-    return { getStatus, getIdentity, register, checkPairing, push, pushTransactions, startAutoSync: maybeStartAutoSync, stopAutoSync };
+    return { getStatus, getIdentity, register, checkPairing, push, pushTransactions, exchangeStock, startAutoSync: maybeStartAutoSync, stopAutoSync, stopStockSync };
   }
 
   return {
@@ -256,11 +370,19 @@ function createDeviceSyncService({
     checkPairing,
     push,
     pushTransactions,
+    exchangeStock,
+    queueRestockAck,
+    claimRestock,
+    applyMenuRestock: applyMenuRestockProvider,
+    claimIngredientRestock: claimIngredientRestockProvider,
+    completeIngredientRestock: completeIngredientRestockProvider,
     getPendingCount,
     rotateCredential,
     setDeviceName,
     maybeStartAutoSync,
     stopAutoSync,
+    maybeStartStockSync,
+    stopStockSync,
     syncAutoSyncState,
     isAutoSyncRunning,
     registerHandlers,

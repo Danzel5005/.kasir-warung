@@ -37,3 +37,6 @@ verify_jwt = false
 
 [functions.sync-upload]
 verify_jwt = false
+
+[functions.stock-exchange]
+verify_jwt = false

@@ -77,6 +77,8 @@ function useDeviceSync({ toast_, isAdmin = true } = {}) {
         setLastSync({ ok: false, at: payload.at || new Date().toISOString(), error: payload.message });
       } else if (payload.kind === "sync-ok") {
         setLastSync({ ok: true, sent: payload.sent, at: payload.at || new Date().toISOString() });
+      } else if (payload.kind === "stock-sync-failed") {
+        toast_?.(payload.message || "Sinkronisasi stok cloud gagal", "err");
       }
       // Segarkan jumlah tertunda supaya badge akurat setelah auto-sync.
       api.devicePendingCount().then((n) => setPendingCount(Number(n) || 0)).catch(() => {});

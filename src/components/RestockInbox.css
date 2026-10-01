@@ -1,0 +1,38 @@
+.restock-inbox-banner { align-items: center; background: #fff2dc; border-bottom: 1px solid #ead5ae; color: #583b10; display: flex; gap: 12px; justify-content: space-between; padding: 8px 16px; }
+.restock-inbox-banner span { display: grid; font-size: 12px; gap: 2px; }
+.restock-inbox-banner small { color: #78664a; font-size: 10px; }
+.restock-inbox-banner button { background: #1a5c38; border: 0; border-radius: 4px; color: white; cursor: pointer; font: inherit; font-size: 11px; font-weight: 700; min-height: 34px; padding: 0 14px; }
+.restock-inbox-backdrop { align-items: center; background: #101a1280; display: flex; inset: 0; justify-content: center; padding: 16px; position: fixed; z-index: 2000; }
+.restock-inbox-dialog { background: #fff; border-radius: 7px; box-shadow: 0 18px 70px #06140b55; max-height: 90vh; max-width: 620px; overflow: hidden; width: 100%; }
+.restock-inbox-dialog > header { align-items: center; border-bottom: 1px solid #e3e9e3; display: flex; justify-content: space-between; padding: 16px 19px; }
+.restock-inbox-header-actions { align-items: center; display: flex; gap: 8px; }
+.restock-inbox-dialog > header p { color: #e87c2a; font-size: 10px; font-weight: 800; margin: 0 0 4px; }
+.restock-inbox-dialog > header h2 { color: #1a5c38; font-size: 19px; margin: 0; }
+.restock-inbox-dialog > header button { background: transparent; border: 0; color: #627067; cursor: pointer; font: inherit; font-size: 24px; min-height: 36px; min-width: 36px; }
+.restock-inbox-dialog > header button:disabled { cursor: not-allowed; opacity: .5; }
+.restock-inbox-dialog > header .restock-accept-all { background: #1a5c38; border-radius: 4px; color: #fff; font-size: 11px; font-weight: 700; min-height: 36px; padding: 0 12px; white-space: nowrap; }
+.restock-inbox-dialog > header .restock-accept-all:disabled { cursor: not-allowed; opacity: .55; }
+.restock-inbox-warning, .restock-inbox-error { font-size: 12px; margin: 12px 19px; padding: 10px; }
+.restock-inbox-warning { background: #fff2dc; color: #735113; }
+.restock-inbox-error { background: #fdecec; color: #8f2525; }
+.restock-inbox-item-error { margin: 9px 0 0 40px; }
+.restock-inbox-list { max-height: 60vh; overflow-y: auto; padding: 0 19px; }
+.restock-inbox-list article { border-bottom: 1px solid #e3e9e3; padding: 13px 0; }
+.restock-inbox-item { align-items: flex-start; display: flex; gap: 10px; }
+.restock-inbox-type { align-items: center; background: #e8f1e9; border-radius: 4px; color: #1a5c38; display: flex; flex: 0 0 30px; font-size: 11px; font-weight: 800; height: 30px; justify-content: center; }
+.restock-inbox-item strong, .restock-inbox-item small { display: block; overflow-wrap: anywhere; }
+.restock-inbox-item strong { color: #27342b; font-size: 13px; }
+.restock-inbox-item small { color: #718077; font-size: 10px; margin-top: 4px; }
+.restock-inbox-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+.restock-inbox-actions button, .restock-inbox-dialog > footer button { border: 0; border-radius: 4px; cursor: pointer; font: inherit; font-size: 11px; font-weight: 700; min-height: 36px; padding: 0 14px; }
+.restock-inbox-actions button:disabled, .restock-inbox-dialog > footer button:disabled { cursor: not-allowed; opacity: .5; }
+.restock-reject { background: #f3e7e5; color: #a34333; }
+.restock-accept, .restock-inbox-dialog > footer button { background: #1a5c38; color: #fff; }
+.restock-inbox-dialog > footer { align-items: center; border-top: 1px solid #e3e9e3; color: #718077; display: flex; font-size: 10px; gap: 12px; justify-content: space-between; padding: 12px 19px; }
+@media (max-width: 560px) {
+  .restock-inbox-banner { align-items: stretch; }
+  .restock-inbox-banner button { align-self: center; }
+  .restock-inbox-dialog > header { align-items: flex-start; gap: 8px; }
+  .restock-inbox-dialog > header .restock-accept-all { font-size: 10px; padding: 0 8px; }
+  .restock-inbox-dialog > footer { align-items: stretch; flex-direction: column; }
+}

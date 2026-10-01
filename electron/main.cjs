@@ -77,6 +77,25 @@ const deviceSync = createDeviceSyncService({
   pendingCountProvider: () => database.countUnsyncedTransactions(),
   pendingListProvider: () => database.listUnsyncedTransactions(),
   markSynced: (ids, at) => database.markTransactionsSynced(ids, at),
+  stockSnapshotProvider: () => {
+    const settings = backup.rJSON(FILES.settings) || {};
+    const ingredientsEnabled = settings.advancedFeatures?.enabled === true && settings.advancedFeatures?.bahanBaku === true;
+    const menuRows = database.loadMenuList().map((item) => ({
+      id: String(item.id), type: "menu", name: String(item.nama || item.name || item.id), unit: "pcs",
+      stock: item.stok === null || item.stok === undefined ? null : Number(item.stok),
+      minStock: Number(item.minStok || 0), updatedAt: item.updatedAt || null,
+    }));
+    const ingredientRows = ingredientsEnabled
+      ? (backup.rJSON(FILES.bahanBaku) || []).map((item) => ({
+        id: String(item.id), type: "ingredient", name: String(item.nama || item.id), unit: item.satuan || null,
+        stock: Number(item.stok || 0), minStock: Number(item.minStok || 0), updatedAt: item.updatedAt || null,
+      }))
+      : [];
+    return { rows: [...menuRows, ...ingredientRows], features: { ingredientsEnabled } };
+  },
+  applyMenuRestockProvider: (event) => database.applyRemoteMenuRestock(event),
+  claimIngredientRestockProvider: (event) => database.claimIngredientRestock(event),
+  completeIngredientRestockProvider: (eventId) => database.completeIngredientRestock(eventId),
   // Peringatan/sukses sync diteruskan ke renderer (toast "gagal kirim" dsb.).
   notify: (payload) => {
     for (const w of BrowserWindow.getAllWindows()) {

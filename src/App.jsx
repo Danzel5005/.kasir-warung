@@ -7,6 +7,7 @@ import LicenseScreen from "./screens/LicenseScreen.jsx";
 import LoginScreen from "./screens/LoginScreen.jsx";
 import Header from "./screens/Workspace/Header.jsx";
 import ModalStack from "./screens/Workspace/ModalStack.jsx";
+import RestockInbox from "./components/RestockInbox.jsx";
 
 import { useToast } from "./hooks/useToast.js";
 import { useSettings } from "./hooks/useSettings.js";
@@ -422,6 +423,7 @@ const executeConfirmDel = useCallback((restoreStock = false) => {
       overflow:"hidden"
       }}>
 
+      <RestockInbox advancedData={advDataH} menuH={menuH} canApprove={isAdmin(authH.currentUser)} toast_={toastH.toast_} />
       <Header
         settingsH={settingsH}
         authH={authH}
